@@ -1,0 +1,361 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 168.15,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 97,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "АБС-операции без признака дебета и кредита: списания не отличить",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-11",
+          "R-20"
+        ],
+        "evidence": [
+          {
+            "line": 34,
+            "quote": "(дата и время проведения, описание, сумма в валюте счёта, списания — со знаком минус); обороты по дебету и кредиту"
+          },
+          {
+            "line": 47,
+            "quote": "операции с датой и временем проведения, описанием и суммой"
+          }
+        ],
+        "problem": "Ф-4 требует показывать списания со знаком минус и обороты по дебету и кредиту, но описанный ответ АБС содержит только дату и время, описание и сумму без признака направления и без правила знака суммы.",
+        "scenario": "АБС отдаёт операцию на 500 без признака направления; генератор не может определить, это списание (-500) или зачисление (+500), и обороты по дебету и кредиту не вычисляются.",
+        "impact": "Выписка с неверными знаками и оборотами, расхождение со сверкой с АБС.",
+        "recommendation": "Добавить в описание ответа АБС поле направления операции или правило знака суммы и включить его в перечень данных генератора.",
+        "rewrite": "GET /abs/v1/accounts/{accountId}/turnovers: в каждой операции поле direction (DEBIT / CREDIT), либо сумма со знаком (отрицательная для списания); <уточнить: какое из двух и имя поля в АБС>.",
+        "question": "Какое поле АБС содержит направление операции или передаёт ли АБС сумму со знаком?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Часовой пояс времени операций в ответе АБС не указан",
+        "kind": "ambiguity",
+        "criterion": "unambiguous",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-11",
+          "R-20"
+        ],
+        "evidence": [
+          {
+            "line": 34,
+            "quote": "операции, проведённые в АБС с 00:00:00 даты начала по 23:59:59 даты окончания"
+          },
+          {
+            "line": 47,
+            "quote": "операции с датой и временем проведения, описанием и суммой"
+          }
+        ],
+        "problem": "Границы периода заданы по Астане, а время проведения операций в ответе АБС описано без часового пояса; от пояса зависит, попадёт ли операция в период.",
+        "scenario": "Операция проведена 28.02.2026 в 23:59 по Астане; если АБС отдаёт UTC, граница сдвигается и операция может выпасть из выписки.",
+        "impact": "Неверный состав операций в выписке на границе периода.",
+        "recommendation": "Указать часовой пояс времени операций в ответе АБС и правило пересчёта в Астану.",
+        "rewrite": "Время проведения операции в ответе АБС — ISO 8601 с указанием смещения; генератор переводит его в Астану (UTC+5) до отбора операций по периоду.",
+        "question": "",
+        "blocks": "testing",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Предусловие «физическое лицо» не проверяется логикой метода 1",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-08",
+          "R-53"
+        ],
+        "evidence": [
+          {
+            "line": 31,
+            "quote": "Ф-1. Клиент — физическое лицо с доступом в мобильный банк — заказывает выписку по своему незакрытому счёту"
+          },
+          {
+            "line": 136,
+            "quote": "4. Получить счёт методом сервиса счетов GET /accounts/{accountId}. Если счёт не найден или принадлежит другому клиенту, вернуть 404 ACCOUNT_NOT_FOUND"
+          }
+        ],
+        "problem": "Ф-1 ограничивает заказ физическими лицами, но ни один шаг логики метода 1 не проверяет тип клиента и не задаёт код ответа при его нарушении.",
+        "scenario": "Клиент, не являющийся физическим лицом, с действующей сессией вызывает метод 1; по шагам 1–7 заказ создаётся с 202.",
+        "impact": "Заказ создаётся для клиентов, которым услуга не предназначена, без определённого отказа.",
+        "recommendation": "Добавить в логику метода 1 проверку типа клиента с определённым кодом и телом ответа.",
+        "rewrite": "Шаг 1а логики метода 1: если клиент не физическое лицо — вернуть <уточнить: код ошибки> с телом errorCode и message.",
+        "question": "Какой код ответа возвращать клиенту, не являющемуся физическим лицом?",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "GET /accounts (сервис счетов, существующий)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 40
+        },
+        {
+          "name": "GET /accounts/{accountId} (сервис счетов, существующий)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 40
+        },
+        {
+          "name": "GET /abs/v1/accounts/{accountId}/turnovers (АБС, существующий)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 40
+        },
+        {
+          "name": "Метод 1: /statements/orders",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 121
+        },
+        {
+          "name": "Метод 2: /statements/orders (список)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 196
+        },
+        {
+          "name": "Метод 3: /statements/orders/{orderId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 197
+        },
+        {
+          "name": "Метод 4: /statements/orders/{orderId}/link",
+          "method": "POST",
+          "purpose": "создание (выдача ссылки)",
+          "line": 198
+        },
+        {
+          "name": "Метод 5: /statements/files/{token}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 199
+        },
+        {
+          "name": "Задание на формирование в очередь заданий",
+          "method": "событие",
+          "purpose": "создание",
+          "line": 40
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать список заказов «Мои выписки»",
+          "line": 46,
+          "operation": "Метод 2: /statements/orders (список)"
+        },
+        {
+          "what": "показать статус заказа и опрашивать его каждые 5 секунд",
+          "line": 24,
+          "operation": "Метод 3: /statements/orders/{orderId}"
+        },
+        {
+          "what": "выдать ссылку на скачивание при нажатии «Скачать»",
+          "line": 25,
+          "operation": "Метод 4: /statements/orders/{orderId}/link"
+        },
+        {
+          "what": "получить дату открытия счёта для календаря",
+          "line": 22,
+          "operation": "GET /accounts (сервис счетов, существующий)"
+        },
+        {
+          "what": "получить обороты по дебету и кредиту для выписки",
+          "line": 34,
+          "operation": "GET /abs/v1/accounts/{accountId}/turnovers (АБС, существующий)"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            194,
+            196,
+            197,
+            199
+          ],
+          "described": true,
+          "note": "успешные ответы методов 2–5"
+        },
+        {
+          "code": "202",
+          "lines": [
+            80,
+            135,
+            139,
+            175
+          ],
+          "described": true,
+          "note": "условие и пример тела в методе 1"
+        },
+        {
+          "code": "400",
+          "lines": [
+            134,
+            176
+          ],
+          "described": true,
+          "note": "условие и тело VALIDATION_ERROR"
+        },
+        {
+          "code": "401",
+          "lines": [
+            133,
+            177,
+            23
+          ],
+          "described": true,
+          "note": "условие и тело UNAUTHORIZED"
+        },
+        {
+          "code": "404",
+          "lines": [
+            136,
+            178,
+            197,
+            198,
+            199
+          ],
+          "described": true,
+          "note": "ACCOUNT_NOT_FOUND, ORDER_NOT_FOUND, LINK_NOT_FOUND"
+        },
+        {
+          "code": "409",
+          "lines": [
+            135,
+            179,
+            73
+          ],
+          "described": true,
+          "note": "IDEMPOTENCY_KEY_CONFLICT"
+        },
+        {
+          "code": "410",
+          "lines": [
+            198,
+            199,
+            79,
+            82
+          ],
+          "described": true,
+          "note": "FILE_EXPIRED в методе 4, LINK_EXPIRED в методе 5"
+        },
+        {
+          "code": "422",
+          "lines": [
+            137,
+            180,
+            198,
+            83
+          ],
+          "described": true,
+          "note": "коды метода 1 в таблице; ORDER_NOT_READY в методе 4 вне таблицы"
+        },
+        {
+          "code": "500",
+          "lines": [
+            181,
+            192,
+            196
+          ],
+          "described": true,
+          "note": "внутренняя ошибка"
+        }
+      ],
+      "fields": [
+        {
+          "name": "accountId",
+          "places": "запрос string 1–64 (L155); ответ string (L165); хранится account_id (L044)"
+        },
+        {
+          "name": "dateFrom",
+          "places": "запрос string YYYY-MM-DD, 10 (L156); ответ string date (L167); хранится (L044)"
+        },
+        {
+          "name": "dateTo",
+          "places": "запрос string YYYY-MM-DD, 10 (L157); ответ string date (L168); хранится (L044)"
+        },
+        {
+          "name": "language",
+          "places": "запрос string 2, ru/kk/en (L158); ответ (L169); хранится (L044)"
+        },
+        {
+          "name": "fileExpiresAt",
+          "places": "ответ string date-time или null (L172); хранится file_expires_at (L044)"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "Метод 1",
+          "step": "проверка сессии",
+          "line": 133,
+          "outcome": "401 UNAUTHORIZED, тело errorCode и message (L177)"
+        },
+        {
+          "operation": "Метод 1",
+          "step": "проверка Idempotency-Key и тела",
+          "line": 134,
+          "outcome": "400 VALIDATION_ERROR"
+        },
+        {
+          "operation": "Метод 1",
+          "step": "повтор с тем же ключом",
+          "line": 135,
+          "outcome": "202 с существующим заказом или 409 IDEMPOTENCY_KEY_CONFLICT"
+        },
+        {
+          "operation": "Метод 1",
+          "step": "счёт не найден, чужой или CLOSED",
+          "line": 136,
+          "outcome": "404 ACCOUNT_NOT_FOUND или 422 ACCOUNT_CLOSED"
+        },
+        {
+          "operation": "Метод 1",
+          "step": "проверка периода",
+          "line": 137,
+          "outcome": "422 с кодом нарушения"
+        },
+        {
+          "operation": "Метод 1",
+          "step": "суточный предел",
+          "line": 138,
+          "outcome": "422 DAILY_LIMIT_EXCEEDED"
+        },
+        {
+          "operation": "Метод 1",
+          "step": "создание заказа и задание генератору",
+          "line": 139,
+          "outcome": "202"
+        },
+        {
+          "operation": "Метод 4",
+          "step": "заказ не READY",
+          "line": 198,
+          "outcome": "422 ORDER_NOT_READY"
+        },
+        {
+          "operation": "Метод 5",
+          "step": "проверка токена и срока",
+          "line": 199,
+          "outcome": "404 LINK_NOT_FOUND или 410 LINK_EXPIRED"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

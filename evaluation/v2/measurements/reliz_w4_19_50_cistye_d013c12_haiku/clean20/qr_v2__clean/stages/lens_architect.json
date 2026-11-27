@@ -1,0 +1,396 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 73.04,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 53,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Сумма в запросе перевода: необязательна в таблице и обязательна в логике",
+        "kind": "contradiction",
+        "criterion": "set_consistent",
+        "severity": "major",
+        "requirement_ids": [
+          "R-36",
+          "R-26"
+        ],
+        "evidence": [
+          {
+            "line": 154,
+            "quote": "amount | integer | 32 bit | Нет | 100–500 000 | Сумма в тенге, если в QR-коде нет суммы | amount_kzt"
+          },
+          {
+            "line": 128,
+            "quote": "Если суммы нет, поле amount обязательно: от 100 до 500 000 ₸, иначе вернуть 400."
+          }
+        ],
+        "problem": "Таблица параметров помечает amount как необязательное, а шаг 5 логики требует его и возвращает 400, если QR-код без суммы и поле не передано. Одинаковый запрос получает разный исход по разным местам.",
+        "scenario": "Отправитель сканирует QR-код без суммы и не передаёт amount. По таблице поле не обязательно, по шагу 5 сервер отвечает 400 «Некорректный запрос». Клиентский разработчик не знает, отправлять ли поле.",
+        "impact": "Клиентские приложения и серверная часть реализуют разные проверки, часть переводов по QR без суммы получит 400 без понятной причины.",
+        "recommendation": "Указать в таблице параметров условную обязательность amount относительно наличия суммы в QR-коде.",
+        "rewrite": "amount | integer | 32 bit | Да, если в QR-коде нет суммы; игнорируется, если сумма задана в QR-коде | 100–500 000 | Сумма в тенге для QR-кода без суммы | amount_kzt",
+        "question": "",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Ключ идемпотентности и поля перевода не входят в перечень хранимых данных",
+        "kind": "missing_element",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-31",
+          "R-14",
+          "R-37"
+        ],
+        "evidence": [
+          {
+            "line": 155,
+            "quote": "requestId | string | 36 | Да | UUID | Ключ идемпотентности | request_id"
+          },
+          {
+            "line": 51,
+            "quote": "Хранить идентификатор QR-кода, идентификатор клиента-получателя, карту зачисления, сумму в тенге"
+          }
+        ],
+        "problem": "Поле request_id пишется в хранилище, но перечень хранимых данных его не содержит; также не назван результат первого перевода, который должен возвращаться при повторе. Без этого правило повтора с тем же requestId нельзя реализовать.",
+        "scenario": "Клиент повторно отправляет запрос с тем же requestId после таймаута. Сервер не знает, где хранить ключ и сохранённый результат, и может создать второй перевод вопреки строке 54.",
+        "impact": "Повторный запрос может создать второй перевод либо вернуть не тот результат.",
+        "recommendation": "Добавить в перечень хранимых данных ключ повтора и сохранённый результат перевода, а также карту списания.",
+        "rewrite": "Хранить для перевода по QR-коду: request_id (ключ идемпотентности), debit_card_id (карта списания), статус перевода, transfer_id, сумму и маскированное имя получателя, возвращаемые при повторе.",
+        "question": "",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Ключ повтора requestId не назван ни в одном шаге логики",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-31"
+        ],
+        "evidence": [
+          {
+            "line": 135,
+            "quote": "2. Повторный запрос с тем же requestId возвращает результат первого запроса."
+          },
+          {
+            "line": 131,
+            "quote": "8. Выполнить списание и зачисление одной операцией сервиса переводов"
+          }
+        ],
+        "problem": "Правило повтора задано в особых правилах, но шаги логики 1–8 не содержат проверки requestId, поэтому неясно, на каком шаге сверяется ключ.",
+        "scenario": "Разработчик пишет шаги 1–8 в порядке документа и не знает, нужно ли проверять ключ до сессии или до списания.",
+        "impact": "Порядок проверки ключа расходится между реализациями.",
+        "recommendation": "Добавить в логику метода шаг проверки requestId до шага 1 или перед шагом 8.",
+        "rewrite": "0. Если перевод с тем же requestId уже сохранён, вернуть его результат без повторной обработки шагов 1–8.",
+        "question": "",
+        "blocks": "development",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Поле status и amount без условия отсутствуют в телах ошибок",
+        "kind": "api_contract",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-39",
+          "R-41",
+          "R-43"
+        ],
+        "evidence": [
+          {
+            "line": 162,
+            "quote": "status | string | DONE / REJECTED | Результат перевода | status"
+          },
+          {
+            "line": 184,
+            "quote": "{\"message\":\"Некорректный запрос\"}"
+          }
+        ],
+        "problem": "Поле status описано без условия, значит присутствует во всех ответах, но тела 400, 401, 404, 410 и 500 содержат только message.",
+        "scenario": "Клиент разбирает ответ 400 по полю status и получает пустое значение.",
+        "impact": "Клиентский код должен различать формы ответа без описания в документе.",
+        "recommendation": "Уточнить, что тело ошибки содержит только message, либо добавить status в тела ошибок.",
+        "rewrite": "status | string | DONE / REJECTED | Результат перевода; только при успешной обработке (200), в ответах 400, 401, 404, 410, 500 отсутствует",
+        "question": "",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "/qr/transfer",
+          "method": "POST",
+          "purpose": "изменение",
+          "line": 115
+        },
+        {
+          "name": "/qr",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 213
+        },
+        {
+          "name": "/qr/{qrId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 214
+        },
+        {
+          "name": "/qr/{qrId}",
+          "method": "DELETE",
+          "purpose": "удаление",
+          "line": 215
+        }
+      ],
+      "promises": [
+        {
+          "what": "создать QR-код",
+          "line": 54,
+          "operation": "/qr"
+        },
+        {
+          "what": "получить данные QR-кода перед подтверждением",
+          "line": 54,
+          "operation": "/qr/{qrId}"
+        },
+        {
+          "what": "отменить QR-код",
+          "line": 54,
+          "operation": "/qr/{qrId}"
+        },
+        {
+          "what": "выполнить перевод по QR-коду",
+          "line": 54,
+          "operation": "/qr/transfer"
+        },
+        {
+          "what": "показать отправителю маскированное имя получателя и сумму на экране подтверждения",
+          "line": 29,
+          "operation": "/qr/{qrId}"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            158,
+            170,
+            179
+          ],
+          "described": true,
+          "note": "перевод DONE или REJECTED"
+        },
+        {
+          "code": "400",
+          "lines": [
+            125,
+            128,
+            158,
+            171,
+            182,
+            213
+          ],
+          "described": true,
+          "note": "тело {\"message\":\"Некорректный запрос\"}"
+        },
+        {
+          "code": "401",
+          "lines": [
+            158,
+            172,
+            189,
+            209
+          ],
+          "described": true,
+          "note": "тело {\"message\":\"Требуется вход\"}"
+        },
+        {
+          "code": "404",
+          "lines": [
+            126,
+            173,
+            194,
+            213,
+            214,
+            215
+          ],
+          "described": true,
+          "note": "тело {\"message\":\"QR-код не найден\"}"
+        },
+        {
+          "code": "410",
+          "lines": [
+            126,
+            127,
+            129,
+            174,
+            199,
+            214,
+            215
+          ],
+          "described": true,
+          "note": "тело {\"message\":\"QR-код недействителен\"}"
+        },
+        {
+          "code": "500",
+          "lines": [
+            131,
+            158,
+            175,
+            202,
+            209
+          ],
+          "described": true,
+          "note": "тело {\"message\":\"Ошибка сервиса\"}"
+        }
+      ],
+      "fields": [
+        {
+          "name": "qrId",
+          "places": "request L152 string 1–36 обязательный; path L214 string 1–36; хранится qr_id L152"
+        },
+        {
+          "name": "cardId",
+          "places": "request L153 string 1–64, debit_card_id; method 2 L213 string 1–64 карта зачисления"
+        },
+        {
+          "name": "amount",
+          "places": "request L154 integer 32 bit, Mandatory «Нет»; step 5 L128 обязателен, если нет суммы в QR; response L164 integer тенге; method 3 L214 integer или null"
+        },
+        {
+          "name": "requestId",
+          "places": "request L155 string 36 UUID, request_id; L135 повтор; в перечне хранимых данных L051 отсутствует"
+        },
+        {
+          "name": "status",
+          "places": "response L162 string DONE/REJECTED, без условия"
+        },
+        {
+          "name": "transferId",
+          "places": "response L163 string при DONE"
+        },
+        {
+          "name": "recipientName",
+          "places": "response L165 string «Имя Ф.»; method 3 L214"
+        },
+        {
+          "name": "message",
+          "places": "response L166 при REJECTED или ошибке"
+        },
+        {
+          "name": "expiresAt",
+          "places": "method 2 L213 и method 3 L214, ISO со смещением +05:00"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "/qr/transfer",
+          "step": "1. Проверить сессию отправителя.",
+          "line": 124,
+          "outcome": "401 по описанию L172, тело {\"message\":\"Требуется вход\"}"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "2. Карта списания не принадлежит отправителю, не активна или не в тенге",
+          "line": 125,
+          "outcome": "400, {\"message\":\"Некорректный запрос\"}"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "3. QR-код не найден",
+          "line": 126,
+          "outcome": "404, {\"message\":\"QR-код не найден\"}"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "3. Карта зачисления получателя закрыта или заблокирована",
+          "line": 126,
+          "outcome": "410, {\"message\":\"QR-код недействителен\"}"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "4. Срок истёк или QR-код отменён",
+          "line": 127,
+          "outcome": "410, {\"message\":\"QR-код недействителен\"}"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "5. Сумма отсутствует в QR и amount не передан",
+          "line": 128,
+          "outcome": "400, {\"message\":\"Некорректный запрос\"}"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "6. QR-код с суммой уже оплачен",
+          "line": 129,
+          "outcome": "410, {\"message\":\"QR-код недействителен\"}"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "7. Отказ антифрода",
+          "line": 130,
+          "outcome": "200, status REJECTED"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "8. Недостаточно средств на карте списания",
+          "line": 131,
+          "outcome": "400, {\"message\":\"Некорректный запрос\"}"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "8. Сбой при списании и зачислении",
+          "line": 131,
+          "outcome": "500, {\"message\":\"Ошибка сервиса\"}"
+        },
+        {
+          "operation": "/qr/transfer",
+          "step": "Повторный запрос с тем же requestId",
+          "line": 135,
+          "outcome": "результат первого запроса (шаг проверки ключа не назван)"
+        },
+        {
+          "operation": "/qr",
+          "step": "Сумма вне 100–500 000, карта не активна или не в тенге",
+          "line": 213,
+          "outcome": "400, {\"message\":\"…\"}"
+        },
+        {
+          "operation": "/qr",
+          "step": "Карта не найдена или чужая",
+          "line": 213,
+          "outcome": "404, {\"message\":\"…\"}"
+        },
+        {
+          "operation": "/qr/{qrId}",
+          "step": "Срок истёк, отменён или QR с суммой оплачен",
+          "line": 214,
+          "outcome": "410, {\"message\":\"QR-код недействителен\"}"
+        },
+        {
+          "operation": "/qr/{qrId}",
+          "step": "QR не найден",
+          "line": 214,
+          "outcome": "404, {\"message\":\"…\"}"
+        },
+        {
+          "operation": "/qr/{qrId}",
+          "step": "Отмена: QR с суммой оплачен, есть перевод в обработке, уже отменён или истёк",
+          "line": 215,
+          "outcome": "410, {\"message\":\"QR-код недействителен\"}"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

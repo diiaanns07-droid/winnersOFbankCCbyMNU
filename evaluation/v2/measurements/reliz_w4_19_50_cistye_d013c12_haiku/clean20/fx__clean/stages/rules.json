@@ -1,0 +1,81 @@
+{
+  "stage": "rules",
+  "status": "ok",
+  "seconds": 0.13,
+  "calls": 0,
+  "error": "",
+  "input": {},
+  "output": {
+    "signals": [
+      {
+        "rule": "terms.component_names",
+        "kind": "terminology",
+        "line": 25,
+        "quote": "Сервис обмена",
+        "message": "Похоже, один компонент назван по-разному: «Сервис обмена» и «результат обмена» (строки 25, 47). Проверьте, один ли это компонент.",
+        "audience": [
+          "consistency",
+          "architect"
+        ],
+        "id": "S-01",
+        "covered": false,
+        "lines": [
+          25
+        ],
+        "note": "Похоже, один компонент назван по-разному: «Сервис обмена» и «результат обмена» (строки 25, 47). Проверьте, один ли это компонент."
+      },
+      {
+        "rule": "terms.component_names",
+        "kind": "terminology",
+        "line": 47,
+        "quote": "сервис счетов",
+        "message": "Похоже, один компонент назван по-разному: «сервис счетов» и «данные счетов» (строки 47, 47). Проверьте, один ли это компонент.",
+        "audience": [
+          "consistency",
+          "architect"
+        ],
+        "id": "S-02",
+        "covered": false,
+        "lines": [
+          47
+        ],
+        "note": "Похоже, один компонент назван по-разному: «сервис счетов» и «данные счетов» (строки 47, 47). Проверьте, один ли это компонент."
+      },
+      {
+        "rule": "language.open_list",
+        "kind": "ambiguity",
+        "line": 67,
+        "quote": "1723…), expiresAt 2026-11-27T11:01:00.",
+        "message": "Открытый перечень: «3…)» — открытый перечень: состав не определён.",
+        "audience": [
+          "analyst",
+          "qa"
+        ],
+        "id": "S-03",
+        "covered": false,
+        "lines": [
+          67
+        ],
+        "note": "Открытый перечень: «3…)» — открытый перечень: состав не определён."
+      },
+      {
+        "rule": "api.methods",
+        "kind": "inventory",
+        "line": 118,
+        "quote": "REST type | POST | POST",
+        "message": "Описанные методы API: /fx/v1/exchanges (POST, изменение); /fx/v1/quotes (POST, изменение).",
+        "audience": [
+          "architect"
+        ],
+        "id": "S-04",
+        "covered": false,
+        "lines": [
+          118
+        ],
+        "note": "Описанные методы API: /fx/v1/exchanges (POST, изменение); /fx/v1/quotes (POST, изменение)."
+      }
+    ],
+    "candidates": []
+  },
+  "warnings": []
+}

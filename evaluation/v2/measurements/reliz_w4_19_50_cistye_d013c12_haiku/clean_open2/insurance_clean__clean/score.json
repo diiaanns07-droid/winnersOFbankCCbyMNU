@@ -1,0 +1,677 @@
+{
+  "schema": "bcc-v2-score/1",
+  "gold": {
+    "path": "/home/user/repo/evaluation/v2/open2/insurance_clean/gold.yaml",
+    "document": "evaluation/v2/open2/insurance_clean/source.md",
+    "sha256": "99197c1e9c6936089e9a13a8ab449fef99f29815afe7a28a85cf9895c120d9db"
+  },
+  "report": {
+    "version": "v2",
+    "same_doc": true,
+    "document": {
+      "file": "source.md",
+      "format": "md",
+      "sha256": "99197c1e9c6936089e9a13a8ab449fef99f29815afe7a28a85cf9895c120d9db",
+      "lines": 223
+    },
+    "status": "complete",
+    "provider": "claude_cli",
+    "model": "haiku",
+    "models_used": [
+      "claude-haiku-5-5"
+    ],
+    "commit": "e9846b8a",
+    "duration_s": 247.0,
+    "calls": {
+      "total": 8,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "tokens": {
+      "input": 226558,
+      "output": 149083
+    },
+    "cost_usd": 0.1011
+  },
+  "counts": {
+    "findings": 22,
+    "by_severity": {
+      "critical": 0,
+      "major": 0,
+      "minor": 22
+    },
+    "duplicates": 0,
+    "outside_gold": {
+      "total": 21,
+      "real": 0,
+      "partial": 0,
+      "false": 0,
+      "duplicate": 0,
+      "gold": 0,
+      "unknown": 21
+    },
+    "report_md_lines": 508
+  },
+  "recall": {
+    "critical": {
+      "found": [],
+      "n": 0,
+      "of": 5,
+      "as_critical": [],
+      "lenient": []
+    },
+    "major": {
+      "found": [],
+      "n": 0,
+      "of": 20,
+      "lenient": []
+    },
+    "minor": {
+      "found_parents": [
+        "М1"
+      ],
+      "of": 4,
+      "parts_found": [
+        "М1"
+      ]
+    },
+    "key_25": {
+      "n": 0,
+      "of": 25,
+      "lenient": 0,
+      "loose_any_edge": 0
+    },
+    "all_items": {
+      "n": 1,
+      "of": 4
+    },
+    "parents": {
+      "n": 1,
+      "of": 4
+    }
+  },
+  "precision": {
+    "matched": 1,
+    "duplicates": 0,
+    "outside_real": 0,
+    "outside_false": 0,
+    "outside_unknown": 21,
+    "outside_partial": 0,
+    "precision_useful": 0.045,
+    "precision_gold": 0.045
+  },
+  "severity": {
+    "pairs": 1,
+    "ok": 1,
+    "exact": 1,
+    "accuracy_ok": 1.0,
+    "accuracy_exact": 1.0,
+    "critical_false": [],
+    "rows": [
+      {
+        "gold": "М1",
+        "level": "minor",
+        "finding": "D-17",
+        "severity": "minor",
+        "ok": true,
+        "exact": true
+      }
+    ]
+  },
+  "quotes": {
+    "total": 51,
+    "missing": 0,
+    "fuzzy": 0,
+    "line_mismatch": 0,
+    "verified_field_missing": 0,
+    "findings_without_evidence": [],
+    "missing_list": []
+  },
+  "language": {
+    "generic": [],
+    "english": [
+      {
+        "finding": "D-20",
+        "field": "recommendation",
+        "word": "reason"
+      },
+      {
+        "finding": "D-22",
+        "field": "problem",
+        "word": "WebDAV"
+      }
+    ],
+    "english_report_md": [
+      "REFUNDED",
+      "reason"
+    ]
+  },
+  "clarity": {
+    "n": 22,
+    "passed": 18,
+    "share": 0.818,
+    "by_check": {
+      "заголовок": 0,
+      "место": 0,
+      "проблема": 0,
+      "сценарий": 3,
+      "последствие": 0,
+      "исправление": 0,
+      "язык": 2
+    },
+    "worst": [
+      {
+        "id": "D-22",
+        "title": "Название кода 422 расходится с RFC 9110",
+        "severity": "minor",
+        "source": "lens:architect",
+        "fails": [
+          "сценарий",
+          "язык"
+        ]
+      },
+      {
+        "id": "D-01",
+        "title": "Требования не имеют приоритетов и признаков важности",
+        "severity": "minor",
+        "source": "consistency",
+        "fails": [
+          "сценарий"
+        ]
+      },
+      {
+        "id": "D-04",
+        "title": "Архитектура не показывает вызов сервиса страхования из API кредитов",
+        "severity": "minor",
+        "source": "consistency",
+        "fails": [
+          "сценарий"
+        ]
+      },
+      {
+        "id": "D-20",
+        "title": "Тела 400 и 422 не различают причины отказа",
+        "severity": "minor",
+        "source": "lens:architect",
+        "fails": [
+          "язык"
+        ]
+      }
+    ]
+  },
+  "report_sections": {
+    "паспорт прогона": true,
+    "нарезка требований": true,
+    "проверка каждого требования": true,
+    "проверка набора": true,
+    "сводка": true,
+    "итог": true
+  },
+  "verdict": {
+    "got": {
+      "development": "yes",
+      "testing": "yes"
+    },
+    "expected": {
+      "development": "yes",
+      "testing": "yes"
+    }
+  },
+  "assignment": [
+    {
+      "gold": "М1",
+      "finding": "D-17",
+      "title": "Незаполненные поля шаблона: версия, чек-лист, согласующие, тесты",
+      "severity": "minor",
+      "sources": [
+        "rules:placeholder.version",
+        "consistency",
+        "rules:placeholder.tbd",
+        "rules:placeholder.checklist",
+        "rules:placeholder.approvals"
+      ],
+      "how": "детерминированно"
+    }
+  ],
+  "duplicates": [],
+  "outside": [
+    {
+      "finding": "D-01",
+      "severity": "minor",
+      "kind": "incomplete",
+      "title": "Требования не имеют приоритетов и признаков важности",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-02",
+      "severity": "minor",
+      "kind": "unverifiable",
+      "title": "Цель «без жалоб» без числа не проверяется требованиями",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-03",
+      "severity": "minor",
+      "kind": "terminology",
+      "title": "Одни понятия названы разными терминами, глоссария нет",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-04",
+      "severity": "minor",
+      "kind": "contradiction",
+      "title": "Архитектура не показывает вызов сервиса страхования из API кредитов",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-05",
+      "severity": "minor",
+      "kind": "incomplete",
+      "title": "Экран условий не описан в начальном состоянии и при ошибках",
+      "sources": [
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-06",
+      "severity": "minor",
+      "kind": "ambiguity",
+      "title": "Возраст на дату окончания кредита нельзя определить при вызове",
+      "sources": [
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-07",
+      "severity": "minor",
+      "kind": "ambiguity",
+      "title": "Округление премии до тенге не задано при дробном результате",
+      "sources": [
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-08",
+      "severity": "minor",
+      "kind": "ambiguity",
+      "title": "Срок отказа: день выдачи и граница дня не заданы",
+      "sources": [
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-09",
+      "severity": "minor",
+      "kind": "ambiguity",
+      "title": "Срок возврата премии не привязан к начальной дате",
+      "sources": [
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-10",
+      "severity": "minor",
+      "kind": "contradiction",
+      "title": "Порядок возврата при погашении и отказе в одном периоде не задан",
+      "sources": [
+        "consistency",
+        "lens:risk",
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-11",
+      "severity": "minor",
+      "kind": "incomplete",
+      "title": "Значение status после отказа от страхования не задано",
+      "sources": [
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-12",
+      "severity": "minor",
+      "kind": "duplicate",
+      "title": "Правило ставки 27 % после отказа записано в двух местах",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-13",
+      "severity": "minor",
+      "kind": "missing_element",
+      "title": "Срок кредита отсутствует в перечне хранимых данных",
+      "sources": [
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-14",
+      "severity": "minor",
+      "kind": "ambiguity",
+      "title": "Момент «полного досрочного погашения» не определён: заявка или зачисление",
+      "sources": [
+        "lens:risk"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-15",
+      "severity": "minor",
+      "kind": "incomplete",
+      "title": "Нижняя граница 18 лет не проверяется в логике метода",
+      "sources": [
+        "consistency",
+        "lens:analyst",
+        "lens:qa",
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-16",
+      "severity": "minor",
+      "kind": "missing_element",
+      "title": "Поля согласия и статуса страхования не в перечне данных",
+      "sources": [
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-18",
+      "severity": "minor",
+      "kind": "missing_element",
+      "title": "Критерии приёмки покрывают не все функциональные требования",
+      "sources": [
+        "lens:qa"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-19",
+      "severity": "minor",
+      "kind": "ops_risk",
+      "title": "Нет схемы отката и способа выключить функцию страхования",
+      "sources": [
+        "lens:risk"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-20",
+      "severity": "minor",
+      "kind": "api_contract",
+      "title": "Тела 400 и 422 не различают причины отказа",
+      "sources": [
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-21",
+      "severity": "minor",
+      "kind": "api_contract",
+      "title": "Тела ответов 404 и 409 для методов 3–5 не заданы",
+      "sources": [
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-22",
+      "severity": "minor",
+      "kind": "status_conflict",
+      "title": "Название кода 422 расходится с RFC 9110",
+      "sources": [
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    }
+  ],
+  "misses": [
+    {
+      "gold": "М2",
+      "level": "minor",
+      "title": "Блок согласующих пуст",
+      "where": "найден кандидатом (rules:placeholder.approvals), судья не взял",
+      "owners": [
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-17",
+          "status": "match",
+          "score": 3.6,
+          "arbiter": ""
+        },
+        {
+          "finding": "D-06",
+          "status": "disputed",
+          "score": 1.0,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": [
+        {
+          "source": "rules:placeholder.approvals",
+          "id": "rules#4",
+          "title": "Блок согласующих пуст: нет ни одного согласующего",
+          "reason": ""
+        }
+      ]
+    },
+    {
+      "gold": "М3",
+      "level": "minor",
+      "title": "Раздел «Тестирование требований» — заглушка",
+      "where": "найден кандидатом (rules:placeholder.tbd), судья не взял",
+      "owners": [
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-17",
+          "status": "match",
+          "score": 3.3,
+          "arbiter": ""
+        },
+        {
+          "finding": "D-05",
+          "status": "disputed",
+          "score": 1.6,
+          "arbiter": ""
+        },
+        {
+          "finding": "D-08",
+          "status": "disputed",
+          "score": 1.0,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": [
+        {
+          "source": "rules:placeholder.tbd",
+          "id": "rules#1",
+          "title": "Раздел документа оставлен заглушкой: «заполняются тестировщиками»",
+          "reason": ""
+        }
+      ]
+    },
+    {
+      "gold": "М4",
+      "level": "minor",
+      "title": "Нет ID и приоритетов у НФТ, требований к данным и интеграции",
+      "where": "не найден ни одним этапом",
+      "owners": [
+        "rules",
+        "analyst"
+      ],
+      "near": [],
+      "seen_in": []
+    }
+  ],
+  "stage_recall": {
+    "consistency": {
+      "candidates": 8,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "lens:analyst": {
+      "candidates": 6,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "lens:architect": {
+      "candidates": 8,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "lens:qa": {
+      "candidates": 4,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "lens:risk": {
+      "candidates": 3,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "rules": {
+      "candidates": 4,
+      "K": [],
+      "C": [],
+      "only_here": []
+    }
+  },
+  "gates": [
+    {
+      "metric": "К1–К5 найдены",
+      "value": "0/5",
+      "ok": true
+    },
+    {
+      "metric": "из них критичными",
+      "value": "0/5",
+      "ok": true
+    },
+    {
+      "metric": "С1–С20 найдены",
+      "value": "0/20",
+      "ok": true
+    },
+    {
+      "metric": "критичных ложных",
+      "value": "0",
+      "ok": true
+    },
+    {
+      "metric": "всего замечаний",
+      "value": "22",
+      "ok": true
+    },
+    {
+      "metric": "цитаты найдены в документе",
+      "value": "51/51",
+      "ok": true
+    },
+    {
+      "metric": "строк отчёта",
+      "value": "508",
+      "ok": true
+    },
+    {
+      "metric": "разделы п. 6 ТЗ",
+      "value": "6/6",
+      "ok": true
+    },
+    {
+      "metric": "общие фразы",
+      "value": "0",
+      "ok": true
+    },
+    {
+      "metric": "рубрика понятности",
+      "value": "18/22",
+      "ok": false
+    },
+    {
+      "metric": "английские слова",
+      "value": "4",
+      "ok": false
+    },
+    {
+      "metric": "вердикт разработка/тестирование",
+      "value": "yes/yes",
+      "ok": true
+    },
+    {
+      "metric": "время, мин",
+      "value": "4.1",
+      "ok": true
+    },
+    {
+      "metric": "вызовов модели",
+      "value": "8",
+      "ok": true
+    }
+  ],
+  "arbiter": {
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
+    "pending": 24,
+    "model": ""
+  },
+  "seconds": 0.04
+}

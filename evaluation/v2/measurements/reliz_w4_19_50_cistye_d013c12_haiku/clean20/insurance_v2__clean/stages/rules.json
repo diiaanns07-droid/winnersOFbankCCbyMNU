@@ -1,0 +1,100 @@
+{
+  "stage": "rules",
+  "status": "ok",
+  "seconds": 0.05,
+  "calls": 0,
+  "error": "",
+  "input": {},
+  "output": {
+    "signals": [
+      {
+        "rule": "language.open_list",
+        "kind": "ambiguity",
+        "line": 40,
+        "quote": "Клиент может отказаться от страхования в течение 14 календарных дней с даты выдачи кредита, которая является датой начала действия полиса (сроки в днях здесь и далее отсчитываются со дня, следующего",
+        "message": "Открытый перечень: «и далее» — открытый перечень: состав не определён.",
+        "audience": [
+          "analyst",
+          "qa"
+        ],
+        "id": "S-01",
+        "covered": false,
+        "lines": [
+          40
+        ],
+        "note": "Открытый перечень: «и далее» — открытый перечень: состав не определён."
+      },
+      {
+        "rule": "promises.read",
+        "kind": "inventory",
+        "line": 48,
+        "quote": "Экран условий показывает стоимость страхования и обе ставки до включения флажка.",
+        "message": "Справка для описи, не дефект: обещанный показ данных читают операции /loans/insurance/quote и /loans/{loanId}/insurance.",
+        "audience": [
+          "architect"
+        ],
+        "id": "S-02",
+        "covered": false,
+        "lines": [
+          48
+        ],
+        "note": "Справка для описи, не дефект: обещанный показ данных читают операции /loans/insurance/quote и /loans/{loanId}/insurance."
+      },
+      {
+        "rule": "api.methods",
+        "kind": "inventory",
+        "line": 110,
+        "quote": "REST type | POST",
+        "message": "Описанные методы API: /loans/applications/{applicationId}/insurance (POST, изменение); /loans/insurance/quote (GET, чтение); /loans/{loanId}/insurance/refusal (POST, изменение); /loans/applications/{applicationId}/insurance (DELETE, изменение); /loans/{loanId}/insurance (GET, чтение).",
+        "audience": [
+          "architect"
+        ],
+        "id": "S-03",
+        "covered": false,
+        "lines": [
+          110
+        ],
+        "note": "Описанные методы API: /loans/applications/{applicationId}/insurance (POST, изменение); /loans/insurance/quote (GET, чтение); /loans/{loanId}/insurance/refusal (POST, изменение); /loans/applications/{applicationId}/insurance (DELETE, изменение); /loans/{loanId}/insurance (GET, чтение)."
+      },
+      {
+        "rule": "api.idempotent_replay",
+        "kind": "inventory",
+        "line": 131,
+        "quote": "Повторный вызов с теми же суммой и сроком возвращает действующие условия страхования",
+        "message": "Справка, не дефект: документ сам задаёт исход повторного вызова с теми же суммой и сроком — действующие условия страхования. Шаги логики описывают первый вызов; что вернуть на повтор после отказа, подписания или другой смены состояния — уточнение (minor), а не противоречие «особое правило против шага» и не critical. Справка — только об этом повторе: остальные особые правила сверяй с функциональными требованиями как обычно.",
+        "audience": [
+          "consistency",
+          "qa",
+          "architect",
+          "risk",
+          "analyst"
+        ],
+        "id": "S-04",
+        "covered": false,
+        "lines": [
+          131
+        ],
+        "note": "Справка, не дефект: документ сам задаёт исход повторного вызова с теми же суммой и сроком — действующие условия страхования. Шаги логики описывают первый вызов; что вернуть на повтор после отказа, подписания или другой смены состояния — уточнение (minor), а не противоречие «особое правило против шага» и не critical. Справка — только об этом повторе: остальные особые правила сверяй с функциональными требованиями как обычно."
+      },
+      {
+        "rule": "api.status_inventory",
+        "kind": "inventory",
+        "line": 221,
+        "quote": "Метод | REST type и URL | Параметры | Ответ 200 | Ошибки",
+        "message": "Перечень статусов: 200, 400, 401, 404, 409, 422, 500 и 502; упомянуты в тексте: 200, 400, 401, 404, 409, 422, 500 и 502.",
+        "audience": [
+          "architect",
+          "qa"
+        ],
+        "id": "S-05",
+        "covered": false,
+        "lines": [
+          221
+        ],
+        "note": "Перечень статусов: 200, 400, 401, 404, 409, 422, 500 и 502; упомянуты в тексте: 200, 400, 401, 404, 409, 422, 500 и 502."
+      }
+    ],
+    "candidates": []
+  },
+  "warnings": []
+}

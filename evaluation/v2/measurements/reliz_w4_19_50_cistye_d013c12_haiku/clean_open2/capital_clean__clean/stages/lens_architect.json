@@ -1,0 +1,288 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 58.76,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 46,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Способ выплаты из запроса пишется в поле текущего месяца",
+        "kind": "contradiction",
+        "criterion": "set_consistent",
+        "severity": "major",
+        "requirement_ids": [
+          "R-23",
+          "R-31",
+          "R-35",
+          "R-34"
+        ],
+        "evidence": [
+          {
+            "line": 148,
+            "quote": "mode | string | — | Да | CAPITALIZATION / CARD | Способ выплаты процентов | payout_mode"
+          },
+          {
+            "line": 157,
+            "quote": "nextMode | string | CAPITALIZATION / CARD | Способ выплаты с 1-го числа следующего месяца | next_payout_mode"
+          },
+          {
+            "line": 156,
+            "quote": "currentMode | string | CAPITALIZATION / CARD | Способ выплаты в текущем месяце | payout_mode"
+          },
+          {
+            "line": 122,
+            "quote": "4. Сохранить способ выплаты с датой начала действия — 1-е число следующего месяца."
+          }
+        ],
+        "problem": "Запрос mode по колонке payout_mode пишется в то же поле, которое ответ отдаёт как currentMode. Шаг 4 логики требует записать способ с 1-го числа следующего месяца, а не в текущий месяц.",
+        "scenario": "15 марта клиент отправляет PUT с {\"mode\":\"CARD\",\"cardId\":\"c-2001\"}. По строке 148 payout_mode становится CARD, и строка 156 вернёт currentMode=CARD уже в марте, хотя по шагу 4 и строке 157 действует с 1 апреля.",
+        "impact": "Проценты текущего месяца выплачиваются не тем способом, что предусмотрен Ф-3 и критерием приёмки в строке 65; клиент и приложение видят разные периоды.",
+        "recommendation": "Для mode указать поле next_payout_mode (сохранение с датой next_mode_from), а payout_mode оставить для текущего способа; добавить next_payout_mode в перечень хранимых данных строки 50.",
+        "rewrite": "mode | string | — | Да | CAPITALIZATION / CARD | Способ выплаты процентов с 1-го числа следующего месяца | next_payout_mode (дата — next_mode_from)",
+        "question": "",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Название сервиса: API сбережений и SavingsInterestController",
+        "kind": "terminology",
+        "criterion": "unambiguous",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-02",
+          "R-28"
+        ],
+        "evidence": [
+          {
+            "line": 44,
+            "quote": "Приложение → API сбережений: сохранить способ выплаты."
+          },
+          {
+            "line": 132,
+            "quote": "Приложение → SavingsInterestController → депозитный модуль → SavingsInterestController → приложение."
+          }
+        ],
+        "problem": "Один и тот же входной компонент назван в последовательности «API сбережений», а в схеме метода — «SavingsInterestController».",
+        "scenario": "Разработчик не может однозначно сопоставить узел схемы метода с компонентом из архитектуры при проверке маршрута запроса.",
+        "impact": "Небольшая неоднозначность при сверке архитектуры и контроллера, без влияния на поведение.",
+        "recommendation": "Назвать входной компонент в архитектуре и последовательности так же, как в схеме метода, либо указать соответствие в одном месте.",
+        "rewrite": "Архитектура и последовательность: «SavingsInterestController (API сбережений)»",
+        "question": "",
+        "blocks": "none",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Дата 1-го числа без часового пояса",
+        "kind": "ambiguity",
+        "criterion": "unambiguous",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-23",
+          "R-36"
+        ],
+        "evidence": [
+          {
+            "line": 122,
+            "quote": "4. Сохранить способ выплаты с датой начала действия — 1-е число следующего месяца."
+          },
+          {
+            "line": 37,
+            "quote": "Остаток на конец дня — остаток счёта на 23:59:59 по времени Астаны (UTC+5)."
+          }
+        ],
+        "problem": "Граница месяца в шаге 4 и в поле effectiveFrom не привязана к часовому поясу, хотя Ф-2 задаёт время Астаны.",
+        "scenario": "Запрос в 23:30 31 марта по времени Астаны, обработанный сервером в UTC, может получить дату начала 1 апреля или 31 марта в зависимости от интерпретации.",
+        "impact": "Возможен спор, к какому месяцу отнесён новый способ выплаты для запросов на границе месяца.",
+        "recommendation": "Указать, что дата effectiveFrom вычисляется по времени Астаны (UTC+5).",
+        "rewrite": "effectiveFrom | string | ГГГГ-ММ-ДД, вычисляется по времени Астаны (UTC+5) | Дата начала действия нового способа | next_mode_from",
+        "question": "",
+        "blocks": "both",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "PUT /savings/{accountId}/payout-mode",
+          "method": "PUT",
+          "purpose": "изменение",
+          "line": 110
+        },
+        {
+          "name": "GET /savings/{accountId}/interest",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 201
+        },
+        {
+          "name": "GET /savings/{accountId}/interest/history",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 202
+        }
+      ],
+      "promises": [
+        {
+          "what": "получить ставку для показа в приложении",
+          "line": 53,
+          "operation": "GET /savings/{accountId}/interest"
+        },
+        {
+          "what": "получить проценты за текущий месяц для показа",
+          "line": 53,
+          "operation": "GET /savings/{accountId}/interest"
+        },
+        {
+          "what": "получить историю начислений для показа",
+          "line": 53,
+          "operation": "GET /savings/{accountId}/interest/history"
+        },
+        {
+          "what": "сохранить способ выплаты процентов",
+          "line": 53,
+          "operation": "PUT /savings/{accountId}/payout-mode"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            152,
+            164,
+            172
+          ],
+          "described": true,
+          "note": "успех, тело в примере"
+        },
+        {
+          "code": "400",
+          "lines": [
+            152,
+            165,
+            177
+          ],
+          "described": true,
+          "note": "условия и тело описаны"
+        },
+        {
+          "code": "401",
+          "lines": [
+            152,
+            166,
+            182
+          ],
+          "described": true,
+          "note": "условия и тело описаны"
+        },
+        {
+          "code": "404",
+          "lines": [
+            152,
+            167,
+            187,
+            201,
+            202
+          ],
+          "described": true,
+          "note": "условия и тело описаны"
+        },
+        {
+          "code": "500",
+          "lines": [
+            152,
+            168,
+            192,
+            197
+          ],
+          "described": true,
+          "note": "условия и тело описаны"
+        }
+      ],
+      "fields": [
+        {
+          "name": "accountId",
+          "places": "path, string, 1–64, обязательный (строка 141; путь строка 110, 201)"
+        },
+        {
+          "name": "mode",
+          "places": "request body, string, CAPITALIZATION / CARD, обязательный, payout_mode (строка 148)"
+        },
+        {
+          "name": "cardId",
+          "places": "request body, string, 1–64, для CARD, payout_card_id (строка 149)"
+        },
+        {
+          "name": "currentMode",
+          "places": "ответ PUT, string, payout_mode (строка 156)"
+        },
+        {
+          "name": "nextMode",
+          "places": "ответ PUT, string, next_payout_mode (строка 157)"
+        },
+        {
+          "name": "effectiveFrom",
+          "places": "ответ PUT, string ГГГГ-ММ-ДД, next_mode_from (строка 158)"
+        },
+        {
+          "name": "rate",
+          "places": "ответ, number, rate (строка 159; строка 172; строка 201)"
+        },
+        {
+          "name": "accruedInterest",
+          "places": "ответ, number ≥ 0, ₸ (строка 160; строка 201)"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "PUT /savings/{accountId}/payout-mode",
+          "step": "проверка сессии клиента",
+          "line": 119,
+          "outcome": "401 {\"message\":\"Требуется вход\"}"
+        },
+        {
+          "operation": "PUT /savings/{accountId}/payout-mode",
+          "step": "счёт не принадлежит клиенту или закрыт",
+          "line": 120,
+          "outcome": "404 {\"message\":\"Счёт или карта не найдены\"}"
+        },
+        {
+          "operation": "PUT /savings/{accountId}/payout-mode",
+          "step": "mode = CARD: карта не активна, не в тенге или cardId не передан",
+          "line": 121,
+          "outcome": "400 {\"message\":\"Некорректный запрос\"}"
+        },
+        {
+          "operation": "PUT /savings/{accountId}/payout-mode",
+          "step": "mode = CARD: карта принадлежит другому клиенту",
+          "line": 121,
+          "outcome": "404 {\"message\":\"Счёт или карта не найдены\"}"
+        },
+        {
+          "operation": "PUT /savings/{accountId}/payout-mode",
+          "step": "сохранить способ выплаты с 1-го числа следующего месяца, вернуть условия",
+          "line": 122,
+          "outcome": "200 с currentMode, nextMode, effectiveFrom, rate, accruedInterest"
+        },
+        {
+          "operation": "PUT /savings/{accountId}/payout-mode",
+          "step": "повторная установка уже выбранного способа",
+          "line": 126,
+          "outcome": "200 с текущими условиями"
+        },
+        {
+          "operation": "GET /savings/{accountId}/interest/history",
+          "step": "период больше 12 месяцев или from позже to",
+          "line": 202,
+          "outcome": "400"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

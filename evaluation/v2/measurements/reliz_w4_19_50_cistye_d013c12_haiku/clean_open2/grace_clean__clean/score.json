@@ -1,0 +1,624 @@
+{
+  "schema": "bcc-v2-score/1",
+  "gold": {
+    "path": "/home/user/repo/evaluation/v2/open2/grace_clean/gold.yaml",
+    "document": "evaluation/v2/open2/grace_clean/source.md",
+    "sha256": "950d6b2074ea5b677bc6e10d3bc3a628087e4df4215ae3e3e754b59ce4cfe127"
+  },
+  "report": {
+    "version": "v2",
+    "same_doc": true,
+    "document": {
+      "file": "source.md",
+      "format": "md",
+      "sha256": "950d6b2074ea5b677bc6e10d3bc3a628087e4df4215ae3e3e754b59ce4cfe127",
+      "lines": 212
+    },
+    "status": "complete",
+    "provider": "claude_cli",
+    "model": "haiku",
+    "models_used": [
+      "claude-haiku-5-5"
+    ],
+    "commit": "e9846b8a",
+    "duration_s": 289.0,
+    "calls": {
+      "total": 9,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "tokens": {
+      "input": 311295,
+      "output": 173245
+    },
+    "cost_usd": 0.128
+  },
+  "counts": {
+    "findings": 19,
+    "by_severity": {
+      "critical": 0,
+      "major": 0,
+      "minor": 19
+    },
+    "duplicates": 0,
+    "outside_gold": {
+      "total": 18,
+      "real": 0,
+      "partial": 0,
+      "false": 0,
+      "duplicate": 0,
+      "gold": 0,
+      "unknown": 18
+    },
+    "report_md_lines": 498
+  },
+  "recall": {
+    "critical": {
+      "found": [],
+      "n": 0,
+      "of": 5,
+      "as_critical": [],
+      "lenient": []
+    },
+    "major": {
+      "found": [],
+      "n": 0,
+      "of": 20,
+      "lenient": []
+    },
+    "minor": {
+      "found_parents": [
+        "М1"
+      ],
+      "of": 4,
+      "parts_found": [
+        "М1"
+      ]
+    },
+    "key_25": {
+      "n": 0,
+      "of": 25,
+      "lenient": 0,
+      "loose_any_edge": 0
+    },
+    "all_items": {
+      "n": 1,
+      "of": 4
+    },
+    "parents": {
+      "n": 1,
+      "of": 4
+    }
+  },
+  "precision": {
+    "matched": 1,
+    "duplicates": 0,
+    "outside_real": 0,
+    "outside_false": 0,
+    "outside_unknown": 18,
+    "outside_partial": 0,
+    "precision_useful": 0.053,
+    "precision_gold": 0.053
+  },
+  "severity": {
+    "pairs": 1,
+    "ok": 1,
+    "exact": 1,
+    "accuracy_ok": 1.0,
+    "accuracy_exact": 1.0,
+    "critical_false": [],
+    "rows": [
+      {
+        "gold": "М1",
+        "level": "minor",
+        "finding": "D-16",
+        "severity": "minor",
+        "ok": true,
+        "exact": true
+      }
+    ]
+  },
+  "quotes": {
+    "total": 45,
+    "missing": 0,
+    "fuzzy": 0,
+    "line_mismatch": 0,
+    "verified_field_missing": 0,
+    "findings_without_evidence": [],
+    "missing_list": []
+  },
+  "language": {
+    "generic": [],
+    "english": [],
+    "english_report_md": [
+      "MCC"
+    ]
+  },
+  "clarity": {
+    "n": 19,
+    "passed": 16,
+    "share": 0.842,
+    "by_check": {
+      "заголовок": 0,
+      "место": 0,
+      "проблема": 0,
+      "сценарий": 3,
+      "последствие": 0,
+      "исправление": 0,
+      "язык": 0
+    },
+    "worst": [
+      {
+        "id": "D-02",
+        "title": "Карточный процессинг указан в ИС, но не в архитектуре",
+        "severity": "minor",
+        "source": "consistency",
+        "fails": [
+          "сценарий"
+        ]
+      },
+      {
+        "id": "D-03",
+        "title": "Цель «снизить долю потерь» без показателя и срока",
+        "severity": "minor",
+        "source": "consistency",
+        "fails": [
+          "сценарий"
+        ]
+      },
+      {
+        "id": "D-06",
+        "title": "Экран не задаёт выбор карты и вид блока без льготного периода",
+        "severity": "minor",
+        "source": "lens:analyst",
+        "fails": [
+          "сценарий"
+        ]
+      }
+    ]
+  },
+  "report_sections": {
+    "паспорт прогона": true,
+    "нарезка требований": true,
+    "проверка каждого требования": true,
+    "проверка набора": true,
+    "сводка": true,
+    "итог": true
+  },
+  "verdict": {
+    "got": {
+      "development": "yes",
+      "testing": "yes"
+    },
+    "expected": {
+      "development": "yes",
+      "testing": "yes"
+    }
+  },
+  "assignment": [
+    {
+      "gold": "М1",
+      "finding": "D-16",
+      "title": "Незаполненные разделы шаблона: тесты, чек-лист, версия, согласующие",
+      "severity": "minor",
+      "sources": [
+        "rules:placeholder.tbd",
+        "rules:placeholder.checklist",
+        "rules:placeholder.version",
+        "rules:placeholder.approvals"
+      ],
+      "how": "детерминированно"
+    }
+  ],
+  "duplicates": [],
+  "outside": [
+    {
+      "finding": "D-01",
+      "severity": "minor",
+      "kind": "traceability",
+      "title": "Нет ID и приоритетов у пунктов требований и критериев",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-02",
+      "severity": "minor",
+      "kind": "incomplete",
+      "title": "Карточный процессинг указан в ИС, но не в архитектуре",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-03",
+      "severity": "minor",
+      "kind": "incomplete",
+      "title": "Цель «снизить долю потерь» без показателя и срока",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-04",
+      "severity": "minor",
+      "kind": "terminology",
+      "title": "Термины документа не едины, глоссария нет",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-05",
+      "severity": "minor",
+      "kind": "incomplete",
+      "title": "Не определено, получит ли клиент напоминание, включённое после 22-го",
+      "sources": [
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-06",
+      "severity": "minor",
+      "kind": "incomplete",
+      "title": "Экран не задаёт выбор карты и вид блока без льготного периода",
+      "sources": [
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-07",
+      "severity": "minor",
+      "kind": "missing_element",
+      "title": "Кнопка «Пополнить» на экране не связана ни с каким описанным действием",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-08",
+      "severity": "minor",
+      "kind": "boundary_conflict",
+      "title": "Не определено, входят ли покупки 1-го числа в сумму выписки",
+      "sources": [
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-09",
+      "severity": "minor",
+      "kind": "non_singular",
+      "title": "Пункты Ф-2, Ф-4 и Ф-5 объединяют несколько правил",
+      "sources": [
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-10",
+      "severity": "minor",
+      "kind": "ambiguity",
+      "title": "Термин «квази-кэш» не раскрыт перечнем операций",
+      "sources": [
+        "lens:qa"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-11",
+      "severity": "minor",
+      "kind": "contradiction",
+      "title": "Сумма для погашения: фиксирована на выписке или уменьшается возвратом",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-12",
+      "severity": "minor",
+      "kind": "duplicate",
+      "title": "Правило прогноза процентов продублировано в особых правилах API",
+      "sources": [
+        "consistency"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-13",
+      "severity": "minor",
+      "kind": "ambiguity",
+      "title": "Не сказано, в какой момент проверяется неоплата для напоминания",
+      "sources": [
+        "lens:analyst"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-14",
+      "severity": "minor",
+      "kind": "incomplete",
+      "title": "Критерии приёмки покрывают 5 из 11 функциональных требований",
+      "sources": [
+        "lens:qa"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-15",
+      "severity": "minor",
+      "kind": "ambiguity",
+      "title": "Платёж, зачисленный минуту назад, может не попасть в сведения",
+      "sources": [
+        "lens:qa"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-17",
+      "severity": "minor",
+      "kind": "unit_mismatch",
+      "title": "Суммы в ₸ в критериях и тиыны в API без правила пересчёта",
+      "sources": [
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-18",
+      "severity": "minor",
+      "kind": "ops_risk",
+      "title": "Схема отката не описана, экран нельзя скрыть при ошибке",
+      "sources": [
+        "lens:risk"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    },
+    {
+      "finding": "D-19",
+      "severity": "minor",
+      "kind": "missing_element",
+      "title": "Метод 1 не получает покупки для прогноза и общей задолженности",
+      "sources": [
+        "lens:architect"
+      ],
+      "verdict": "unknown",
+      "reason": ""
+    }
+  ],
+  "misses": [
+    {
+      "gold": "М2",
+      "level": "minor",
+      "title": "Блок согласующих пуст",
+      "where": "найден кандидатом (rules:placeholder.approvals), судья не взял",
+      "owners": [
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-16",
+          "status": "match",
+          "score": 3.6,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": [
+        {
+          "source": "rules:placeholder.approvals",
+          "id": "rules#4",
+          "title": "Блок согласующих пуст: нет ни одного согласующего",
+          "reason": ""
+        }
+      ]
+    },
+    {
+      "gold": "М3",
+      "level": "minor",
+      "title": "Раздел «Тестирование требований» — заглушка",
+      "where": "найден кандидатом (lens:qa, rules:placeholder.tbd), судья не взял",
+      "owners": [
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-16",
+          "status": "match",
+          "score": 3.3,
+          "arbiter": ""
+        },
+        {
+          "finding": "D-05",
+          "status": "disputed",
+          "score": 1.6,
+          "arbiter": ""
+        },
+        {
+          "finding": "D-06",
+          "status": "disputed",
+          "score": 1.3,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": [
+        {
+          "source": "lens:qa",
+          "id": "rejected#2",
+          "title": "Раздел тестирования не заполнен",
+          "reason": "снято линзой тестировщика: вне зоны линзы тестировщика (неоднозначность, неполнота, контракт — у аналитика и архитектора); судье передано не больше 2 таких; вне"
+        },
+        {
+          "source": "rules:placeholder.tbd",
+          "id": "rules#1",
+          "title": "Раздел документа оставлен заглушкой: «заполняются тестировщиками»",
+          "reason": ""
+        }
+      ]
+    },
+    {
+      "gold": "М4",
+      "level": "minor",
+      "title": "Нет ID и приоритетов у НФТ, требований к данным и интеграции",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
+      "owners": [
+        "rules",
+        "analyst",
+        "judge"
+      ],
+      "near": [
+        {
+          "finding": "D-01",
+          "status": "disputed",
+          "score": 1.9,
+          "arbiter": ""
+        }
+      ],
+      "seen_in": []
+    }
+  ],
+  "stage_recall": {
+    "consistency": {
+      "candidates": 8,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "lens:analyst": {
+      "candidates": 5,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "lens:architect": {
+      "candidates": 2,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "lens:qa": {
+      "candidates": 5,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "lens:risk": {
+      "candidates": 1,
+      "K": [],
+      "C": [],
+      "only_here": []
+    },
+    "rules": {
+      "candidates": 4,
+      "K": [],
+      "C": [],
+      "only_here": []
+    }
+  },
+  "gates": [
+    {
+      "metric": "К1–К5 найдены",
+      "value": "0/5",
+      "ok": true
+    },
+    {
+      "metric": "из них критичными",
+      "value": "0/5",
+      "ok": true
+    },
+    {
+      "metric": "С1–С20 найдены",
+      "value": "0/20",
+      "ok": true
+    },
+    {
+      "metric": "критичных ложных",
+      "value": "0",
+      "ok": true
+    },
+    {
+      "metric": "всего замечаний",
+      "value": "19",
+      "ok": true
+    },
+    {
+      "metric": "цитаты найдены в документе",
+      "value": "45/45",
+      "ok": true
+    },
+    {
+      "metric": "строк отчёта",
+      "value": "498",
+      "ok": true
+    },
+    {
+      "metric": "разделы п. 6 ТЗ",
+      "value": "6/6",
+      "ok": true
+    },
+    {
+      "metric": "общие фразы",
+      "value": "0",
+      "ok": true
+    },
+    {
+      "metric": "рубрика понятности",
+      "value": "16/19",
+      "ok": false
+    },
+    {
+      "metric": "английские слова",
+      "value": "1",
+      "ok": false
+    },
+    {
+      "metric": "вердикт разработка/тестирование",
+      "value": "yes/yes",
+      "ok": true
+    },
+    {
+      "metric": "время, мин",
+      "value": "4.8",
+      "ok": true
+    },
+    {
+      "metric": "вызовов модели",
+      "value": "9",
+      "ok": true
+    }
+  ],
+  "arbiter": {
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
+    "pending": 25,
+    "model": ""
+  },
+  "seconds": 0.03
+}

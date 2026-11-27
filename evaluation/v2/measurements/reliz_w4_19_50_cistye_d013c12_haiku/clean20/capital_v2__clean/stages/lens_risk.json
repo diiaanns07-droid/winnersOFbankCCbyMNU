@@ -1,0 +1,16 @@
+{
+  "stage": "lens_risk",
+  "status": "ok",
+  "seconds": 30.67,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 47,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [],
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

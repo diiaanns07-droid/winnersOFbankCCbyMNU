@@ -1,0 +1,322 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 88.53,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 75,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Частичные возвраты по одной покупке не описаны в данных и правиле Ф-6",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "line": 39,
+            "quote": "Возврат (REFUND, полный или частичный) исключает сумму округления исходной покупки из накопленной суммы за сутки проведения этой покупки"
+          },
+          {
+            "line": 51,
+            "quote": "Д-2. Участвующие покупки (roundup_purchase: operationId, карта, время проведения, сумма покупки, шаг, сумма округления, operationId возврата при исключении)"
+          }
+        ],
+        "problem": "Ф-6 допускает несколько частичных возвратов по одной покупке, но в roundup_purchase хранится один operationId возврата. Не описано, что делать со вторым и последующими возвратами по той же покупке.",
+        "scenario": "Покупка 1 250,00 ₸, шаг 100 ₸ (сумма округления 50,00 ₸). Два частичных возврата с разными operationId по 300 ₸ до фиксации. Первый исключает 50,00 ₸ и записывает operationId. Второй: поле уже занято, то есть либо перезаписывается, либо вычитается повторно и накопленная сумма уходит ниже нуля.",
+        "impact": "Разные разработчики реализуют накопленную сумму по-разному, а итоговая сумма к переводу и показатель «Накоплено сегодня» расходятся.",
+        "recommendation": "Указать хранение всех operationId возвратов по покупке и правило: сумма округления исключается один раз по первому возврату, повторные возвраты не меняют накопленную сумму. Уточнить бизнес-решение по повторным частичным возвратам.",
+        "rewrite": "Д-2: roundup_purchase — список operationId возвратов по покупке; сумма округления исключается однократно по первому возврату; последующие возвраты по покупке не меняют накопленную сумму <уточнить: подтвердить это правило для повторных частичных возвратов>.",
+        "question": "Исключается ли сумма округления повторно при каждом следующем частичном возврате по той же покупке?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Повтор и ошибка отправки push не описаны",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "line": 54,
+            "quote": "Сервис копилки → сервис уведомлений: POST /notifications/v1/push."
+          },
+          {
+            "line": 40,
+            "quote": "клиент получает push «Не удалось перевести N ₸ в копилку: причина»"
+          }
+        ],
+        "problem": "Для вызова push не описаны ответ, ошибка и повтор, хотя для переводов повтор описан подробно. Push о невыполненном переводе — обязательная часть Ф-7.",
+        "scenario": "POST /notifications/v1/push возвращает 503 после окончательного отказа перевода. Документ не говорит, повторять ли отправку и через сколько, поэтому клиент может не получить причину, а при повторе может получить два одинаковых push.",
+        "impact": "Клиент не узнает о неудачном переводе, либо получит дубликаты; тест на этот случай нельзя написать по тексту.",
+        "recommendation": "Описать поведение при ошибке push: число повторов и интервал, а также признак, что push по этому переводу уже отправлен.",
+        "rewrite": "Сервис копилки → сервис уведомлений: POST /notifications/v1/push при ответе 5xx повторяется <уточнить: число попыток и интервал>; push по одному переводу отправляется не более одного раза.",
+        "question": "",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Название и номер сохранённого счёта на экране не получаются ни из одного метода",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [],
+        "evidence": [
+          {
+            "line": 27,
+            "quote": "выбор «Сберегательный счёт» (название и последние четыре цифры номера из списка сберегательных счетов клиента, И-3)"
+          },
+          {
+            "line": 184,
+            "quote": "savingsAccountId | string | null, если копилка не настраивалась | «Сберегательный счёт» | savings_account_id"
+          }
+        ],
+        "problem": "Метод 2 возвращает только savingsAccountId. Название и последние четыре цифры сохранённого счёта берутся из списка И-3, но документ не говорит, что приложение должно сопоставить их по идентификатору.",
+        "scenario": "Клиент открывает экран при выключенном переключателе. Метод 2 вернул savingsAccountId acc-7781. Приложение не знает, какие название и цифры показать, пока не сопоставит ответ со списком И-3.",
+        "impact": "Разработчики мобильного приложения и сервера по-разному реализуют показ сохранённого счёта, а тесты не могут подтвердить показ.",
+        "recommendation": "Явно указать сопоставление: название и последние четыре цифры сохранённого счёта берутся из И-3 по savingsAccountId; если счёта нет в списке, поле пустое.",
+        "rewrite": "Экран «Копилка» при выключенном переключателе показывает название и последние четыре цифры счёта, найденного в списке И-3 по savingsAccountId из ответа метода 2; если счёта в списке нет, поле пустое.",
+        "question": "",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "PUT /roundup/v1/cards/{cardId}/settings",
+          "method": "PUT",
+          "purpose": "изменение",
+          "line": 137
+        },
+        {
+          "name": "GET /roundup/v1/cards/{cardId}/settings",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 199
+        },
+        {
+          "name": "card.operations.posted",
+          "method": "событие",
+          "purpose": "чтение",
+          "line": 54
+        },
+        {
+          "name": "GET /processing/v1/cards/{cardId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 54
+        },
+        {
+          "name": "GET /accounts/v1/clients/me/accounts?type=SAVINGS&currency=KZT",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 54
+        },
+        {
+          "name": "GET /accounts/v1/accounts/{accountId}",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 54
+        },
+        {
+          "name": "POST /transfers/v1/internal",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 54
+        },
+        {
+          "name": "POST /notifications/v1/push",
+          "method": "POST",
+          "purpose": "уведомление",
+          "line": 54
+        }
+      ],
+      "promises": [
+        {
+          "what": "получить и сохранить настройки копилки",
+          "line": 54,
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings"
+        },
+        {
+          "what": "показать сохранённые значения настроек и показатели «Накоплено сегодня», «Переведено в этом месяце», «Осталось до предела»",
+          "line": 27,
+          "operation": "GET /roundup/v1/cards/{cardId}/settings"
+        },
+        {
+          "what": "выбрать сберегательный счёт из списка с названием и последними четырьмя цифрами номера",
+          "line": 27,
+          "operation": "GET /accounts/v1/clients/me/accounts?type=SAVINGS&currency=KZT"
+        },
+        {
+          "what": "перевести сумму к переводу с карточного счёта на сберегательный счёт",
+          "line": 37,
+          "operation": "POST /transfers/v1/internal"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            178,
+            191
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "400",
+          "lines": [
+            147,
+            178,
+            192
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "401",
+          "lines": [
+            146,
+            178,
+            193
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "404",
+          "lines": [
+            148,
+            178,
+            194
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422",
+          "lines": [
+            149,
+            178,
+            195
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "500",
+          "lines": [
+            148,
+            149,
+            178,
+            196
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "503",
+          "lines": [
+            81
+          ],
+          "described": false,
+          "note": "ответ сервиса переводов, не код метода"
+        }
+      ],
+      "fields": [
+        {
+          "name": "enabled",
+          "places": "запрос: boolean, обязательно; ответ: boolean"
+        },
+        {
+          "name": "roundingStep",
+          "places": "запрос: integer, обязательно при enabled=true; ответ: integer или null, тенге"
+        },
+        {
+          "name": "savingsAccountId",
+          "places": "запрос: string 1–64, обязательно при enabled=true; ответ: string или null"
+        },
+        {
+          "name": "monthlyLimit",
+          "places": "запрос: integer, обязательно при enabled=true; ответ: integer или null, тенге"
+        },
+        {
+          "name": "accruedToday",
+          "places": "ответ: number, два знака, тенге"
+        },
+        {
+          "name": "transferredThisMonth",
+          "places": "ответ: number, два знака, тенге"
+        },
+        {
+          "name": "limitRemaining",
+          "places": "ответ: number, два знака, тенге, null если monthlyLimit=null"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "шаг 1: нет или истекла сессия",
+          "line": 146,
+          "outcome": "401, {\"message\"}"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "шаг 2: тело не соответствует схеме",
+          "line": 147,
+          "outcome": "400, {\"message\"}"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "шаг 3: карта не найдена или чужая",
+          "line": 148,
+          "outcome": "404, {\"message\"}"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "шаг 3: карточный процессинг не ответил",
+          "line": 148,
+          "outcome": "500, {\"message\"}"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "шаг 4: бизнес-проверка не пройдена при enabled=true",
+          "line": 149,
+          "outcome": "422, {\"errorCode\",\"message\"}"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "шаг 4: сервис счетов не ответил",
+          "line": 149,
+          "outcome": "500, {\"message\"}"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "шаг 5: значения сохранены или не изменились",
+          "line": 150,
+          "outcome": "200, состояние копилки"
+        },
+        {
+          "operation": "GET /roundup/v1/cards/{cardId}/settings",
+          "step": "ошибки 401, 404, 500",
+          "line": 199,
+          "outcome": "401, 404, 500 как у метода 1"
+        },
+        {
+          "operation": "PUT /roundup/v1/cards/{cardId}/settings",
+          "step": "особое правило 2: enabled=false",
+          "line": 154,
+          "outcome": "200, ранее сохранённые значения"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

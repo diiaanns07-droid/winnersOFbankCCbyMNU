@@ -1,0 +1,440 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 128.46,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 86,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Параллельные запросы метода 1 по одной котировке дают две проводки",
+        "kind": "contradiction",
+        "criterion": "set_consistent",
+        "severity": "major",
+        "requirement_ids": [
+          "R-12",
+          "R-49",
+          "R-50",
+          "R-32"
+        ],
+        "evidence": [
+          {
+            "line": 42,
+            "quote": "По одной котировке выполняется не более одного обмена."
+          },
+          {
+            "line": 134,
+            "quote": "Котировка со статусом USED — 422 QUOTE_ALREADY_USED"
+          },
+          {
+            "line": 135,
+            "quote": "Создать обмен со статусом PROCESSING и передать в АБС проводку по счетам и суммам котировки с ключом exchangeId"
+          },
+          {
+            "line": 78,
+            "quote": "Один — 200, другой — 422 QUOTE_ALREADY_USED; проводка одна"
+          }
+        ],
+        "problem": "Шаг 3 отказывает только при статусе USED, а статус USED ставится лишь после DONE (шаг 5). Пока первый обмен в PROCESSING, второй запрос с котировкой ACTIVE проходит шаг 3 и создаёт второй обмен с второй проводкой. Критерий 12 ожидает одну проводку и 422 QUOTE_ALREADY_USED.",
+        "scenario": "Два запроса метода 1 с R3 и R4 приходят одновременно по котировке ACTIVE. Первый ставит обмен в PROCESSING. Второй на шаге 3 видит ACTIVE, на шаге 4 шлёт вторую проводку в АБС. По тексту возможны 200 на оба запроса и два списания, либо 422 на второй, что противоречит тексту шага 3.",
+        "impact": "Двойное списание по одной котировке и расхождение с критерием 12, который по тексту логики не воспроизводится.",
+        "recommendation": "Добавить в шаг 3 проверку статуса обмена PROCESSING по этой котировке с явным ответом и кодом; уточнить ответ второму запросу, пока первый не завершён.",
+        "rewrite": "Шаг 3 метода 1: котировка с обменом в статусе PROCESSING — не создавать второй обмен; ответ: <уточнить: код и errorCode для запроса, пришедшего во время PROCESSING>; котировка USED — 422 QUOTE_ALREADY_USED.",
+        "question": "Какой код и тело ответа получает второй запрос, пришедший, пока первый обмен по этой котировке в статусе PROCESSING?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Пример тела 404 в таблице не совпадает с errorCode для счёта",
+        "kind": "status_conflict",
+        "criterion": "set_consistent",
+        "severity": "major",
+        "requirement_ids": [
+          "R-79",
+          "R-33",
+          "R-77"
+        ],
+        "evidence": [
+          {
+            "line": 187,
+            "quote": "{\"errorCode\":\"QUOTE_NOT_FOUND\",\"message\":\"Котировка не найдена\"}"
+          },
+          {
+            "line": 79,
+            "quote": "404 ACCOUNT_NOT_FOUND; 404 QUOTE_NOT_FOUND"
+          }
+        ],
+        "problem": "Для метода 2 при счёте не найденном среди счетов клиента текст задаёт 404 ACCOUNT_NOT_FOUND, а единственный пример тела 404 содержит QUOTE_NOT_FOUND. Для метода 2 примера тела ACCOUNT_NOT_FOUND нет.",
+        "scenario": "Клиент передаёт чужой creditAccountId в метод 2. По тексту строки 79 приходит 404 ACCOUNT_NOT_FOUND; по примеру строки 187 клиент ждёт QUOTE_NOT_FOUND, и разработчик не знает, какой errorCode вернуть.",
+        "impact": "Клиентское приложение и тесты разбирают errorCode по примеру и получают другой код для той же ошибки.",
+        "recommendation": "Указать для кода 404 два тела — по методу 2 и по методу 1, каждое со своим errorCode и message.",
+        "rewrite": "404 Not Found, метод 2: {\"errorCode\":\"ACCOUNT_NOT_FOUND\",\"message\":\"Счёт не найден\"}; метод 1: {\"errorCode\":\"QUOTE_NOT_FOUND\",\"message\":\"Котировка не найдена\"}",
+        "question": "",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Статус обмена FAILED при неподтверждённой отмене проводки",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "major",
+        "requirement_ids": [
+          "R-50",
+          "R-57",
+          "R-30",
+          "R-17"
+        ],
+        "evidence": [
+          {
+            "line": 135,
+            "quote": "В этих случаях обмен получает статус FAILED, котировка остаётся ACTIVE."
+          },
+          {
+            "line": 145,
+            "quote": "повторяет её каждые 30 с до подтверждения"
+          },
+          {
+            "line": 53,
+            "quote": "status (PROCESSING — проводка передана в АБС, DONE — проведена, FAILED — не выполнена)"
+          }
+        ],
+        "problem": "Текст ставит FAILED и оставляет котировку ACTIVE сразу после таймаута АБС, хотя отмена проводки ещё не подтверждена и может не выполниться. Состояния для незавершённой отмены в Д-2 нет, а правило отмены не задаёт исход при её неудаче.",
+        "scenario": "АБС не отвечает на проводку 10 с. Сервис отправил отмену и вернул 500; обмен стал FAILED, котировка ACTIVE. Отмена не подтверждается, проводка может быть проведена позже. Клиент повторяет запрос с новым requestId и получает вторую проводку.",
+        "impact": "Итоговые остатки счетов и статус обмена в системе расходятся с ответом клиенту; сверка не может определить, выполнен ли обмен.",
+        "recommendation": "Добавить в Д-2 статус для обмена с неподтверждённой отменой и задать, когда ставится FAILED и котировка возвращается в ACTIVE.",
+        "rewrite": "Д-2 status: добавить значение <уточнить: название статуса> — отмена проводки не подтверждена; FAILED ставится только после подтверждения отмены «отменено».",
+        "question": "Что происходит с обменом и котировкой, если отмена проводки не подтверждается, и должна ли котировка оставаться ACTIVE?",
+        "blocks": "both",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "POST /fx/v1/exchanges (метод 1, обмен по котировке)",
+          "method": "POST",
+          "purpose": "создание обмена и изменение остатков через проводку; возврат результата",
+          "line": 122
+        },
+        {
+          "name": "POST /fx/v1/quotes (метод 2, создание котировки)",
+          "method": "POST",
+          "purpose": "создание котировки",
+          "line": 122
+        },
+        {
+          "name": "GET /accounts/v1/accounts (сервис счетов, список)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 56
+        },
+        {
+          "name": "GET /accounts/v1/accounts/{accountId} (сервис счетов)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 56
+        },
+        {
+          "name": "GET /abs/v1/calendar/{date} (АБС)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 56
+        },
+        {
+          "name": "POST /abs/v1/fx-postings (АБС, проводка)",
+          "method": "POST",
+          "purpose": "изменение",
+          "line": 56
+        },
+        {
+          "name": "POST /abs/v1/fx-postings/{exchangeId}/cancel (АБС, отмена)",
+          "method": "POST",
+          "purpose": "изменение",
+          "line": 56
+        },
+        {
+          "name": "GET /rates/v1/retail (сервис курсов)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 56
+        },
+        {
+          "name": "POST /notifications/v1/push (сервис уведомлений)",
+          "method": "POST",
+          "purpose": "уведомление",
+          "line": 56
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать доступный остаток счёта списания и зачисления в списках экрана обмена",
+          "line": 28,
+          "operation": "GET /accounts/v1/accounts (сервис счетов, список)"
+        },
+        {
+          "what": "получить список счетов клиента",
+          "line": 56,
+          "operation": "GET /accounts/v1/accounts (сервис счетов, список)"
+        },
+        {
+          "what": "проверить остаток счёта списания по данным сервиса счетов",
+          "line": 38,
+          "operation": "GET /accounts/v1/accounts/{accountId} (сервис счетов)"
+        },
+        {
+          "what": "получить курсы buy/sell из сервиса курсов",
+          "line": 56,
+          "operation": "GET /rates/v1/retail (сервис курсов)"
+        },
+        {
+          "what": "выполнить проводку в АБС одной транзакцией",
+          "line": 43,
+          "operation": "POST /abs/v1/fx-postings (АБС, проводка)"
+        },
+        {
+          "what": "отправить push клиенту о выполненном обмене",
+          "line": 44,
+          "operation": "POST /notifications/v1/push (сервис уведомлений)"
+        },
+        {
+          "what": "создать котировку с курсом и суммой зачисления",
+          "line": 41,
+          "operation": "POST /fx/v1/quotes (метод 2, создание котировки)"
+        },
+        {
+          "what": "выполнить обмен по котировке и вернуть результат",
+          "line": 42,
+          "operation": "POST /fx/v1/exchanges (метод 1, обмен по котировке)"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            76,
+            184,
+            70
+          ],
+          "described": true,
+          "note": "метод 2 — котировка создана; метод 1 — обмен или сохранённый ответ"
+        },
+        {
+          "code": "400 VALIDATION_ERROR",
+          "lines": [
+            77,
+            139,
+            185
+          ],
+          "described": true,
+          "note": "условие и тело заданы"
+        },
+        {
+          "code": "401 UNAUTHORIZED",
+          "lines": [
+            132,
+            139,
+            186
+          ],
+          "described": true,
+          "note": "условие и тело заданы"
+        },
+        {
+          "code": "404 ACCOUNT_NOT_FOUND",
+          "lines": [
+            140,
+            79,
+            187
+          ],
+          "described": false,
+          "note": "в строке 187 пример тела для 404 содержит QUOTE_NOT_FOUND, для методом 2 ACCOUNT_NOT_FOUND примера нет"
+        },
+        {
+          "code": "404 QUOTE_NOT_FOUND",
+          "lines": [
+            134,
+            187,
+            79
+          ],
+          "described": true,
+          "note": "условие и тело заданы"
+        },
+        {
+          "code": "422 PAIR_NOT_SUPPORTED",
+          "lines": [
+            140,
+            188
+          ],
+          "described": true,
+          "note": "условие и тело заданы"
+        },
+        {
+          "code": "422 ACCOUNT_NOT_AVAILABLE",
+          "lines": [
+            140,
+            135,
+            189
+          ],
+          "described": true,
+          "note": "условие и тело заданы"
+        },
+        {
+          "code": "422 AMOUNT_OUT_OF_LIMITS",
+          "lines": [
+            140,
+            190
+          ],
+          "described": true,
+          "note": "условие и тело заданы"
+        },
+        {
+          "code": "422 INSUFFICIENT_FUNDS",
+          "lines": [
+            135,
+            140,
+            191
+          ],
+          "described": true,
+          "note": "условие и тело заданы"
+        },
+        {
+          "code": "422 QUOTE_ALREADY_USED",
+          "lines": [
+            134,
+            192,
+            78
+          ],
+          "described": true,
+          "note": "условие USED; при PROCESSING код не задан"
+        },
+        {
+          "code": "422 QUOTE_EXPIRED",
+          "lines": [
+            134,
+            193
+          ],
+          "described": true,
+          "note": "условие и тело заданы"
+        },
+        {
+          "code": "500 INTERNAL_ERROR",
+          "lines": [
+            135,
+            138,
+            145,
+            194
+          ],
+          "described": true,
+          "note": "условие и тело заданы"
+        }
+      ],
+      "fields": [
+        {
+          "name": "quoteId",
+          "places": "string, 36, UUID; запрос метода 1 (строка 158), ответ метода 2 (строка 170), пример (строка 197)"
+        },
+        {
+          "name": "requestId",
+          "places": "string, 36, UUID; только запрос метода 1 (строка 159)"
+        },
+        {
+          "name": "debitAmount",
+          "places": "string, ^\\d{1,12}\\.\\d{2}$; запрос метода 2 (строка 162), ответ (строка 171)"
+        },
+        {
+          "name": "rate",
+          "places": "string, ^\\d{1,6}\\.\\d{2}$; ответ (строка 175); хранится numeric(8,2) (строка 53)"
+        },
+        {
+          "name": "rateType",
+          "places": "string, WORKING / NON_WORKING; ответ (строка 176)"
+        },
+        {
+          "name": "createdAt / expiresAt",
+          "places": "string, ISO 8601; ответ метода 2 (строки 177–178)"
+        },
+        {
+          "name": "executedAt",
+          "places": "string, ISO 8601; ответ метода 1 (строка 179); хранится только при DONE (строка 53)"
+        },
+        {
+          "name": "exchangeId",
+          "places": "string, UUID; ответ метода 1 (строка 169); exchange_id (строка 169)"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "метод 1",
+          "step": "проверка сессии и формата тела",
+          "line": 132,
+          "outcome": "401 UNAUTHORIZED / 400 VALIDATION_ERROR с errorCode и message"
+        },
+        {
+          "operation": "метод 1",
+          "step": "сохранённый ответ 200 по ключу клиент+quoteId+requestId",
+          "line": 133,
+          "outcome": "вернуть сохранённое тело"
+        },
+        {
+          "operation": "метод 1",
+          "step": "котировка не найдена / USED / позже expiresAt",
+          "line": 134,
+          "outcome": "404 QUOTE_NOT_FOUND; 422 QUOTE_ALREADY_USED; 422 QUOTE_EXPIRED"
+        },
+        {
+          "operation": "метод 1",
+          "step": "создать обмен PROCESSING, проводка в АБС; отказы АБС",
+          "line": 135,
+          "outcome": "422 INSUFFICIENT_FUNDS; 422 ACCOUNT_NOT_AVAILABLE; 500 INTERNAL_ERROR"
+        },
+        {
+          "operation": "метод 1",
+          "step": "таймаут АБС — отмена проводки",
+          "line": 135,
+          "outcome": "500 INTERNAL_ERROR"
+        },
+        {
+          "operation": "метод 1",
+          "step": "ответ АБС «проведено»",
+          "line": 136,
+          "outcome": "200 с телом обмена"
+        },
+        {
+          "operation": "метод 1",
+          "step": "отмена проводки повторяется каждые 30 с до подтверждения",
+          "line": 145,
+          "outcome": "500 после первой отправки отмены; дальнейший исход не задан"
+        },
+        {
+          "operation": "метод 2",
+          "step": "проверка сессии и тела",
+          "line": 139,
+          "outcome": "401 UNAUTHORIZED / 400 VALIDATION_ERROR"
+        },
+        {
+          "operation": "метод 2",
+          "step": "проверки счетов, пары, лимита, остатка",
+          "line": 140,
+          "outcome": "404 ACCOUNT_NOT_FOUND; 422 PAIR_NOT_SUPPORTED; 422 ACCOUNT_NOT_AVAILABLE; 422 AMOUNT_OUT_OF_LIMITS; 422 INSUFFICIENT_FUNDS"
+        },
+        {
+          "operation": "метод 2",
+          "step": "сбой сервисов счетов, АБС или курсов",
+          "line": 138,
+          "outcome": "500 INTERNAL_ERROR"
+        },
+        {
+          "operation": "метод 2",
+          "step": "котировка сохраняется и возвращается",
+          "line": 141,
+          "outcome": "200 с телом котировки"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}

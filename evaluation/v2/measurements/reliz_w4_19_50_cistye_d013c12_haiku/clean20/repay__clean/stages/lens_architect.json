@@ -1,0 +1,344 @@
+{
+  "stage": "lens_architect",
+  "status": "ok",
+  "seconds": 75.85,
+  "calls": 1,
+  "error": "",
+  "input": {
+    "requirements": 100,
+    "requirements_source": "heuristic"
+  },
+  "output": {
+    "candidates": [
+      {
+        "title": "Повтор с ключом, когда операция в статусе PROCESSING, не описан",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-055",
+          "R-061"
+        ],
+        "evidence": [
+          {
+            "quote": "новый ключ зарегистрировать с новым operationId и статусом операции PROCESSING",
+            "line": 132
+          },
+          {
+            "quote": "после 422 или 500 сервис запрашивает статус операции в АБС",
+            "line": 139
+          }
+        ],
+        "problem": "Правило повтора описывает ключ после 200, 422 и 500, но не описывает запрос с уже зарегистрированным ключом, пока первый запрос в статусе PROCESSING. Приложение повторяет запрос по таймауту 30 с (строка 26), и ответ для этого случая не определён.",
+        "scenario": "Клиент нажал «Подтвердить», сервер ещё обрабатывает запрос с ключом K. Приложение по таймауту 30 с отправляет «Повторить» с тем же K. Правило шага 4 и особое правило 2 не говорят, вернуть 500, 409 или ждать результата.",
+        "impact": "Разработчики по-разному реализуют ответ на повтор во время обработки; тест не может проверить единственный исход.",
+        "recommendation": "Добавить в особое правило 2 явный исход для статуса PROCESSING с точным кодом и телом ответа.",
+        "rewrite": "Особое правило 2, добавить: тот же ключ при операции в статусе PROCESSING — 500 INTERNAL_ERROR «Не удалось получить результат» без обращения к АБС, либо ожидание результата; <уточнить: код и поведение>.",
+        "question": "Какой ответ получает повтор с ключом, пока первый запрос ещё в обработке?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "После 422 повтор с тем же ключом может дать 200, но статус REJECTED финальный",
+        "kind": "contradiction",
+        "criterion": "set_consistent",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-061",
+          "R-062"
+        ],
+        "evidence": [
+          {
+            "quote": "после 422 или 500 сервис запрашивает статус операции в АБС",
+            "line": 139
+          },
+          {
+            "quote": "При ответе 422 операция получает статус REJECTED, при ответе 500 — UNKNOWN",
+            "line": 140
+          }
+        ],
+        "problem": "Особое правило 2 при повторе после 422 запрашивает статус в АБС и может вернуть 200 «проведена». Особое правило 3 фиксирует статус REJECTED при 422, а строка 158 говорит, что при 422 погашение не проведено. Итоговый исход повтора после 422 не определён.",
+        "scenario": "Первый запрос с ключом K вернул 422 SOURCE_UNAVAILABLE, операция REJECTED. Повтор с тем же K и телом: АБС отвечает «проведена», сервис по правилу 2 возвращает 200, хотя по статусу операции погашения быть не должно.",
+        "impact": "Клиент видит отказ, а затем успех по тому же ключу; без выбора исхода возможно двойное списание при ручной проверке.",
+        "recommendation": "Согласовать: после 422 повтор с ключом не обращается к АБС и возвращает 422, либо статус REJECTED меняется при подтверждении АБС.",
+        "rewrite": "Особое правило 2: после 422 повтор с тем же ключом возвращает сохранённый 422 без обращения к АБС; <уточнить: или допускается изменение статуса REJECTED по статусу АБС>.",
+        "question": "Может ли операция, получившая 422 и статус REJECTED, стать проведённой по повтору с тем же ключом?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Поведение при сбое push и его повторе не описано, хотя обещан один push",
+        "kind": "incomplete",
+        "criterion": "complete",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-059",
+          "R-045",
+          "R-050"
+        ],
+        "evidence": [
+          {
+            "quote": "асинхронно передать push по Ф-9",
+            "line": 136
+          },
+          {
+            "quote": "200 с тем же operationId; одно списание, один push",
+            "line": 76
+          }
+        ],
+        "problem": "Документ обещает ровно один push при повторе запроса, но не описывает сбой отправки push в сервис уведомлений после ответа 200 и повтор отправки. Ключ, по которому push распознаётся как уже отправленный, не указан.",
+        "scenario": "Погашение проведено, операция DONE, сервис уведомлений не принял push. Повтор с тем же ключом возвращает сохранённый 200 без нового push по особому правилу 2, и клиент не получает уведомление никогда.",
+        "impact": "Клиент не получает подтверждение списания; тест «один push» не имеет определённого сценария сбоя.",
+        "recommendation": "Описать повтор push по операции до подтверждения доставки и ключ дедупликации push по operationId.",
+        "rewrite": "Push ставится в очередь по operationId; повтор отправки до подтверждения сервисом уведомлений, дедупликация по operationId; <уточнить: число попыток и интервал>.",
+        "question": "Что происходит с push, если сервис уведомлений не принял его после ответа 200?",
+        "blocks": "both",
+        "source": "lens:architect"
+      },
+      {
+        "title": "Один компонент назван «Мобильное приложение» и «Приложение»",
+        "kind": "terminology",
+        "criterion": "unambiguous",
+        "severity": "minor",
+        "requirement_ids": [
+          "R-002",
+          "R-019"
+        ],
+        "evidence": [
+          {
+            "quote": "Мобильное приложение → сервер мобильного банка",
+            "line": 20
+          },
+          {
+            "quote": "Приложение → сервис досрочного погашения: условия (метод 2)",
+            "line": 42
+          }
+        ],
+        "problem": "Один и тот же клиентский компонент назван в архитектуре «Мобильное приложение», а в последовательности «Приложение». Сопоставить схемы без догадок нельзя.",
+        "scenario": "Интегратор ищет в схеме процесса компонент «Приложение» и не находит его в архитектуре, где он назван «Мобильное приложение».",
+        "impact": "Разночтение в описании состава систем, без влияния на поведение.",
+        "recommendation": "Использовать один термин во всех схемах.",
+        "rewrite": "Во всех схемах и тексте использовать «Мобильное приложение».",
+        "question": "",
+        "blocks": "development",
+        "source": "lens:architect"
+      }
+    ],
+    "inventory": {
+      "operations": [
+        {
+          "name": "POST /loans/{loanId}/early-repayments (метод 1, проведение)",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 121
+        },
+        {
+          "name": "GET /loans/{loanId}/early-repayments/terms (метод 2, условия)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 199
+        },
+        {
+          "name": "POST /loans/{loanId}/early-repayments/calculations (метод 3, расчёт)",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 200
+        },
+        {
+          "name": "GET /loans (сервер мобильного банка)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 49
+        },
+        {
+          "name": "GET /accounts (сервер мобильного банка)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 49
+        },
+        {
+          "name": "GET /loans/{loanId}/schedule (сервер мобильного банка)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 49
+        },
+        {
+          "name": "GET /abs/loans/{loanId} (АБС)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 50
+        },
+        {
+          "name": "POST /abs/loans/{loanId}/prepayments/calculate (АБС)",
+          "method": "POST",
+          "purpose": "создание",
+          "line": 50
+        },
+        {
+          "name": "POST /abs/loans/{loanId}/prepayments (АБС, проведение)",
+          "method": "POST",
+          "purpose": "изменение",
+          "line": 50
+        },
+        {
+          "name": "GET /abs/prepayments/{operationId} (АБС, статус)",
+          "method": "GET",
+          "purpose": "чтение",
+          "line": 50
+        },
+        {
+          "name": "POST /notifications/push (сервис уведомлений)",
+          "method": "POST",
+          "purpose": "уведомление",
+          "line": 51
+        }
+      ],
+      "promises": [
+        {
+          "what": "показать остаток основного долга и проценты на дату погашения",
+          "line": 23,
+          "operation": "GET /loans/{loanId}/early-repayments/terms (метод 2, условия)"
+        },
+        {
+          "what": "показать ежемесячный платёж и число оставшихся платежей на экране подтверждения",
+          "line": 24,
+          "operation": "POST /loans/{loanId}/early-repayments/calculations (метод 3, расчёт)"
+        },
+        {
+          "what": "провести погашение и получить результат",
+          "line": 48,
+          "operation": "POST /loans/{loanId}/early-repayments (метод 1, проведение)"
+        },
+        {
+          "what": "получить условия досрочного погашения",
+          "line": 48,
+          "operation": "GET /loans/{loanId}/early-repayments/terms (метод 2, условия)"
+        }
+      ],
+      "codes": [
+        {
+          "code": "200",
+          "lines": [
+            158,
+            175
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "400",
+          "lines": [
+            158,
+            176
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "401",
+          "lines": [
+            129,
+            158,
+            177
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "404",
+          "lines": [
+            131,
+            158,
+            178
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "409",
+          "lines": [
+            158,
+            179
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "422",
+          "lines": [
+            158,
+            180,
+            183
+          ],
+          "described": true,
+          "note": ""
+        },
+        {
+          "code": "500",
+          "lines": [
+            158,
+            181
+          ],
+          "described": true,
+          "note": ""
+        }
+      ],
+      "fields": [
+        {
+          "name": "Idempotency-Key",
+          "places": "заголовок, string, 36, обязательный, UUID (строка 118); ключ хранится в операции (строка 46)"
+        },
+        {
+          "name": "calculationId",
+          "places": "тело метода 1, string, 36, UUID (строка 155); ответ метода 3, string (строка 200); хранится в расчёте (строка 46)"
+        },
+        {
+          "name": "amount",
+          "places": "ответ метода 1, integer, ₸ (строка 164); метод 3, integer, ₸ (строка 200)"
+        },
+        {
+          "name": "operationId",
+          "places": "ответ метода 1, string, 1–64 (строка 161); хранится в операции (строка 46)"
+        },
+        {
+          "name": "monthlyPayment",
+          "places": "ответ метода 1, integer / null (строка 168); ответ метода 3 (строка 200)"
+        }
+      ],
+      "branches": [
+        {
+          "operation": "POST /loans/{loanId}/early-repayments",
+          "step": "проверка ключа идемпотентности; новый ключ регистрируется со статусом PROCESSING",
+          "line": 132,
+          "outcome": ""
+        },
+        {
+          "operation": "POST /loans/{loanId}/early-repayments",
+          "step": "повтор с ключом после 422 или 500: запрос статуса в АБС, «проведена» — 200",
+          "line": 139,
+          "outcome": "200 с результатом операции"
+        },
+        {
+          "operation": "POST /loans/{loanId}/early-repayments",
+          "step": "проверка расчёта: не найден или другой кредит — 422 CALCULATION_NOT_FOUND",
+          "line": 133,
+          "outcome": "422 CALCULATION_NOT_FOUND, поле errorCode и message"
+        },
+        {
+          "operation": "POST /loans/{loanId}/early-repayments",
+          "step": "отказ АБС из-за источника списания или остатка",
+          "line": 135,
+          "outcome": "422 SOURCE_UNAVAILABLE или 422 INSUFFICIENT_FUNDS"
+        },
+        {
+          "operation": "POST /loans/{loanId}/early-repayments",
+          "step": "ошибка АБС или нет ответа за 10 с",
+          "line": 135,
+          "outcome": "500 INTERNAL_ERROR"
+        }
+      ]
+    },
+    "requirements_source": "heuristic"
+  },
+  "warnings": []
+}
