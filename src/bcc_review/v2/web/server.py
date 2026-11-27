@@ -223,7 +223,7 @@ def index_page(app: App, *, error: str = "", provider: str = "", model: str = ""
         files = "".join(f'<a href="{e(u)}">{e(lbl)}</a>' for lbl, u in top["files"])
         acts = (f'<span class="sep" aria-hidden="true"></span>'
                 f'<a href="{e(href)}#questions"><span>Вопросы<span class="long"> владельцу</span></span><b class="n">{q}</b></a>'
-                f'<a href="{e(href)}#revised"><span><span class="long">Исправленная </span>редакция</span></a>'
+                f'<a href="{e(href)}#revised"><span class="long">Исправленная редакция</span><span class="short">Редакция</span></a>'
                 f'<details class="b-menu"><summary>Выгрузить</summary><div class="b-menu-pop">{files}</div></details>')
     cur = next((p for p in provs if p["id"] == sel), provs[0])
     err = f'<p class="dock-msg bad" id="dmsg" role="alert">{e(error)}</p>' if error else \

@@ -300,7 +300,7 @@ def build_sheet(report: dict[str, Any] | None, raw: list[str] | None, *, file_na
             sev = SEV.get(str(f.get("severity")), "minor")
             title = str(f.get("title") or f.get("problem") or "")
             notes += (f'<button type="button" class="b-note {sev}" data-f="{e(f.get("id"))}" style="--i:{note_i}">'
-                      f'<b>{e(f.get("id"))}</b>{e(title)}</button>')
+                      f'<b>{e(f.get("id"))}</b><span class="t">{e(title)}</span></button>')
             note_i += 1
         if notes:
             cls.append("has-note")

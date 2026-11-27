@@ -150,6 +150,8 @@ html{-webkit-text-size-adjust:100%;color-scheme:dark;background:var(--b-desk)}
 .b-note::before{content:"";position:absolute;left:-13px;top:calc(13px - var(--dy,0px));width:13px;height:var(--dy,0px);
   border:solid var(--b-desk-hair-2);border-width:0 0 1px 1px}
 .b-note b{display:block;font:500 12px/1.55 var(--b-mono);letter-spacing:.02em}
+.b-note .t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.b-note.on .t,.b-note:hover .t{-webkit-line-clamp:unset}
 .b-note.crit b{color:var(--b-desk-red)} .b-note.major b{color:var(--b-desk-gold)} .b-note.minor b{color:var(--b-desk-blue)}
 .b-note:hover,.b-note.on{color:var(--b-desk-ink);background:rgba(255,255,255,.04)}
 .b-note.on::before,.b-note.on::after{border-color:rgba(255,255,255,.55)}

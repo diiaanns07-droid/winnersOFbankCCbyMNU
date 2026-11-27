@@ -1,5 +1,6 @@
 /* Веб BCC Review: экраны. Язык (стол, лист, правка, печать, панель) — в tokens.css (№39). */
 
+.b-dock .short{display:none}
 .vh{position:absolute !important;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);border:0;opacity:0}
 
 /* ── стол: стопка · карта · лист · поля для заметок ── */
@@ -60,10 +61,14 @@
 @media (max-width:760px){
   .desk{display:block;padding:18px 0 150px}
   .desk-stack{padding:0 16px 18px}
+  .b-stack>.b-leaf{flex:0 0 210px;aspect-ratio:auto;min-height:74px;padding:12px 12px 10px;background-image:none}
+  .b-stack>.b-leaf .b-leaf-t{-webkit-line-clamp:1}
+  .b-sheet-head{display:none}
   .desk-map{display:none}
   .b-dock{left:8px;right:8px;bottom:10px;transform:none;flex-wrap:wrap;justify-content:center;max-width:none}
   .b-dock>a,.b-dock>label,.b-menu>summary{height:38px;padding:0 11px;font-size:14px}
   .b-dock .long{display:none}
+  .b-dock .short{display:inline}
   .b-dock .sep{display:none}
   .b-menu-pop{position:fixed;left:8px;right:8px;bottom:118px;min-width:0;width:auto}
   .dock-msg{bottom:calc(100% + 8px)}
