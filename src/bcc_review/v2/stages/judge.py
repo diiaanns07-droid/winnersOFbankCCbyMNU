@@ -172,6 +172,7 @@ def response_schema() -> dict:
         "requirement_ids": _SA,
         "problem": _S,
         "scenario": _S,
+        "wish": {"type": "boolean"},
         "severity_basis": _S,
         "severity": {"type": "string", "enum": SEVERITIES},
         "blocks": {"type": "string", "enum": BLOCKS},
@@ -727,6 +728,65 @@ def _merge_no_id(findings: list[dict], ctx: Any, warnings: list[str]) -> list[di
     return [f for f in findings if id(f) not in drop]
 
 
+_WISHES = {
+    "title": "Документ не рассматривает ряд случаев",
+    "lead": "Документ не говорит, что происходит в случаях: ",
+    "impact": "Без решения владельца продукта поведение в этих случаях выберут разработчики, и его нечем проверить.",
+    "recommendation": "Решить с владельцем продукта, какие из перечисленных случаев описать в требованиях, а какие "
+                      "явно исключить из объёма доработки.",
+    "kind": "incomplete", "criterion": "set_complete", "warn": "пожелания полноты",
+}
+_PLACEHOLDERS = {
+    "title": "Не заполнены поля и разделы шаблона документа",
+    "lead": "Оставлены незаполненными или заглушкой: ",
+    "impact": "Документ нельзя считать согласованным и прослеживаемым: не видно версии, ответственных и источников.",
+    "recommendation": "Заполнить перечисленные поля и разделы шаблона или явно указать «не применимо» с причиной.",
+    "kind": "placeholder", "criterion": "conforming", "warn": "незаполненные поля шаблона",
+}
+
+
+def _lc_first(text: str) -> str:
+    """Первая буква строчная, кроме аббревиатур и ID («ID», «Ф-2», «НФТ»)."""
+    if len(text) > 1 and (text[1].isupper() or not text[1].isalpha()):
+        return text
+    return text[:1].lower() + text[1:]
+
+
+def _consolidate(findings: list[dict], pred, spec: dict, ctx: Any, warnings: list[str]) -> list[dict]:
+    """Однотипные мелочи — одно minor на документ: дефекты, отобранные ``pred``, сводятся в один со всеми местами."""
+    hits = [f for f in findings if pred(f)]
+    if not hits:
+        return findings
+    if len(hits) == 1:
+        hits[0]["severity"], hits[0]["blocks"], hits[0]["priority"] = "minor", "none", 0
+        return findings
+    hits.sort(key=lambda f: f["_first_line"])
+    members = [m for f in hits for m in f["_members"]]
+    items = [re.sub(r"[.;:\s]+$", "", f["title"]) for f in hits]
+    lead = spec["lead"]
+    listed = "; ".join(_lc_first(x) for x in items[:10])
+    main = dict(hits[0])
+    main.update({
+        "candidate_ids": sorted({c for f in hits for c in f["candidate_ids"]}, key=_cid_num),
+        "title": spec["title"],
+        "kind": spec["kind"], "criterion": spec["criterion"],
+        "standard_refs": list(STANDARD_REFS.get(spec["criterion"], [])),
+        "severity": "minor", "blocks": "none", "priority": 0,
+        "requirement_ids": list(dict.fromkeys(r for f in hits for r in f["requirement_ids"])),
+        "evidence": _pick_evidence(members, None),
+        "problem": _cut(lead + listed + ".", 900),
+        "scenario": "", "impact": spec["impact"], "recommendation": spec["recommendation"],
+        "rewrite": "", "question": "",
+        "sources": _sources(members), "_members": members, "_wish": False,
+    })
+    main["_first_line"] = main["evidence"][0]["line_start"] if main["evidence"] else hits[0]["_first_line"]
+    _warn(ctx, warnings, f"судья: {len(hits)} замечаний ({spec['warn']}) сведены в одно незначительное")
+    drop = {id(f) for f in hits}
+    out = [f for f in findings if id(f) not in drop]
+    out.append(main)
+    return out
+
+
 def _cap_critical(findings: list[dict], ctx: Any, warnings: list[str]) -> None:
     crit = [f for f in findings if f["severity"] == "critical"]
     if len(crit) <= MAX_CRITICAL:
@@ -926,11 +986,15 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             "sources": _sources(members),
             "_members": members,
             "_first_line": evidence[0]["line_start"],
+            "_wish": f.get("wish") is True,
         }
         _calibrate(item, members, ctx, warnings, run_sources)
         findings.append(item)
 
     findings = _merge_no_id(findings, ctx, warnings)
+    findings = _consolidate(findings, lambda f: f["_wish"] and f["severity"] != "critical", _WISHES, ctx, warnings)
+    findings = _consolidate(findings, lambda f: f["kind"] == "placeholder" and f["severity"] != "critical",
+                            _PLACEHOLDERS, ctx, warnings)
     for f in findings:  # после слияния — доказательства и источники заново
         if len(f["_members"]) > 1:
             f["evidence"] = _pick_evidence(f["_members"], f["_members"][0]) or f["evidence"]

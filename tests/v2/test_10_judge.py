@@ -89,7 +89,7 @@ def finding(key, ids, *, severity="major", kind="ambiguity", criterion="unambigu
             blocks="both", title=None, scenario="", impact="", reqs=()):
     return {"key": key, "candidate_ids": list(ids), "base": ids[0], "title": title or f"Дефект {key}",
             "kind": kind, "criterion": criterion, "requirement_ids": list(reqs), "problem": f"Суть {key}.",
-            "scenario": scenario, "impact": impact, "severity_basis": "", "severity": severity,
+            "scenario": scenario, "impact": impact, "wish": False, "severity_basis": "", "severity": severity,
             "blocks": blocks, "priority": priority, "recommendation": ""}
 
 
@@ -563,3 +563,34 @@ def test_empty_model_answer_falls_back_to_code_registry():
     all_placed(res, ["C-001", "C-002"])
     assert len(res["findings"]) == 2 and not res["rejected"]
     assert any("судья недоступен" in w for w in res["warnings"])
+
+
+def test_wishes_and_placeholders_become_one_minor_each():
+    cs = [cand("C-001", 38, "Месяц определяется", kind="contradiction", criterion="set_consistent",
+               extra=[(64, "Февральский счётчик")]),
+          cand("C-002", 46, "в течение минуты", kind="incomplete", source="lens:risk"),
+          cand("C-003", 49, "Хранить идентификатор карты", kind="ops_risk", source="lens:risk"),
+          cand("C-004", 52, "Повторная доставка", kind="incomplete", source="consistency"),
+          cand("C-005", 57, "заполняются тестировщиками", kind="placeholder", source="rules:placeholder.tbd"),
+          cand("C-006", 68, "Документ (версия/дата)", kind="placeholder", source="rules:placeholder.version"),
+          cand("C-007", 91, "| | |", kind="placeholder", source="rules:placeholder.approvals")]
+    fs = [finding("F01", ["C-001"], severity="critical", kind="contradiction", criterion="set_consistent",
+                  scenario="Вход: два исхода.", impact="Две реализации.", priority=1),
+          dict(finding("F02", ["C-002"], title="Сбой внешней системы не описан"), wish=True),
+          dict(finding("F03", ["C-003"], title="Гонки параллельных событий не описаны"), wish=True),
+          dict(finding("F04", ["C-004"], severity="critical", title="Ключевое событие не определено",
+                       kind="ambiguity", criterion="unambiguous", scenario="s", impact="i"), wish=True),  # critical не сводится
+          finding("F05", ["C-005"], severity="minor", kind="placeholder", title="Раздел тестирования — заглушка"),
+          finding("F06", ["C-006"], severity="major", kind="placeholder", title="Версия не указана"),
+          finding("F07", ["C-007"], severity="minor", kind="placeholder", title="Блок согласующих пуст")]
+    res = judge.run(Ctx(FakeLLM(response(fs))), cs)
+    all_placed(res, [c["id"] for c in cs])
+    by_title = {f["title"]: f for f in res["findings"]}
+    w = by_title["Документ не рассматривает ряд случаев"]
+    assert w["candidate_ids"] == ["C-002", "C-003"] and w["severity"] == "minor" and w["blocks"] == "none"
+    assert "сбой внешней системы" in w["problem"] and "гонки" in w["problem"]
+    p = by_title["Не заполнены поля и разделы шаблона документа"]
+    assert p["candidate_ids"] == ["C-005", "C-006", "C-007"] and p["severity"] == "minor"
+    assert [e["line_start"] for e in p["evidence"]] == [57, 68, 91]
+    assert any(f["candidate_ids"] == ["C-004"] and f["severity"] == "critical" for f in res["findings"])
+    assert len(res["findings"]) == 4
