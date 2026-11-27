@@ -55,6 +55,11 @@ def _summary(report: dict, md_path, json_path, width: int) -> str:
     out = [p for p in (md_path, json_path) if p]
     if out:
         lines.append("Отчёт: " + " и ".join(out))
-    for w in (run.get("warnings") or [])[:3]:
+    warns = [str(w) for w in run.get("warnings") or []]
+    err = " ".join(str(run.get("model_error") or "").split())
+    if err:  # объяснение, почему модель не работала, и где взять ключ — целиком, одной строкой (№02)
+        lines.append(f"  ! {err}")
+        warns = [w for w in warns if " ".join(w.split()) != err]
+    for w in warns[:3 if not err else 2]:
         lines.append(f"  ! {shorten(w, width - 4)}")
     return "\n".join(lines)

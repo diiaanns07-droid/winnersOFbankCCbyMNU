@@ -154,8 +154,12 @@ def test_sections_in_order_and_budget(sample):
 
 
 def test_header_says_generated_and_verified(sample):
-    first = markdown.render(sample).split("\n")[2]
-    assert "без ручных правок" in first and "коммит `c0b8368`" in first and "все 67 цитат сверены" in first
+    md = markdown.render(sample)
+    first = md.split("\n")[2]
+    assert "без ручных правок" in first and "все 67 цитат найдены в документе" in first
+    assert "коммит" not in first and "verify" not in first  # технические подробности — в паспорте
+    passport = md[md.find("></a>1. Паспорт"):md.find("></a>2. Нарезка")]
+    assert "коммит `c0b8368`" in passport and "python -m bcc_review verify" in passport
 
 
 def test_first_screen(sample):
@@ -163,9 +167,15 @@ def test_first_screen(sample):
     brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
     assert "⛔ нельзя начинать" in brief
     assert "🔴 **5** критичных" in brief and "**8** вопросов владельцу" in brief
-    assert brief.count("| 🔴 [D-") == 5  # таблица блокеров
-    assert "**Исправить первым**" in brief
+    blockers = re.findall(r"^\d\. 🔴 \[D-\d+\]\(#d-\d+\) \*\*.+\*\* — (.+); блокирует (.+)\.$", brief, re.M)
+    assert len(blockers) == 5  # блокер — одна строка: что, где, что блокирует
+    assert all("строк" in where for where, _ in blockers) and blockers[0][0] == "Ф-3 (строка 39), Ф-4 (строка 40)"
+    assert "**Почему.**" in brief and "**Исправить первым**" in brief
+    fix = brief[brief.find("**Исправить первым**"):]
+    assert fix.count(" → ") >= 7  # у каждого пункта — что сделать
     assert len(brief.split("\n")) <= 40
+    text = re.sub(r"\]\(#[^)]*\)", "]", brief)
+    assert not re.search(r"\bR-\d", text) and "коммит" not in text and "кандидат" not in text
 
 
 def test_every_link_has_anchor(sample):
@@ -188,10 +198,36 @@ def test_tables_have_consistent_columns(sample):
 def test_card_quotes_are_short_and_located(sample):
     md = markdown.render(sample)
     cards = md[md.find("### 3.2."):md.find("### 3.3.")]
-    quotes = re.findall(r"^- (.+?), строк[аи] [\d–]+: «(.+)»$", cards, re.M)
-    assert len(quotes) >= 40
-    assert all(len(q) <= 161 for _, q in quotes)
-    assert all("Часть" in where for where, _ in quotes)
+    quotes = re.findall(r"^(?:- |\*\*Где:\*\* )(.+?), (?:с\. \d+, )?строк[аи] [\d–]+: «(.+?)»(?:;|$)", cards, re.M)
+    assert len(quotes) >= 25
+    assert all(len(q) <= markdown.CARD_QUOTE + 1 for _, q in quotes)
+    # место — ID требования в документе («Ф-3»), пункт или раздел, но не внутренний R-…
+    assert all(re.match(r"(Ф-\d|Часть|критерий приёмки №|[^,]+, п\. \d)", where) for where, _ in quotes), quotes[:5]
+    assert any(where.startswith("Ф-3") for where, _ in quotes)
+
+
+def test_card_follows_clarity_rubric(sample):
+    """Порядок полей карточки: где → проблема → сценарий → последствия → как исправить → справка."""
+    md = markdown.render(sample)
+    card = md[md.find('<a id="d-01"></a>'):md.find('<a id="d-02"></a>')]
+    order = [card.find(x) for x in ("- Ф-3, строка 39: «", "**Проблема.**", "**Сценарий.**", "**Последствия.**",
+                                    "**Как исправить.**", "*Критичный, блокирует разработку и тестирование · критерий")]
+    assert all(p >= 0 for p in order) and order == sorted(order), order
+    assert "**Требования:**" not in card and "R-07 / Ф-3" in card  # требования — в справочной строке
+
+
+def test_model_text_names_requirements_by_document_ids():
+    r = {"requirements": [{"id": "R-06", "source_id": "Ф-2", "kind": "functional"},
+                          {"id": "R-14", "source_id": "Критерии приемки, строка 2", "kind": "acceptance"},
+                          {"id": "R-21", "source_id": "Логика работы метода, п. 5", "kind": "functional"},
+                          {"id": "R-30", "source_id": "Query-параметры: cardId", "kind": "api"}],
+         "findings": [{"id": "D-01", "severity": "major", "title": "т",
+                       "problem": "R-06 (Ф-2) против R-14 (Критерии приемки, строка 2); Ф-2 (R-06); ожидаемый результат "
+                                  "критерия R-14; R-21 и R-30",
+                       "evidence": [{"quote": "q", "line_start": 3, "line_end": 3}]}]}
+    md = markdown.render(r)
+    assert ("[Ф-2](#r-06) против [критерий приёмки №2](#r-14); [Ф-2](#r-06); ожидаемый результат критерия "
+            "[№2](#r-14); [Логика работы метода, п. 5](#r-21) и [R-30](#r-30)") in md
 
 
 def test_ids_of_document_shown_next_to_report_ids(sample):
@@ -394,7 +430,8 @@ def test_candidate_count_excludes_non_proposing_stages(sample):
     r = copy.deepcopy(sample)
     r["run"]["stage_stats"]["quotes"]["candidates"] = 45
     md = markdown.render(r)
-    assert "Кандидатов в дефекты: 45." in md
+    assert "Кандидатов в дефекты: 45;" in md and "нашли 45 возможных дефектов" in md
+    assert "в таблице этапов" not in md
 
 
 def test_identifiers_in_model_text_become_code():
