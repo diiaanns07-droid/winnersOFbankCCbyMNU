@@ -33,7 +33,9 @@ def _utf8_console() -> None:
 def _load_env() -> None:
     try:
         from .providers import doctor
-        doctor.load_dotenv(".env")
+        if not doctor.load_dotenv(".env"):
+            # запуск не из корня репозитория: .env в корне (src/bcc_review/v2/__main__.py → четыре уровня вверх)
+            doctor.load_dotenv(Path(__file__).resolve().parents[3] / ".env")
     except Exception:  # noqa: BLE001
         pass
 

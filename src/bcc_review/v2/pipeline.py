@@ -670,6 +670,9 @@ class Pipeline:
 
     def _offline(self, view: dict) -> dict:
         self.log("Модель не настроена: предварительная проверка правилами (offline)")
+        if (self.opts.get("provider") or "auto") == "auto":
+            self.log("Для полного отчёта впишите ключ в .env в корне репозитория: GEMINI_API_KEY=<ключ> (бесплатно: "
+                     "https://aistudio.google.com/apikey) и запустите снова; проверка — python -m bcc_review doctor")
         from .rules import offline
         report = offline.build(view, None)
         run = report.setdefault("run", {})
