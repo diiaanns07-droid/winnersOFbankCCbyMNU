@@ -19,8 +19,8 @@ from bcc_review.v2.render import console, jsonout, markdown  # noqa: E402
 SAMPLE = ROOT / "tests" / "v2" / "fixtures" / "13_report_sample.json"
 
 REQUIRED_HEADINGS = [
-    "></a>Кратко", "></a>1. Паспорт прогона", "></a>2. Нарезка требований", "></a>3. Проверка каждого требования",
-    "></a>4. Проверка набора требований", "></a>5. Сводка", "></a>6. Итог", "></a>Приложение А. Вопросы владельцу",
+    "></a>Кратко", "></a>1. Паспорт прогона", "></a>2. Нарезка: как агент нарезал требования", "></a>3. Проверка каждого требования",
+    "></a>4. Проверка всего набора требований", "></a>5. Сводка", "></a>6. Итог", "></a>Приложение А. Вопросы владельцу",
     "></a>Приложение Б. Черновик тест-кейсов", "></a>Приложение В. Чек-лист", "></a>Приложение Г. Было → стало",
     "></a>Приложение Д. Как работал агент", "></a>Приложение Е. Методика",
 ]
@@ -154,8 +154,12 @@ def test_sections_in_order_and_budget(sample):
 
 
 def test_header_says_generated_and_verified(sample):
-    first = markdown.render(sample).split("\n")[2]
-    assert "без ручных правок" in first and "коммит `c0b8368`" in first and "все 67 цитат сверены" in first
+    md = markdown.render(sample)
+    first = md.split("\n")[2]
+    assert "без ручных правок" in first and "все 67 цитат найдены в документе" in first
+    assert "коммит" not in first and "verify" not in first  # технические подробности — в паспорте
+    passport = md[md.find("></a>1. Паспорт"):md.find("></a>2. Нарезка")]
+    assert "коммит `c0b8368`" in passport and "python -m bcc_review verify" in passport
 
 
 def test_first_screen(sample):
@@ -163,9 +167,21 @@ def test_first_screen(sample):
     brief = md[md.find("></a>Кратко"):md.find("></a>1. Паспорт")]
     assert "⛔ нельзя начинать" in brief
     assert "🔴 **5** критичных" in brief and "**8** вопросов владельцу" in brief
-    assert brief.count("| 🔴 [D-") == 5  # таблица блокеров
-    assert "**Исправить первым**" in brief
+    # все блокеры останавливают одно и то же — это сказано один раз в заголовке, строка блокера: что и где
+    assert "**Блокеры (5)** — каждый останавливает разработку и тестирование; что не так и где:" in brief
+    blockers = re.findall(r"^\d\. 🔴 \[D-\d+\]\(#d-\d+\) \*\*.+\*\* — (.+)\.$", brief, re.M)
+    assert len(blockers) == 5
+    assert all("строк" in where for where in blockers) and blockers[0] == "Ф-3 (строка 39), Ф-4 (строка 40)"
+    assert "ещё 1 место" not in brief
+    assert "**Почему.**" in brief and "**Исправить первым**" in brief
+    fix = brief[brief.find("**Исправить первым**"):]
+    items = re.findall(r"^\d\. (\S+) \[(D-\d+)\]", fix, re.M)
+    assert 5 <= len(items) <= 5 and all(icon == "🔴" for icon, _ in items[:5])  # сначала блокеры, не больше 5
+    assert fix.count(" → ") >= 5  # у каждого пункта — что сделать
+    assert "на 5 нужен ответ до начала работы" in brief
     assert len(brief.split("\n")) <= 40
+    text = re.sub(r"\]\(#[^)]*\)", "]", brief)
+    assert not re.search(r"\bR-\d", text) and "коммит" not in text and "кандидат" not in text
 
 
 def test_every_link_has_anchor(sample):
@@ -188,10 +204,36 @@ def test_tables_have_consistent_columns(sample):
 def test_card_quotes_are_short_and_located(sample):
     md = markdown.render(sample)
     cards = md[md.find("### 3.2."):md.find("### 3.3.")]
-    quotes = re.findall(r"^- (.+?), строк[аи] [\d–]+: «(.+)»$", cards, re.M)
-    assert len(quotes) >= 40
-    assert all(len(q) <= 161 for _, q in quotes)
-    assert all("Часть" in where for where, _ in quotes)
+    quotes = re.findall(r"^(?:- |\*\*Где:\*\* )(.+?), (?:с\. \d+, )?строк[аи] [\d–]+: «(.+?)»(?:;|$)", cards, re.M)
+    assert len(quotes) >= 25
+    assert all(len(q) <= markdown.CARD_QUOTE + 1 for _, q in quotes)
+    # место — ID требования в документе («Ф-3»), пункт или раздел, но не внутренний R-…
+    assert all(re.match(r"(Ф-\d|Часть|критерий приёмки №|[^,]+, п\. \d)", where) for where, _ in quotes), quotes[:5]
+    assert any(where.startswith("Ф-3") for where, _ in quotes)
+
+
+def test_card_follows_clarity_rubric(sample):
+    """Порядок полей карточки: где → проблема → сценарий → последствия → как исправить → справка."""
+    md = markdown.render(sample)
+    card = md[md.find('<a id="d-01"></a>'):md.find('<a id="d-02"></a>')]
+    order = [card.find(x) for x in ("- Ф-3, строка 39: «", "**Проблема.**", "**Сценарий.**", "**Последствия.**",
+                                    "**Как исправить.**", "*Критичный, блокирует разработку и тестирование · критерий")]
+    assert all(p >= 0 for p in order) and order == sorted(order), order
+    assert "**Требования:**" not in card and "R-07 / Ф-3" in card  # требования — в справочной строке
+
+
+def test_model_text_names_requirements_by_document_ids():
+    r = {"requirements": [{"id": "R-06", "source_id": "Ф-2", "kind": "functional"},
+                          {"id": "R-14", "source_id": "Критерии приемки, строка 2", "kind": "acceptance"},
+                          {"id": "R-21", "source_id": "Логика работы метода, п. 5", "kind": "functional"},
+                          {"id": "R-30", "source_id": "Query-параметры: cardId", "kind": "api"}],
+         "findings": [{"id": "D-01", "severity": "major", "title": "т",
+                       "problem": "R-06 (Ф-2) против R-14 (Критерии приемки, строка 2); Ф-2 (R-06); ожидаемый результат "
+                                  "критерия R-14; R-21 и R-30",
+                       "evidence": [{"quote": "q", "line_start": 3, "line_end": 3}]}]}
+    md = markdown.render(r)
+    assert ("[Ф-2](#r-06) против [критерий приёмки №2](#r-14); [Ф-2](#r-06); ожидаемый результат критерия "
+            "[№2](#r-14); [Логика работы метода, п. 5](#r-21) и [R-30](#r-30)") in md
 
 
 def test_ids_of_document_shown_next_to_report_ids(sample):
@@ -217,8 +259,10 @@ def test_templates_are_russian(sample):
 
 def test_minimal_offline_report_has_all_sections():
     md = markdown.render(minimal())
+    offline_empty = ("Приложение А.", "Приложение Б.", "Приложение В.")  # без модели всегда пусты (№12)
     for h in REQUIRED_HEADINGS:
-        assert h in md, h
+        assert (h in md) != any(x in h for x in offline_empty), h
+    assert "(#pa)" not in md and "(#pb)" not in md and "(#pv)" not in md  # и в содержании их нет
     assert "Режим без модели" in md and "Дефектов не найдено" in md
     assert "❔ не определено" in md and "✅ можно начинать" not in md
 
@@ -345,8 +389,13 @@ def test_line_refs_from_model_text_become_russian():
     assert markdown.prose("по L151 и в L38-L40, из L7–L9; Сервер по L121") == \
         "по строке 151 и в строках 38–40, из строк 7–9; Сервер по строке 121"
     assert markdown.cell("a | L7") == "a \\| строка 7"
+    assert markdown.prose("Привести L045 к маршруту L136") == "Привести строки 45 к маршруту строки 136"
+    assert markdown.prose("L038 и L064 расходятся") == "строки 38 и 64 расходятся"
+    assert markdown.prose("убрать из L052 и L103") == "убрать из строк 52 и 103"
+    assert markdown.prose("Строки L10-L12 описывают") == "Строки 10–12 описывают"
     assert markdown.source_name("lens:что-то") == "проверка ролью"
-    assert markdown.source_name("rules:units") == "правило «units»"
+    assert markdown.source_name("rules:units.time_mix.ttl") == "правило «единицы измерения»"
+    assert markdown.source_name("rules:new_family.x") == "правило без модели"
 
 
 def test_revise_edits_rendered(sample):
@@ -394,7 +443,8 @@ def test_candidate_count_excludes_non_proposing_stages(sample):
     r = copy.deepcopy(sample)
     r["run"]["stage_stats"]["quotes"]["candidates"] = 45
     md = markdown.render(r)
-    assert "Кандидатов в дефекты: 45." in md
+    assert "Кандидатов в дефекты: 45;" in md and "нашли 45 возможных дефектов" in md
+    assert "в таблице этапов" not in md
 
 
 def test_identifiers_in_model_text_become_code():
@@ -448,3 +498,58 @@ def test_export_text_for_word(sample, tmp_path):
     assert not [t for t in texts if "<a id" in t or "\\|" in t]
     heads = [p.text for p in d.paragraphs if p.style.name.startswith("Heading")]
     assert "1. Паспорт прогона" in heads and "Кратко" in heads
+
+
+@pytest.mark.parametrize("n_findings,n_reqs", [(50, 48), (70, 100), (100, 150), (60, 300)])
+def test_long_reports_fit_900_lines(sample, n_findings, n_reqs):
+    """Любой документ — не длиннее 900 строк: при 70+ дефектах существенные идут строками таблицы,
+    критичные остаются полными карточками."""
+    r = copy.deepcopy(sample)
+    fs, rq = r["findings"], r["requirements"]
+    while len(fs) < n_findings:
+        f = copy.deepcopy(fs[len(fs) % 32])
+        f["id"] = f"D-{len(fs) + 1:02d}"
+        if f["severity"] == "critical":
+            f["severity"], f["blocks"] = "major", "development"
+        fs.append(f)
+    while len(rq) < n_reqs:
+        q = copy.deepcopy(rq[len(rq) % 48])
+        q["id"] = f"R-{len(rq) + 1:02d}"
+        rq.append(q)
+    jsonout.finalize(r)
+    md = markdown.render(r)
+    assert md.count("\n") <= 900
+    assert md.count('<a id="d-') == n_findings  # у каждого дефекта есть якорь — ссылки не ломаются
+    assert md.count("**Проблема.**") >= 5  # критичные — полными карточками
+
+
+def test_why_names_kind_of_blockers_and_keeps_priority_sentence(sample):
+    md = markdown.render(sample)
+    why = next(ln for ln in md.split("\n") if ln.startswith("**Почему.**"))
+    assert "5 критичных дефектов блокируют разработку и тестирование: " in why and "противореч" in why
+    r = copy.deepcopy(sample)
+    r["verdict"]["summary"] = ("Нельзя: D-01, D-02, D-03 и D-04 блокируют работу. Первым исправить D-01 и D-02. "
+                               "Потом всё остальное.")
+    why = next(ln for ln in markdown.render(r).split("\n") if ln.startswith("**Почему.**"))
+    assert "Первым исправить [D-01](#d-01) и [D-02](#d-02)." in why and "Потом" not in why and "D-03" not in why
+
+
+def test_offline_does_not_claim_unchecked_criteria_are_fine():
+    r = {"run": {"provider": "offline", "status": "complete", "stages": {"rules": "ok"}},
+         "document": {"title": "т", "file": "t.md"}, "requirements": [], "findings": []}
+    md = markdown.render(r)
+    assert "✅ нарушений не найдено" not in md and "❔ без модели не проверялся" in md
+    assert "4.2–4.5." in md and "### 4.3." not in md
+
+
+def test_rubric_counts_cards_against_wave3(sample):
+    res = markdown.rubric(sample)  # фикстура собрана вручную: часть карточек без «было → стало» — так и считается
+    assert res["checked"] == 25 and res["passed"] == 25 - len(res["failed"]) and set(res["by_item"]) <= set(markdown.RUBRIC)
+    r = copy.deepcopy(sample)
+    f = next(x for x in r["findings"] if x["severity"] == "major")
+    f["title"] = "очень длинный заголовок " * 5
+    f["problem"] = "См. L038 и C-007."
+    f["rewrite"] = f["question"] = ""
+    r["questions"] = [q for q in r.get("questions") or [] if f["id"] not in q.get("finding_ids", [])]
+    bad = markdown.rubric(r)["failed"][f["id"]]
+    assert {"title", "codes", "fix"} <= set(bad), bad

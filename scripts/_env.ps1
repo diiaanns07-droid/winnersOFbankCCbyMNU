@@ -7,6 +7,9 @@ $ErrorActionPreference = "Continue"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 $env:PYTHONUTF8 = "1"
 $env:PYMUPDF_SUGGEST_LAYOUT_ANALYZER = "0"
+# код агента — из этой копии, даже если активно окружение другой копии (editable-установка другого каталога)
+$src = Join-Path (Get-Location) "src"
+if ($env:PYTHONPATH) { $env:PYTHONPATH = "$src;$($env:PYTHONPATH)" } else { $env:PYTHONPATH = $src }
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }
 
 function Test-PythonVersion([string[]]$Command) {
@@ -45,7 +48,8 @@ if (-not (Test-Path $Py)) {
 }
 
 $stamp = Join-Path (Split-Path -Parent (Split-Path -Parent $Py)) ".bcc_requirements"
-$want = (Get-FileHash requirements.txt -Algorithm SHA256).Hash
+# метка установки — requirements.txt и constraints.txt вместе: изменился любой — ставим заново
+$want = ((Get-FileHash requirements.txt -Algorithm SHA256).Hash + (Get-FileHash constraints.txt -Algorithm SHA256).Hash)
 $have = if (Test-Path $stamp) { (Get-Content $stamp -Raw).Trim() } else { "" }
 & $Py -c "import bcc_review" *> $null
 if ($have -ne $want -or $LASTEXITCODE -ne 0) {

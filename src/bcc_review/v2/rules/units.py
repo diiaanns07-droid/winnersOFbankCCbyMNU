@@ -3,14 +3,16 @@
 * деньги: основная и минорная единица одной валюты (тенге/тиын, рубль/копейка, доллар/евро/цент);
 * минорная единица с дробной частью («в … с двумя знаками после точки»);
 * время: «по UTC» без смещения и «UTC+N» для одного и того же поля;
-* период подсчёта: один и тот же лимит «за час» и «за сутки» (сигнал).
+* период подсчёта: один и тот же лимит «за час» и «за сутки» (сигнал);
+* описание поля API и текст требований задают одну величину в разных единицах: «Срок кредита в днях» ↔
+  «на срок от 6 до 60 месяцев», «Ставка, % в месяц» ↔ «ставка 14 % годовых».
 Связка ищется по фразе «<величина> в <единица>» — так сравниваются именно величины, а не слова.
 """
 from __future__ import annotations
 
 import re
 
-from ._text import Doc, Line, candidate, ev, quoted, signal
+from ._text import Doc, Line, candidate, ev, quoted, signal, tables
 
 # Формы: именительный мн. ч., предложный мн. ч., родительный мн. ч.
 CURRENCIES = [
@@ -144,7 +146,7 @@ def rule_currency(doc: Doc, out: dict) -> None:
                 f"связанные величины ({a[1]} и {b[1]})")
         out["candidates"].append(candidate(
             "units.currency_mix",
-            title=f"Денежные величины в разных единицах без правила пересчёта: {quoted(qa)} и {quoted(qb)}",
+            title=f"Суммы в {MN[1]} и в {MJ[1]} без правила пересчёта",
             kind="unit_mismatch", criterion="unambiguous", severity="major", blocks="both",
             evidence=[ev(a[0], qa), ev(b[0], qb)],
             problem=(f"В документе {subj} заданы в разных единицах: {quoted(qa)} и {quoted(qb)}. "
@@ -228,7 +230,7 @@ def rule_timezone(doc: Doc, out: dict) -> None:
                 qb = qb if qb in b[0].joined else b[2]
                 out["candidates"].append(candidate(
                     "units.timezone_mix",
-                    title=f"Одно и то же время описано в разных часовых поясах: {quoted(qa)} и {quoted(qb)}",
+                    title=f"{(a[1][:1].upper() + a[1][1:]) or 'Время'} — {a[2]} и {b[2]}: разные часовые пояса",
                     kind="unit_mismatch", criterion="set_consistent", severity="major", blocks="both",
                     evidence=[ev(a[0], qa), ev(b[0], qb)],
                     problem=(f"{quoted(qa)} и {quoted(qb)} — одна величина в двух поясах: UTC и UTC со смещением. "
@@ -319,7 +321,7 @@ def rule_period(doc: Doc, out: dict) -> None:
                     qb = u[nm.start():qm.end()].strip()
                     out["candidates"].append(candidate(
                         "units.period_mix",
-                        title=(f"Один лимит задан за разные периоды: {quoted(pm.group(0))} и "
+                        title=(f"Один лимит за разные периоды: {quoted(pm.group(0))} и "
                                f"{quoted(qm.group(0))}"),
                         kind="unit_mismatch", criterion="set_consistent", severity="major", blocks="both",
                         evidence=[ev(x, qa), ev(y, qb)],
@@ -476,7 +478,150 @@ def rule_day_kinds(doc: Doc, out: dict) -> None:
                     return
 
 
+# --- поле API ↔ текст требований: одна величина в разных единицах ---------------------------------
+
+# величины со своей единицей: срок, период, интервал, ставка (у ставки единица — период процента)
+QTY_HEAD = re.compile(r"\b(срок\w*|период\w*|интервал\w*|длительност\w*|продолжительност\w*|тайм-?аут\w*|"
+                      r"ставк\w*)", re.I)
+DUR_UNIT = (r"(секунд\w*|минут\w*|час(?:а|ов|ах)?\b|сут(?:ки|ок|ках)\b|дн(?:ей|я|ях|и)\b|день\b|"
+            r"недел\w*|месяц\w*|мес\.|год(?:а|ах)?\b|лет\b)")
+RATE_UNIT = r"(годовых|в\s+год\b|за\s+год\b|в\s+месяц\b|за\s+месяц\b|ежемесячн\w*|в\s+день\b|за\s+день\b|в\s+квартал\b)"
+DUR_NORM = (("секу", "секунды"), ("мину", "минуты"), ("час", "часы"), ("сут", "дни"), ("дн", "дни"), ("ден", "дни"),
+            ("недел", "недели"), ("мес", "месяцы"), ("год", "годы"), ("лет", "годы"))
+RATE_NORM = (("годов", "год"), ("в год", "год"), ("за год", "год"), ("в месяц", "месяц"), ("за месяц", "месяц"),
+             ("ежемесяч", "месяц"), ("в день", "день"), ("за день", "день"), ("в квартал", "квартал"))
+QTY_GENERIC = {"срок", "срока", "сроке", "сроком", "сроки", "период", "интер", "ставк", "длите", "продо",
+               "таймау", "значе", "колич", "число", "указа", "клиен", "время", "течен"}
+FIELD_NAME = re.compile(r"^[a-z][A-Za-z0-9_.]{1,40}$")
+
+
+def _unit_of(text: str, head: str) -> tuple[str, str, str] | None:
+    """Единица величины после её названия: («dur», «месяцы», фрагмент) или («rate», «год», фрагмент)."""
+    m = QTY_HEAD.search(text)
+    if not m or not m.group(1).lower().startswith(head):
+        return None
+    tail = text[m.start():m.start() + 90]
+    tail = re.split(r"[.;|]", tail, maxsplit=1)[0]
+    if head == "ставк":
+        r = re.search(r"%\s*,?\s*" + RATE_UNIT + r"|процент\w*\s+" + RATE_UNIT, tail, re.I)
+        if not r:
+            return None
+        u = (r.group(1) or r.group(2)).lower()
+        for k, v in RATE_NORM:
+            if u.startswith(k):
+                return ("rate", v, tail[:r.end()].strip())
+        return None
+    d = re.search(r"(?:\d[\d\s]*|\bв|\bколичеств\w*|\bчисл\w*)\s*" + DUR_UNIT, tail, re.I)
+    if not d:
+        return None
+    u = d.group(1).lower()
+    for k, v in DUR_NORM:
+        if u.startswith(k):
+            return ("dur", v, tail[:d.end()].strip())
+    return None
+
+
+UNIT_FORMS = {  # (как назвать единицу, родительный мн. ч. после числа, предложный мн. ч.)
+    "секунды": ("секунды", "секунд", "секундах"), "минуты": ("минуты", "минут", "минутах"),
+    "часы": ("часы", "часов", "часах"), "дни": ("дни", "дней", "днях"), "недели": ("недели", "недель", "неделях"),
+    "месяцы": ("месяцы", "месяцев", "месяцах"), "годы": ("годы", "лет", "годах")}
+
+
+def _unit_ru(cls: str, unit: str, form: str = "name") -> str:
+    if cls == "rate":
+        return "% годовых" if unit == "год" else f"% в {unit}"
+    forms = UNIT_FORMS.get(unit, (unit, unit, unit))
+    return forms[1] if form == "gen" else forms[2] if form == "prep" else forms[0]
+
+
+def _rewrite_unit(desc: str, cls: str, unit: str) -> str:
+    """Описание поля с единицей из требований: «Срок кредита в днях» → «Срок кредита в месяцах»."""
+    if cls == "rate":
+        m = re.search(r"%\s*,?\s*" + RATE_UNIT, desc, re.I)
+        return (desc[:m.start()] + _unit_ru(cls, unit)).strip() if m else ""
+    m = re.search(r"\s*,?\s*(?:\bв\s+)?" + DUR_UNIT, desc, re.I)
+    return (desc[:m.start()].rstrip(" ,") + " в " + _unit_ru(cls, unit, "prep")) if m else ""
+
+
+def _qualifiers(phrase: str) -> set[str]:
+    return {w.lower()[:5] for w in re.findall(r"[А-Яа-яЁё]{4,}", phrase)} - QTY_GENERIC
+
+
+def rule_field_units(doc: Doc, out: dict) -> None:
+    """Поле таблицы API описано в одной единице, а та же величина в требованиях — в другой.
+    Связь: то же название величины и (те же числа диапазона или все уточнения описания поля в предложении)."""
+    rows = []
+    for t in tables(doc):
+        if t.col("поле", "field", "параметр", "parameter", "name", "имя") is None:
+            continue
+        di = t.col("описание", "description", "назначение")
+        if di is None:
+            continue
+        for r in t.rows:
+            cells = r.cells or []
+            if not cells or di >= len(cells) or not FIELD_NAME.match(cells[0].strip("`")):
+                continue
+            desc = cells[di]
+            hm = QTY_HEAD.search(desc)
+            if not hm:
+                continue
+            head = "ставк" if hm.group(1).lower().startswith("ставк") else hm.group(1).lower()[:4]
+            u = _unit_of(desc, head)
+            if not u:
+                continue
+            nums = {int(n.replace(" ", "")) for c in cells for n in re.findall(r"\d[\d ]*", c) if n.strip()}
+            rows.append((r, cells[0].strip("`"), desc, head, u, nums, _qualifiers(desc[hm.start():])))
+    if not rows:
+        return
+    row_lines = {r[0].n for r in rows}
+    for r, field_name, desc, head, (cls, unit, _frag), nums, quals in rows:
+        _field_unit_one(doc, out, row_lines, r, field_name, desc, head, cls, unit, nums, quals)
+
+
+def _field_unit_one(doc: Doc, out: dict, row_lines: set[int], r: Line, field_name: str, desc: str, head: str,
+                    cls: str, unit: str, nums: set[int], quals: set[str]) -> None:
+    """Первое расхождение единиц для одного поля (по полю — не больше одного кандидата)."""
+    for x in doc.lines:
+        if not x.text or x.is_code or x.is_heading or x.n in row_lines:
+            continue
+        t = x.joined
+        for sent in re.split(r"(?<=[.;])\s+|\s\|\s", t):
+            hm = QTY_HEAD.search(sent)
+            if not hm or not hm.group(1).lower().startswith(head):
+                continue
+            u2 = _unit_of(sent[hm.start():], head)
+            if not u2 or u2[0] != cls or u2[1] == unit:
+                continue
+            snums = {int(n.replace(" ", "")) for n in re.findall(r"\d[\d ]*", u2[2]) if n.strip()}
+            same_nums = len(nums & snums) >= 2 or (snums and snums <= nums and len(snums) >= 1 and cls == "dur")
+            sq = _qualifiers(sent)
+            if not (same_nums or (quals and quals <= sq) or (cls == "rate" and not quals)):
+                continue
+            if any(re.search(r"1\s*" + unit[:3] + r"\w*\s*=|=\s*\d+\s*" + u2[1][:3], y.joined, re.I)
+                   for y in doc.lines if y.text):
+                continue
+            what = "Ставка" if cls == "rate" else "Срок"
+            ua, ub = _unit_ru(cls, unit), _unit_ru(cls, u2[1])
+            n_a, n_b = _unit_ru(cls, unit, "gen"), _unit_ru(cls, u2[1], "gen")
+            out["candidates"].append(candidate(
+                f"units.field_unit.{field_name}",
+                title=f"{what} в разных единицах: поле {field_name} — {ua}, в требованиях — {ub}",
+                kind="unit_mismatch", criterion="set_consistent", severity="major", blocks="both",
+                evidence=[ev(x, u2[2]), ev(r, desc)],
+                problem=(f"Требования задают {quoted(u2[2])}, а поле {field_name} в API описано как "
+                         f"{quoted(desc)}: одна величина в разных единицах ({ub} и {ua}), правила пересчёта нет."),
+                scenario=(f"{field_name} = 12: по требованиям это 12 {n_b}, по описанию поля — 12 {n_a}; расчёт, "
+                          "проверка диапазона и показ клиенту дают разный результат."),
+                impact="Клиенту считают неверную сумму или срок; интеграция и тесты расходятся в разы.",
+                recommendation=f"Указать одну единицу для {field_name} в описании поля и в требованиях.",
+                rewrite=_rewrite_unit(desc, cls, u2[1]),
+                conflict=True,
+            ))
+            return
+
+
 def run(doc: Doc, out: dict) -> None:
+    rule_field_units(doc, out)
     rule_time_units(doc, out)
     rule_day_kinds(doc, out)
     rule_currency(doc, out)

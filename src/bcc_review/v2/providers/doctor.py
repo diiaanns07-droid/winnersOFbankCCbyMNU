@@ -52,19 +52,37 @@ DOCTOR_HINT = "Проверка настроек: python -m bcc_review doctor (�
 # --------------------------------------------------------------------------- окружение
 
 
+def read_env_text(path: str | Path) -> str:
+    """Текст .env в любой кодировке, в которой его пишет Windows.
+
+    Windows PowerShell 5.1 (``echo GEMINI_API_KEY=… > .env``, ``Out-File``) пишет UTF-16 с BOM — раньше такой
+    файл ронял doctor трейсбэком, а прогон молча уходил в режим без модели. Блокнот — UTF-8 с BOM; старые
+    редакторы — cp1251 (ключ — латиница, читается и так).
+    """
+    raw = Path(path).read_bytes()
+    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return raw.decode("utf-16")
+    if len(raw) >= 4 and raw[1:2] == b"\x00" and raw[3:4] == b"\x00":   # UTF-16 LE без BOM
+        return raw.decode("utf-16-le", "replace")
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return raw.decode("cp1251", "replace")
+
+
 def load_dotenv(path: str | Path = ".env", environ: dict[str, str] | None = None) -> bool:
     """Тот же минимальный загрузчик .env, что в v1: окружение важнее файла. True — файл найден."""
     env = os.environ if environ is None else environ
     p = Path(path)
     if not p.is_file():
         return False
-    for line in p.read_text(encoding="utf-8-sig").splitlines():
+    for line in read_env_text(p).splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
-        key = key.strip().removeprefix("export ").strip()
-        value = value.strip().strip('"').strip("'")
+        key = key.strip().lstrip("\ufeff").removeprefix("export ").strip()
+        value = value.strip().strip('"').strip("'").strip()
         if key and value and key not in env:
             env[key] = value
     return True
@@ -135,7 +153,7 @@ _ADVICE: dict[tuple[str, str], str] = {
     ("gemini", "quota"): ("Квота ключа исчерпана. Минутный лимит сбрасывается через минуту, дневной — в полночь по "
                           "тихоокеанскому времени. Можно задать другую модель (GEMINI_MODEL) или другой ключ."),
     ("gemini", "rate_limit"): ("Слишком много запросов в минуту для бесплатного ключа. Подождите минуту и повторите; "
-                               "можно уменьшить параллельность: GEMINI_CONCURRENCY=2."),
+                               "если у ключа меньше 10 запросов в минуту — задайте темп GEMINI_RPM=5 в .env."),
     ("gemini", "not_found"): ("Модель недоступна этому ключу. Список доступных моделей покажет "
                               "«python -m bcc_review doctor»; затем задайте GEMINI_MODEL=<модель>."),
     ("anthropic", "not_configured"): ANTHROPIC_KEY_HELP,
@@ -227,7 +245,7 @@ def headline(exc: BaseException, provider: str | None = None) -> str:
             wait = getattr(exc, "retry_after_s", None)
             when = f" через {int(wait) + 1} с" if isinstance(wait, (int, float)) and wait > 0 else " через минуту"
             return (f"Превышен лимит запросов в минуту бесплатного ключа Gemini (агент уже ждал и повторял). Повторите"
-                    f"{when}; можно уменьшить параллельность: GEMINI_CONCURRENCY=2 в .env.")
+                    f"{when}; если у ключа меньше 10 запросов в минуту — задайте темп GEMINI_RPM=5 в .env.")
         if kind == "not_found":
             return ("Модели Gemini из цепочки недоступны этому ключу. Список доступных моделей: python -m bcc_review "
                     "doctor; затем GEMINI_MODEL=<модель> в .env.")

@@ -14,6 +14,7 @@ import concurrent.futures as cf
 import copy
 import hashlib
 import os
+import re
 import subprocess
 import time
 import traceback
@@ -34,10 +35,17 @@ DEFAULTS: dict[str, Any] = {
     "timeout": 600.0, "max_retries": 5, "cache": True, "cache_dir": None, "runs_dir": "runs", "run_id": None,
     "export": [], "html": True, "answers": None, "revise": False, "passes": 1, "parallel": 5,
     "mock_dir": None, "lenses": list(LENSES), "consistency": True, "clarify": True, "judge_check": True,
-    "quiet": False, "stage_timeout": 480.0, "rpm": None, "effort": None,
+    "quiet": False, "stage_timeout": 480.0, "rpm": None, "effort": None, "fast_start": False,
+    "clarify_early": True,
 }
 # Темп запросов по умолчанию: бесплатный ключ Gemini — около 10 запросов в минуту на модель.
 DEFAULT_RPM = {"gemini": 10}
+# Линзы от самой долгой к самой короткой (замер 27.11 09:00: haiku architect 102 с, analyst 66, risk 51, qa 50).
+LONGEST_FIRST = ["architect", "analyst", "risk", "qa"]
+# Быстрый старт (--fast-start): рецензенты не ждут нарезку моделью (sonnet 28 с, haiku 58 с), а берут таблицу
+# эвристики кода; на официальном документе она совпадает с нарезкой моделью по строкам и видам (42 против 40).
+HEURISTIC_TABLE = "heuristic"
+FAST_START_MIN_REQUIREMENTS = 5
 
 
 # --------------------------------------------------------------------------- вспомогательное
@@ -60,7 +68,16 @@ def git_commit() -> tuple[str, bool]:
                                     capture_output=True, text=True, timeout=10).stdout.strip())
     except (OSError, subprocess.SubprocessError):
         sha, dirty = "", False
-    return (sha or env or "unknown"), dirty
+    return (sha or env or _archive_commit() or "unknown"), dirty
+
+
+def _archive_commit() -> str:
+    """Хеш из архива GitHub (export-subst в .gitattributes); в клоне в файле шаблон «$Format:%H$» — пусто."""
+    try:
+        value = (Path(__file__).with_name("COMMIT")).read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    return value if re.fullmatch(r"[0-9a-f]{7,40}", value) else ""
 
 
 def load_view(path: str | Path) -> dict:
@@ -193,7 +210,7 @@ class Pipeline:
                 self.stages[name] = rec.get("status", "ok")
                 self.stage_stats[name] = {"calls": 0, "seconds": 0.0, "reused": True,
                                           "candidates": len(rec["output"].get("candidates") or [])}
-                self.run.save_stage(name, {**rec, "reused_from": str(self.reuse.path)})
+                self._save_stage(name, {**rec, "reused_from": str(self.reuse.path)})
                 self.log(f"  {name}: взят из {self.reuse.run_id}")
                 return copy.deepcopy(rec["output"])
         llm = self.ctx.llm if self.ctx else None
@@ -237,14 +254,27 @@ class Pipeline:
             st["split"] = after["split"] - before.get("split", 0)
         self.stage_stats[name] = st
         stage_warnings = list(out.get("warnings") or []) + (self.ctx.warnings[warn_before:] if self.ctx else [])
-        self.run.save_stage(name, {"stage": name, "status": status, "seconds": seconds, "calls": calls,
-                                   "error": err, "input": inputs or {}, "output": out, "warnings": stage_warnings})
+        self._save_stage(name, {"stage": name, "status": status, "seconds": seconds, "calls": calls,
+                                "error": err, "input": inputs or {}, "output": out, "warnings": stage_warnings})
         if status == "ok":
             self.log(f"  {name}: готово за {seconds:.0f} с, вызовов {calls}"
                      + (f", кандидатов {st['candidates']}" if st["candidates"] else ""))
         if required and status == "failed":
             raise _StageFailed(name, err)
         return out
+
+    def _save_stage(self, name: str, record: dict) -> None:
+        """Файл этапа — для команды stage и веб-демо, не для отчёта: сбой записи (Windows: файл держит антивирус
+        или демо читает прогресс) — повтор, затем предупреждение, но не падение прогона."""
+        for attempt in range(3):
+            try:
+                self.run.save_stage(name, record)
+                return
+            except OSError as exc:
+                if attempt == 2:
+                    self.warnings.append(f"Файл этапа {name} не записан: {exc}")
+                    return
+                time.sleep(0.2 * (attempt + 1))
 
     # ------------------------------------------------------------------ весь прогон
 
@@ -268,20 +298,53 @@ class Pipeline:
                 report["run"]["warnings"] = _uniq([self.model_error] + list(report["run"].get("warnings") or []))
             return report
 
-        # 1. нарезка (при сбое — эвристика кода, прогон partial)
-        seg = self.stage("segment", lambda: self._segment(ctx), inputs={"lines": len(view.get("lines") or [])},
-                         empty={"requirements": [], "excluded": []})
-        if not seg.get("requirements"):
-            seg = self._heuristic_segment(view, seg)
-        ctx.requirements = seg.get("requirements") or []
-        ctx.excluded = seg.get("excluded") or []
+        heur = self._fast_start_table(view) if opts.get("fast_start") else None
+        if heur is not None:
+            # 1–3, быстрый старт: нарезка моделью идёт параллельно с рецензентами; рецензенты работают по таблице
+            # эвристики кода, после нарезки ссылки R-ID переводятся на ID нарезки по строкам (_remap_reviewers)
+            rctx = copy.copy(ctx)
+            rctx.requirements = heur.get("requirements") or []
+            rctx.excluded = heur.get("excluded") or []
+            try:
+                rctx.signals = (self._rules(view, heur) or {}).get("signals") or []
+            except Exception:  # noqa: BLE001 — без сигналов рецензенты работают как обычно
+                rctx.signals = []
+            with cf.ThreadPoolExecutor(max_workers=1) as pool:
+                seg_future = pool.submit(self.stage, "segment", lambda: self._segment(ctx),
+                                         inputs={"lines": len(view.get("lines") or [])},
+                                         empty={"requirements": [], "excluded": []})
+                outs = self._parallel_reviewers(rctx, tag=HEURISTIC_TABLE)
+                seg = seg_future.result()
+            if not seg.get("requirements"):
+                seg = self._heuristic_segment(view, seg)
+            ctx.requirements = seg.get("requirements") or []
+            ctx.excluded = seg.get("excluded") or []
+            rules_out = self.stage("rules", lambda: self._rules(view, seg), empty={"signals": [], "candidates": []})
+            ctx.signals = rules_out.get("signals") or []
+            self._remap_reviewers(outs, rctx.requirements, ctx.requirements)
+        else:
+            # 1. нарезка (при сбое — эвристика кода, прогон partial)
+            seg = self.stage("segment", lambda: self._segment(ctx), inputs={"lines": len(view.get("lines") or [])},
+                             empty={"requirements": [], "excluded": []})
+            if not seg.get("requirements"):
+                seg = self._heuristic_segment(view, seg)
+            ctx.requirements = seg.get("requirements") or []
+            ctx.excluded = seg.get("excluded") or []
 
-        # 2. правила (код): сигналы линзам, кандидаты — судье
-        rules_out = self.stage("rules", lambda: self._rules(view, seg), empty={"signals": [], "candidates": []})
-        ctx.signals = rules_out.get("signals") or []
+            # 2. правила (код): сигналы линзам, кандидаты — судье
+            rules_out = self.stage("rules", lambda: self._rules(view, seg), empty={"signals": [], "candidates": []})
+            ctx.signals = rules_out.get("signals") or []
 
-        # 3. линзы и набор — параллельно
-        outs = self._parallel_reviewers(ctx)
+            # 3. линзы и набор — параллельно
+            outs = self._parallel_reviewers(ctx)
+            # выходы, взятые из прогона с быстрым стартом (команда stage), ссылаются на таблицу эвристики
+            if any((o or {}).get("requirements_source") == HEURISTIC_TABLE for o in outs.values()):
+                try:
+                    from .stages import segment as _segment_mod
+                    heur_reqs = _segment_mod.heuristic_segment(view).get("requirements") or []
+                    self._remap_reviewers(outs, heur_reqs, ctx.requirements)
+                except Exception as exc:  # noqa: BLE001
+                    self.warnings.append(f"Ссылки рецензентов на таблицу эвристики не переведены: {exc}")
 
         # 4. сбор и сверка цитат
         cands, rejected, extras = self._collect(ctx, outs, rules_out)
@@ -291,7 +354,8 @@ class Pipeline:
         rejected += [self._rejected_entry(c, "no_quote", c.get("reason") or "цитата не найдена")
                      for c in q.get("rejected") or []]
 
-        # 5. судья
+        # 5. судья; вопросы владельцу (№11) стартуют параллельно с ним по сверенным кандидатам
+        early = self._clarify_start(ctx, kept)
         jd = self.stage("judge", lambda: self._judge(ctx, kept), inputs={"candidates": len(kept)},
                         empty={"findings": [], "rejected": [], "checklist": [], "verdict_summary": ""})
         findings = jd.get("findings") or []
@@ -305,9 +369,14 @@ class Pipeline:
         # 6. вопросы владельцу
         questions: list = []
         if opts.get("clarify", True):
-            cl = self.stage("clarify", lambda: self._clarify(ctx, findings), inputs={"findings": len(findings)},
-                            empty={"questions": []})
+            cl = self.stage("clarify", lambda: self._clarify(ctx, findings, early),
+                            inputs={"findings": len(findings), "early": early is not None}, empty={"questions": []})
             questions = cl.get("questions") or []
+            if early is not None and ctx.llm is not None and "clarify" in self.stage_stats:
+                # ранний вызов закончился до входа в этап: вызовы и время — из клиента модели
+                by = ctx.llm.stats["by_stage"].get("clarify") or {}
+                self.stage_stats["clarify"].update(calls=int(by.get("calls", 0)), early=True,
+                                                   model_seconds=round(float(by.get("seconds", 0.0)), 1))
         else:
             self.stages["clarify"] = "skipped"
 
@@ -358,19 +427,50 @@ class Pipeline:
         from .stages import consistency
         return consistency.run(ctx)
 
-    def _parallel_reviewers(self, ctx: Context) -> dict[str, dict]:
+    def _fast_start_table(self, view: dict) -> dict | None:
+        """Таблица требований эвристики кода для быстрого старта рецензентов; None — ждать нарезку моделью
+        (эвристика нашла слишком мало, или этапы берутся из готового прогона)."""
+        if self.reuse is not None:
+            return None
+        try:
+            from .stages import segment
+            h = segment.heuristic_segment(view)
+        except Exception as exc:  # noqa: BLE001
+            self.warnings.append(f"Быстрый старт отключён: эвристика нарезки не сработала ({type(exc).__name__})")
+            return None
+        if len(h.get("requirements") or []) < FAST_START_MIN_REQUIREMENTS:
+            return None
+        return h
+
+    def _remap_reviewers(self, outs: dict[str, dict], heur: list[dict], model: list[dict]) -> None:
+        """Ссылки рецензентов на таблицу эвристики (R-ID) → ID нарезки моделью по пересечению строк."""
+        mapping = remap_table(heur, model)
+        for out in outs.values():
+            if (out or {}).get("requirements_source") != HEURISTIC_TABLE:
+                continue
+            remap_output(out, mapping, model)
+            out["requirements_source"] = "segment"
+
+    def _parallel_reviewers(self, ctx: Context, tag: str | None = None) -> dict[str, dict]:
         jobs: dict[str, Callable[[], dict]] = {}
-        for name in self.opts.get("lenses") or LENSES:
-            jobs[f"lens_{name}"] = (lambda n=name: self._lens(ctx, n))
+        # Самый долгий рецензент — первым: при паузах темпа (--rpm) или parallel < 5 ждут короткие этапы.
+        # Порядок кандидатов в отчёте от этого не зависит (_collect идёт по фиксированному списку).
         if self.opts.get("consistency", True):
             jobs["consistency"] = lambda: self._consistency(ctx)
+        names = list(self.opts.get("lenses") or LENSES)
+        for name in sorted(names, key=lambda n: (LONGEST_FIRST.index(n) if n in LONGEST_FIRST else 99)):
+            jobs[f"lens_{name}"] = (lambda n=name: self._lens(ctx, n))
         for name in [f"lens_{x}" for x in LENSES] + ["consistency"]:
             if name not in jobs:
                 self.stages[name] = "skipped"
+        inputs: dict[str, Any] = {"requirements": len(ctx.requirements)}
+        if tag:
+            inputs["requirements_source"] = tag
+            jobs = {name: (lambda f=fn: {**(f() or {}), "requirements_source": tag}) for name, fn in jobs.items()}
         outs: dict[str, dict] = {}
         workers = max(1, min(int(self.opts.get("parallel") or 1), len(jobs) or 1))
         with cf.ThreadPoolExecutor(max_workers=workers) as ex:
-            futs = {ex.submit(self.stage, name, fn, inputs={"requirements": len(ctx.requirements)},
+            futs = {ex.submit(self.stage, name, fn, inputs=dict(inputs),
                               empty={"candidates": []}): name for name, fn in jobs.items()}
             for fut in cf.as_completed(futs):
                 name = futs[fut]
@@ -426,8 +526,30 @@ class Pipeline:
         from .stages import judge
         return judge.run(ctx, kept)
 
-    def _clarify(self, ctx: Context, findings: list[dict]) -> dict:
+    def _clarify_start(self, ctx: Context, kept: list[dict]) -> Any:
+        """Ранний запуск вопросов (№11, ``clarify.start``): вызов модели в фоне, пока работает судья."""
+        if not self.opts.get("clarify", True) or not self.opts.get("clarify_early", True) or ctx.llm is None:
+            return None
+        if self.reuse is not None and "clarify" not in self.rerun:
+            return None  # вопросы берутся из готового прогона
+        try:
+            from .stages import clarify
+            start = getattr(clarify, "start", None)
+            return start(ctx, kept) if callable(start) else None
+        except Exception as exc:  # noqa: BLE001 — без раннего запуска вопросы идут после судьи
+            self.warnings.append(f"Ранний запуск вопросов не удался: {type(exc).__name__}: {exc}")
+            return None
+
+    def _clarify(self, ctx: Context, findings: list[dict], early: Any = None) -> dict:
         from .stages import clarify
+        finish = getattr(clarify, "finish", None)
+        if early is not None and callable(finish):
+            # часы этапа clarify пошли с ранним вызовом, параллельно судье; если ранний вызов не удался, поздний
+            # вызов по итоговым дефектам получает свой лимит времени, а не остаток после медленного судьи
+            restart = getattr(ctx.llm, "restart_stage_clock", None)
+            if callable(restart):
+                restart("clarify")
+            return finish(ctx, findings, early)
         return clarify.run(ctx, findings)
 
     @staticmethod
@@ -514,8 +636,8 @@ class Pipeline:
             report["run"].update(llm.summary())
         report["run"]["duration_s"] = round(time.monotonic() - self.t0, 1)
         report["run"]["finished_at"] = now_iso()
-        report["run"]["stages"] = dict(self.stages)
-        report["run"]["stage_stats"] = dict(self.stage_stats)
+        report["run"]["stages"] = _in_stage_order(self.stages)
+        report["run"]["stage_stats"] = _in_stage_order(self.stage_stats)
 
     # ------------------------------------------------------------------ отчёт
 
@@ -540,7 +662,7 @@ class Pipeline:
                 "duration_s": round(time.monotonic() - self.t0, 1), "provider": self.provider_name,
                 "model_requested": self.opts.get("model") or "", "models_used": s["models_used"],
                 "calls": s["calls"], "tokens": s["tokens"], "cost_usd": s["cost_usd"], "status": status,
-                "stages": dict(self.stages), "stage_stats": dict(self.stage_stats),
+                "stages": _in_stage_order(self.stages), "stage_stats": _in_stage_order(self.stage_stats),
                 "warnings": _uniq(self.warnings + (self.ctx.warnings if self.ctx else [])), "options": opts}
 
     def _report(self, view: dict, seg: dict, findings: list, rejected: list, extras: dict, jd: dict,
@@ -566,6 +688,9 @@ class Pipeline:
 
     def _offline(self, view: dict) -> dict:
         self.log("Модель не настроена: предварительная проверка правилами (offline)")
+        if (self.opts.get("provider") or "auto") == "auto":
+            self.log("Для полного отчёта впишите ключ в .env в корне репозитория: GEMINI_API_KEY=<ключ> (бесплатно: "
+                     "https://aistudio.google.com/apikey) и запустите снова; проверка — python -m bcc_review doctor")
         from .rules import offline
         report = offline.build(view, None)
         run = report.setdefault("run", {})
@@ -604,6 +729,16 @@ def _second_pass(ctx: Context) -> Context:
     return c
 
 
+_STAGE_ORDER = ["segment", "rules"] + [f"lens_{x}" for x in LENSES] + ["consistency", "quotes", "judge", "clarify",
+                                                                     "recheck"]
+
+
+def _in_stage_order(d: dict) -> dict:
+    """Этапы в порядке конвейера, а не в порядке завершения параллельных линз: отчёт повторяем байт в байт."""
+    rank = {k: i for i, k in enumerate(_STAGE_ORDER)}
+    return {k: d[k] for k in sorted(d, key=lambda k: rank.get(k, len(rank)))}
+
+
 def _uniq(items: list[str]) -> list[str]:
     seen, out = set(), []
     for x in items:
@@ -611,6 +746,109 @@ def _uniq(items: list[str]) -> list[str]:
             seen.add(x)
             out.append(x)
     return out
+
+
+# --------------------------------------------------------------------------- быстрый старт: перевод ссылок
+
+def _span(r: dict) -> tuple[int, int]:
+    a = int(r.get("line_start") or 0)
+    b = int(r.get("line_end") or a)
+    return a, max(a, b)
+
+
+def remap_table(heur: list[dict], model: list[dict]) -> dict[str, list[str]]:
+    """ID таблицы эвристики → ID нарезки моделью: требования, чьи строки пересекаются; без пересечения —
+    ближайшее требование модели не дальше 2 строк; иначе ссылка пропадает (пустой список)."""
+    spans = [(str(m.get("id")), *_span(m)) for m in model if m.get("id")]
+    out: dict[str, list[str]] = {}
+    for h in heur:
+        hid = str(h.get("id") or "")
+        if not hid:
+            continue
+        a, b = _span(h)
+        hit = [mid for mid, ma, mb in spans if ma <= b and a <= mb]
+        if not hit and spans:
+            dist, mid = min((min(abs(a - mb), abs(ma - b)), mid) for mid, ma, mb in spans)
+            hit = [mid] if dist <= 2 else []
+        out[hid] = hit
+    return out
+
+
+def _ids_for_lines(lines: list[int], model: list[dict]) -> list[str]:
+    out: list[str] = []
+    for n in lines:
+        for m in model:
+            a, b = _span(m)
+            if a <= n <= b and m.get("id") and m["id"] not in out:
+                out.append(str(m["id"]))
+    return out
+
+
+def remap_output(out: dict, mapping: dict[str, list[str]], model: list[dict]) -> None:
+    """Перевести на месте все ссылки на требования в выходе рецензента (CONTRACT 2.3, 2.5)."""
+    model_ids = {str(m.get("id")) for m in model if m.get("id")}
+
+    def many(ids: Any) -> list[str]:
+        res: list[str] = []
+        for x in ids if isinstance(ids, list) else ([ids] if ids else []):
+            x = str(x)
+            # ID эвристики → по строкам; чужой для эвристики, но известный модели ID оставляем как есть
+            targets = mapping[x] if x in mapping else ([x] if x in model_ids else [])
+            for y in targets:
+                if y not in res:
+                    res.append(y)
+        return res
+
+    def one(x: Any) -> str:
+        res = many(x)
+        return res[0] if res else ""
+
+    for c in out.get("candidates") or []:
+        if not isinstance(c, dict):
+            continue
+        ids = many(c.get("requirement_ids") or [])
+        if not ids:  # ссылок не осталось — по строкам цитат
+            lines = [int(e.get("line") or e.get("line_start") or 0) for e in c.get("evidence") or []
+                     if isinstance(e, dict)]
+            ids = _ids_for_lines([n for n in lines if n], model)
+        c["requirement_ids"] = ids
+        if c.get("acceptance_row"):
+            c["acceptance_row"] = one(c["acceptance_row"]) or c["acceptance_row"]
+    for chk in out.get("acceptance_checks") or []:
+        if isinstance(chk, dict):
+            if chk.get("row_requirement_id"):
+                chk["row_requirement_id"] = one(chk["row_requirement_id"])
+            if "rule_requirement_ids" in chk:
+                chk["rule_requirement_ids"] = many(chk.get("rule_requirement_ids") or [])
+    for tc in out.get("test_cases") or []:
+        if isinstance(tc, dict) and "requirement_ids" in tc:
+            tc["requirement_ids"] = many(tc.get("requirement_ids") or [])
+    for p in out.get("pair_checks") or []:
+        if isinstance(p, dict):
+            for k in ("a", "b"):
+                if p.get(k):
+                    p[k] = one(p[k])
+    for t in out.get("trace") or []:
+        if isinstance(t, dict):
+            if t.get("requirement_id"):
+                t["requirement_id"] = one(t["requirement_id"])
+            for k in ("verified_by", "implemented_by"):
+                if k in t:
+                    t[k] = many(t.get(k) or [])
+    if isinstance(out.get("trace"), list):  # две строки эвристики могли слиться в одно требование модели
+        seen: dict[str, dict] = {}
+        merged = []
+        for t in out["trace"]:
+            rid = t.get("requirement_id") if isinstance(t, dict) else None
+            if not rid:
+                continue
+            if rid in seen:
+                for k in ("verified_by", "implemented_by"):
+                    seen[rid][k] = _uniq(list(seen[rid].get(k) or []) + list(t.get(k) or []))
+                continue
+            seen[rid] = t
+            merged.append(t)
+        out["trace"] = merged
 
 
 # --------------------------------------------------------------------------- запись отчёта

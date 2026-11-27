@@ -100,10 +100,13 @@ def test_postprocess_filters(findings):
          "question": "Как учитывать возвраты?", "evidence": [{"quote": "Возврат уменьшает расходы", "line": 38}],
          "options": ["A) Оставить как есть", "B) На усмотрение разработчика", "C) Возврат уменьшает месяц покупки"],
          "why": "…"},
-        {"topic": "Цитата выдумана", "finding_ids": ["D-28"], "to": "Аналитик", "blocking": True,
-         "question": "Нужна ли схема отката?", "evidence": [{"quote": "этого текста нет в документе", "line": 5}],
-         "options": ["1. Да, через выключатель функции", "2. Нет, откат не нужен", "2. Нет, откат не нужен"],
+        {"topic": "Цитата выдумана", "finding_ids": ["D-17"], "to": "Аналитик", "blocking": True,
+         "question": "Когда ставить признак отправки?", "evidence": [{"quote": "этого текста нет в документе", "line": 5}],
+         "options": ["1. После подтверждения приёма", "2. До отправки", "2. До отправки"],
          "why": "…"},
+        {"topic": "Только minor", "finding_ids": ["D-28"], "to": "Аналитик", "blocking": True,
+         "question": "Нужна ли схема отката?", "evidence": [{"quote": "Реализация задачи/проекта предусматривает схему отката решений", "line": 76}],
+         "options": ["Да, через выключатель функции", "Нет, откат не нужен"], "why": "…"},
         {"topic": "Критичный", "finding_ids": ["D-01", "D-01"], "to": "Владелец", "blocking": False,
          "question": "Сколько уведомлений в месяц?", "evidence": [{"quote": "максимум один такой push", "line": 39}],
          "options": ["Один на карту", "Один на каждое значение порога"], "why": "…"},
@@ -117,9 +120,11 @@ def test_postprocess_filters(findings):
     assert crit["blocking"] is True and crit["finding_ids"] == ["D-01"] and crit["to"] == "Владелец продукта"
     assert crit["id"] == "Q-01"
     fake = next(q for q in qs if q["topic"] == "Цитата выдумана")
-    assert fake["options"] == ["Да, через выключатель функции", "Нет, откат не нужен"]
-    assert fake["evidence"] and fake["evidence"][0]["line_start"] == 76  # цитата дефекта вместо выдуманной
-    assert fake["blocking"] is False  # minor-дефект не блокирует
+    assert fake["options"] == ["После подтверждения приёма", "До отправки"]
+    findings_by_id = {f["id"]: f for f in findings}
+    assert fake["evidence"][0]["line_start"] == findings_by_id["D-17"]["evidence"][0]["line_start"]  # цитата дефекта
+    assert fake["blocking"] is False  # major без critical не блокирует
+    assert "Только minor" not in topics  # вопрос только по незначительному дефекту при наличии critical/major
     assert any("D-99" in w or "нет связи" in w for w in warnings)
 
 
@@ -139,7 +144,7 @@ def test_cap_and_order(findings):
     raw["questions"].append(dict(base, topic="Критичная тема", question="Критичный вопрос?", finding_ids=["D-02"],
                                  blocking=False))
     qs = clarify.postprocess(raw, findings, load_view())
-    assert len(qs) == 10
+    assert len(qs) == clarify.MAX_QUESTIONS == 8
     assert qs[0]["topic"] == "Критичная тема"
     seen_nonblocking = False
     for q in qs:
@@ -195,3 +200,178 @@ def test_only_formatting_findings_no_call():
                   {"id": "D-02", "severity": "minor", "kind": "traceability", "criterion": "traceable", "evidence": []}]
     assert clarify.run(FakeCtx(llm), only_minor) == {"questions": []}
     assert llm.calls == []
+
+
+# --------------------------------------------------------------------------- третья волна: меньше, но точнее
+def _q(topic, ids, **kw):
+    base = {"topic": topic, "finding_ids": ids, "to": "Аналитик", "blocking": True, "question": f"{topic}?",
+            "evidence": [{"quote": "Возврат уменьшает расходы", "line": 38}],
+            "options": ["Первый вариант с числом 1", "Второй вариант с числом 2"], "why": "…"}
+    base.update(kw)
+    return base
+
+
+def test_blocking_only_for_critical(findings):
+    raw = {"questions": [_q("Мажор из исправить первым", ["D-05"]), _q("Критичный", ["D-01"], blocking=False)]}
+    qs = {q["topic"]: q for q in clarify.postprocess(raw, findings, load_view())}
+    assert qs["Критичный"]["blocking"] is True
+    assert qs["Мажор из исправить первым"]["blocking"] is False  # D-05 major с priority 5: вердикт «нельзя» не держит
+
+
+def test_cap_five_without_critical(findings):
+    majors = [f for f in findings if f["severity"] != "critical"]
+    raw = {"questions": [_q(f"Тема {i}", [f["id"]]) for i, f in enumerate(majors[:12])]}
+    qs = clarify.postprocess(raw, majors, load_view())
+    assert len(qs) == clarify.MAX_QUESTIONS_NO_CRITICAL == 5
+    assert all(not q["blocking"] for q in qs)
+
+
+def test_plain_text_removes_internal_codes():
+    s = "Кнопка «Отменить» (L028) не имеет вызова; см. D-03 и требование R-12, строка L067, источник lens:qa."
+    out = clarify.plain_text(s)
+    for code in ("L028", "D-03", "R-12", "L067", "lens:qa"):
+        assert code not in out
+    assert "строка 67" in out and "строка строка" not in out and "(" not in out
+    assert clarify.plain_text("Сколько уведомлений (D-01, D-02) по L039?") == "Сколько уведомлений по стр. 39?"
+    assert clarify.plain_text("Один — как в D-01") == "Один"
+    assert not clarify.plain_text("Один, как в D-01.").endswith("в.")
+    assert clarify.plain_text("Правило R-12 документа", keep={"R-12"}) == "Правило R-12 документа"
+
+
+def test_postprocess_cleans_codes_in_texts(findings):
+    raw = {"questions": [_q("Коды", ["D-01"], question="Сколько уведомлений (D-01, D-02) по L039?",
+                            why="Тест R-04 нельзя написать (L064).",
+                            options=["Один — как в D-01", "Два, строка L040"])]}
+    q = clarify.postprocess(raw, findings, load_view())[0]
+    text = " ".join([q["question"], q["why"], *q["options"]])
+    assert not re.search(r"\b(?:[DRC]-\d|L\d{2,})", text), text
+
+
+def test_select_findings_orders_critical_first(findings):
+    sel = clarify.select_findings(list(reversed(findings)))
+    sev = [f["severity"] for f in sel]
+    assert sev == sorted(sev, key=lambda s: clarify._SEV_RANK[s]) and "minor" not in sev
+    assert [f["id"] for f in sel[:4]] == ["D-01", "D-02", "D-03", "D-04"]
+
+
+# --------------------------------------------------------------------------- ранний запуск (параллельно с судьёй)
+def _candidates(findings):
+    """Кандидаты C-… из дефектов фикстуры: у каждого дефекта по два кандидата-дубля."""
+    out = []
+    for n, f in enumerate(findings, 1):
+        for k in (0, 1):
+            out.append({"id": f"C-{2 * n - 1 + k:03d}", "title": f["title"], "kind": f.get("kind"),
+                        "criterion": f.get("criterion"), "severity": f["severity"],
+                        "requirement_ids": f.get("requirement_ids", []), "evidence": f.get("evidence", []),
+                        "problem": f.get("problem", ""), "question": f.get("question", ""),
+                        "blocks": f.get("blocks", "both")})
+    return out
+
+
+def _with_candidate_ids(findings):
+    return [dict(f, candidate_ids=[f"C-{2 * n - 1:03d}", f"C-{2 * n:03d}"]) for n, f in enumerate(findings, 1)]
+
+
+def test_select_candidates_groups_and_filters(findings):
+    groups = clarify.select_candidates(_candidates(findings))
+    flat = [c for g in groups for c in g]
+    assert flat and all(c["severity"] in ("critical", "major") for c in flat)
+    assert groups[0][0]["severity"] == "critical"
+    block = clarify.format_candidates(groups)
+    assert "C-001" in block and "цитаты:" in block
+
+
+def test_remap_candidates_to_findings(findings):
+    fs = _with_candidate_ids(findings)
+    raw = {"questions": [_q("Ранний", ["C-002", "C-003", "C-999", "D-05"])]}
+    out = clarify.remap(raw, fs)
+    assert out["questions"][0]["finding_ids"] == ["D-01", "D-02", "D-05"]
+
+
+def test_early_finish_uses_early_answer(findings):
+    fs = _with_candidate_ids(findings)
+    early_raw = {"questions": [_q("Уведомления в месяц", ["C-001"]), _q("Ложный кандидат", ["C-999"])]}
+    llm = FakeLLM(early_raw)
+    ctx = FakeCtx(llm)
+    handle = clarify.start(ctx, _candidates(findings))
+    res = clarify.finish(ctx, fs, handle)
+    assert len(llm.calls) == 1  # один вызов — ранний, повторного нет
+    assert "C-001" in llm.calls[0]["user"]
+    assert [q["finding_ids"] for q in res["questions"]] == [["D-01"]]
+    assert res["questions"][0]["blocking"] is True
+
+
+def test_early_failure_falls_back_to_late_call(findings):
+    fs = _with_candidate_ids(findings)
+
+    class Flaky(FakeLLM):
+        def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
+            self.calls.append({"user": user})
+            if len(self.calls) == 1:
+                raise RuntimeError("503")
+            return {"questions": [_q("Поздний", ["D-02"])]}
+
+    llm = Flaky()
+    ctx = FakeCtx(llm)
+    res = clarify.finish(ctx, fs, clarify.start(ctx, _candidates(findings)))
+    assert len(llm.calls) == 2 and res["questions"][0]["finding_ids"] == ["D-02"]
+    assert any("ранний вызов" in w for w in ctx.warnings)
+
+
+def test_early_off_target_reasks(findings):
+    fs = _with_candidate_ids(findings)
+
+    class Two(FakeLLM):
+        def ask(self, stage, system, user, schema, *, max_output_tokens=16000):
+            self.calls.append({"user": user})
+            if len(self.calls) == 1:  # ранний ответ только про кандидатов, которых судья отклонил
+                return {"questions": [_q("Отклонённый", ["C-998"])]}
+            return {"questions": [_q("По итогу", ["D-03"])]}
+
+    llm = Two()
+    ctx = FakeCtx(llm)
+    res = clarify.finish(ctx, fs, clarify.start(ctx, _candidates(findings)))
+    assert len(llm.calls) == 2 and res["questions"][0]["topic"] == "По итогу"
+
+
+def test_finish_without_early_is_plain_run(findings):
+    llm = FakeLLM({"questions": [_q("Поздний", ["D-02"])]})
+    res = clarify.finish(FakeCtx(llm), findings, None)
+    assert len(llm.calls) == 1 and res["questions"][0]["finding_ids"] == ["D-02"]
+
+
+def test_start_without_llm_returns_none():
+    ctx = FakeCtx(None)
+    assert clarify.start(ctx, []) is None
+
+
+def test_sides_inside_one_line():
+    a = {"line_start": 36, "quote": "срок 25-го числа включительно"}
+    b = {"line_start": 36, "quote": "проценты начисляются с 26-го"}
+    c = {"line_start": 36, "quote": "25-го числа"}
+    assert clarify.count_sides([a, b]) == 2  # две разные цитаты одной строки — две стороны
+    assert clarify.count_sides([a, c]) == 1  # вложенная цитата — та же сторона
+    assert clarify.is_new_side({"line_start": 40, "quote": "x"}, [a])
+
+
+def test_reviewers_rank_majors(findings):
+    a = dict(findings[6], id="D-90", priority=0, sources=["lens:qa"])
+    b = dict(findings[6], id="D-91", priority=0, sources=["lens:qa", "consistency", "rules:api.status", "rules:api.x"])
+    assert clarify.reviewers(a) == 1 and clarify.reviewers(b) == 3  # правила одного вида — один ревьюер
+    sel = clarify.select_findings([a, b])
+    assert [f["id"] for f in sel] == ["D-91", "D-90"]
+    raw = {"questions": [_q("Один ревьюер", ["D-90"]), _q("Три ревьюера", ["D-91"])]}
+    qs = clarify.postprocess(raw, [a, b], load_view())
+    assert [q["topic"] for q in qs] == ["Три ревьюера", "Один ревьюер"]
+    assert "ревьюеров: 3" in clarify.format_findings([b])
+
+
+def test_placeholder_options_softened_only_when_needed():
+    opts = ["Все QR действуют 15 минут", "Без суммы — до 23:59:59 по <уточнить: часовой пояс банка>",
+            "Без суммы — 15 минут, но не дольше 23:59:59 по <уточнить: часовой пояс>"]
+    out = clarify.clean_options(opts)
+    assert len(out) == 3 and not any("<уточнить" in o for o in out)
+    assert "(часовой пояс банка — укажите)" in out[1]
+    # хватает двух конкретных — вариант с заглушкой отбрасывается
+    out2 = clarify.clean_options(["Первый вариант", "Второй вариант", "Третий <уточнить: срок>"])
+    assert out2 == ["Первый вариант", "Второй вариант"]

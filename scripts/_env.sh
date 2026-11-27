@@ -4,6 +4,8 @@
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
 export PYTHONUTF8=1 PYMUPDF_SUGGEST_LAYOUT_ANALYZER=0
+# код агента — из этой копии, даже если активно окружение другой копии (editable-установка другого каталога)
+export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 
 if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then
   PY="$VIRTUAL_ENV/bin/python"   # уже активированное окружение (шаг 1 README)
@@ -31,13 +33,15 @@ else
 fi
 
 stamp="$(dirname "$(dirname "$PY")")/.bcc_requirements"
-if [ ! -f "$stamp" ] || ! cmp -s requirements.txt "$stamp" || ! "$PY" -c "import bcc_review" 2>/dev/null; then
+# метка установки — requirements.txt и constraints.txt вместе: изменился любой — ставим заново
+want="$(cat requirements.txt constraints.txt)"
+if [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$want" ] || ! "$PY" -c "import bcc_review" 2>/dev/null; then
   echo "== установка зависимостей (1–2 минуты при первом запуске)"
   "$PY" -m pip install -q --disable-pip-version-check -r requirements.txt -e . || {
     echo "Установка не удалась — сообщение pip выше." >&2
     exit 1
   }
-  cp requirements.txt "$stamp"
+  printf '%s' "$want" > "$stamp"
 fi
 
 if [ ! -f .env ]; then

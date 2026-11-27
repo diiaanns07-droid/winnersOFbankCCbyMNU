@@ -22,8 +22,16 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo "рабочее дерево изменено: закоммитьте или отложите правки, иначе в паспорте будет -dirty" >&2
   exit 1
 fi
+# Код агента — из этой копии (worktree на теге), даже если python из чужого .venv с editable-установкой другого
+# каталога: иначе паспорт запишет чужой коммит, а отчёт построит не тот код.
+export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
+used="$(python -c 'import bcc_review, pathlib; print(pathlib.Path(bcc_review.__file__).resolve().parents[1])')"
+if [ "$used" != "$(cd src && pwd -P)" ]; then
+  echo "python берёт bcc_review из $used, а не из $PWD/src — запустите из окружения этой копии" >&2
+  exit 1
+fi
 tag="$(git describe --tags --exact-match 2>/dev/null || true)"
-echo "коммит: $(git rev-parse --short HEAD) ${tag:+(тег $tag)}"
+echo "коммит: $(git rev-parse --short HEAD) ${tag:+(тег $tag)}; код агента: $used"
 [ -z "$tag" ] && echo "внимание: HEAD не на теге релиза" >&2
 
 suffix=""
