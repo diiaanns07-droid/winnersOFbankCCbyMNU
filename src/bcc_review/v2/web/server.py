@@ -378,7 +378,6 @@ def job_page(job: Job, app: App | None = None) -> str:
   </div>
   <div class="jb-err" id="err" hidden><p class="jb-errline" id="errtext" role="alert"></p><p class="jb-todo" id="todo"></p>
   <a class="jb-btn" href="/">Новая проверка</a></div>
-  <ol class="jb-stages" id="stages" hidden></ol>
   <details class="jb-log"><summary>Журнал запуска</summary><pre id="log"></pre></details>
 </section>
 <section class="jb-result" id="result" hidden></section>"""
