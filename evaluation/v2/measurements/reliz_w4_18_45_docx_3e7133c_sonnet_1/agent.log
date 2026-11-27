@@ -1,0 +1,36 @@
+$ /usr/local/bin/python -m bcc_review release/input/requirements.docx /home/user/repo/evaluation/v2/measurements/reliz_w4_18_45_docx_3e7133c_sonnet_1/report.md --provider claude_cli --model sonnet --no-cache
+rc=0
+--- stdout
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 26 дефектов (критичных 5, существенных 11, незначительных 10), вопросов 8
+Разработка: нельзя · тестирование: нельзя — блокеров 5, останавливают разработку и тестирование, D-05 — только разработку:
+  D-01 Ф-3 и Ф-4 по-разному решают повторный push в месяце
+  D-02 Критерий приёмки №2 противоречит правилу месяца в Ф-2
+  D-03 Ответ на недопустимую сумму описан как 200 ERROR и как 400
+  и ещё 2: D-04, D-05 — в отчёте, раздел «Кратко»
+Прогон завершён полностью: 2 мин 34 с, 9 вызовов модели, claude-sonnet-5-5; цитат сверено 75 из 75
+Отчёт: /home/user/repo/evaluation/v2/measurements/reliz_w4_18_45_docx_3e7133c_sonnet_1/report.md и /home/user/repo/evaluation/v2/measurements/reliz_w4_18_45_docx_3e7133c_sonnet_1/report.json
+  ! судья: 3 дефекта (пожелания полноты) сведены в одно незначительное
+HTML: /home/user/repo/evaluation/v2/measurements/reliz_w4_18_45_docx_3e7133c_sonnet_1/report.html
+
+--- stderr
+Документ: release/input/requirements.docx
+  segment: запуск
+  consistency: запуск
+  lens_architect: запуск
+  lens_analyst: запуск
+  lens_risk: запуск
+  lens_qa: запуск
+  segment: готово за 17 с, вызовов 1
+  lens_analyst: готово за 33 с, вызовов 1, кандидатов 7
+  lens_qa: готово за 39 с, вызовов 1, кандидатов 4
+  lens_risk: готово за 42 с, вызовов 1, кандидатов 8
+  consistency: готово за 42 с, вызовов 1, кандидатов 9
+  lens_architect: готово за 55 с, вызовов 1, кандидатов 9
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 52
+  judge: запуск
+  judge: готово за 90 с, вызовов 2
+  clarify: запуск
+  clarify: готово за 0 с, вызовов 0
