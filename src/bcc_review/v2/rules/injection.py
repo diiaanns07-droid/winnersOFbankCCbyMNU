@@ -126,7 +126,7 @@ def normalize(text: str) -> tuple[str, list[str]]:
         t = BIDI.sub("", t)
     zw = INVISIBLE.findall(t)
     # соединитель ZWJ внутри эмодзи (👨‍👩‍👧) — обычный текст
-    letters_zw = re.findall("(?<=[^\W\d_])[\u200b\u200c\u200d\u2060\ufeff\u00ad](?=[^\W\d_])", t)
+    letters_zw = re.findall(r"(?<=[^\W\d_])[\u200b\u200c\u200d\u2060\ufeff\u00ad](?=[^\W\d_])", t)
     if letters_zw or len(zw) >= 3:
         notes.append("символы нулевой ширины внутри слов")
     t = INVISIBLE.sub("", t)
