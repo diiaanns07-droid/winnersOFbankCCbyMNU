@@ -1,0 +1,35 @@
+$ /usr/local/bin/python3 -m bcc_review /home/user/winnersOFbankCCbyMNU/release/input/requirements.md /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/stabil_nost_haiku_692ee4c_haiku_3/report.md --provider claude_cli --model haiku --no-cache --runs-dir /home/user/winnersOFbankCCbyMNU/out/round/stabil_nost_haiku/runs
+rc=0
+--- stdout
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 37 дефектов (критичных 5, существенных 22, незначительных 10), вопросов 8
+Разработка: нельзя · тестирование: нельзя
+  D-01 Событие «проведённая покупка» не определено: авторизация или клиринг — блокирует разработку и тестирование
+  D-02 Месяц покупки: по дате совершения (Ф-2) или по дате проведения (приёмка) — блокирует разработку и тестирование
+  D-03 Второй push в месяце: Ф-3 запрещает, Ф-4 требует при смене порога — блокирует разработку и тестирование
+Прогон завершён полностью: 4 мин 54 с, 9 вызовов модели, claude-haiku-5-5; цитат сверено 97 из 97
+Отчёт: /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/stabil_nost_haiku_692ee4c_haiku_3/report.md и /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/stabil_nost_haiku_692ee4c_haiku_3/report.json
+  ! Тестировщик: тест-кейсов 13, оставлено 12
+HTML: /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/stabil_nost_haiku_692ee4c_haiku_3/report.html
+
+--- stderr
+Документ: /home/user/winnersOFbankCCbyMNU/release/input/requirements.md
+  segment: запуск
+  consistency: запуск
+  lens_architect: запуск
+  lens_analyst: запуск
+  lens_risk: запуск
+  lens_qa: запуск
+  lens_risk: готово за 55 с, вызовов 1, кандидатов 7
+  segment: готово за 68 с, вызовов 1
+  lens_analyst: готово за 69 с, вызовов 1, кандидатов 9
+  lens_qa: готово за 73 с, вызовов 1, кандидатов 3
+  consistency: готово за 93 с, вызовов 1, кандидатов 15
+  lens_architect: готово за 122 с, вызовов 1, кандидатов 12
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 61
+  judge: запуск
+  judge: готово за 163 с, вызовов 2
+  clarify: запуск
+  clarify: готово за 0 с, вызовов 0

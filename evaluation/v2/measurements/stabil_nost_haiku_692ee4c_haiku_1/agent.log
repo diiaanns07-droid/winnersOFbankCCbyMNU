@@ -1,0 +1,34 @@
+$ /usr/local/bin/python3 -m bcc_review /home/user/winnersOFbankCCbyMNU/release/input/requirements.md /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/stabil_nost_haiku_692ee4c_haiku_1/report.md --provider claude_cli --model haiku --no-cache --runs-dir /home/user/winnersOFbankCCbyMNU/out/round/stabil_nost_haiku/runs
+rc=0
+--- stdout
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 33 дефекта (критичных 5, существенных 20, незначительных 8), вопросов 8
+Разработка: нельзя · тестирование: нельзя
+  D-01 «Проведённая» покупка: не определено, авторизация это или проведение — блокирует разработку и тестирование
+  D-02 Чтение порога и суммы за месяц обещано, но не описано ни одной операцией — блокирует разработку и тестирование
+  D-03 Месяц покупки: Ф-2 относит к дате совершения, приёмка — к дате проведения — блокирует разработку и тестирование
+Прогон завершён полностью: 5 мин 34 с, 9 вызовов модели, claude-haiku-5-5; цитат сверено 80 из 80
+Отчёт: /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/stabil_nost_haiku_692ee4c_haiku_1/report.md и /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/stabil_nost_haiku_692ee4c_haiku_1/report.json
+HTML: /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/stabil_nost_haiku_692ee4c_haiku_1/report.html
+
+--- stderr
+Документ: /home/user/winnersOFbankCCbyMNU/release/input/requirements.md
+  segment: запуск
+  consistency: запуск
+  lens_qa: запуск
+  lens_analyst: запуск
+  lens_risk: запуск
+  lens_architect: запуск
+  lens_risk: готово за 55 с, вызовов 1, кандидатов 7
+  segment: готово за 66 с, вызовов 1
+  lens_analyst: готово за 68 с, вызовов 1, кандидатов 7
+  lens_qa: готово за 74 с, вызовов 1, кандидатов 6
+  consistency: готово за 104 с, вызовов 1, кандидатов 12
+  lens_architect: готово за 187 с, вызовов 1, кандидатов 12
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 59
+  judge: запуск
+  judge: готово за 139 с, вызовов 2
+  clarify: запуск
+  clarify: готово за 0 с, вызовов 0
