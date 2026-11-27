@@ -611,3 +611,22 @@ def test_failed_early_questions_survive_slow_judge(tmp_path, monkeypatch):
 
     report, _, _ = _faulty_run(tmp_path, monkeypatch, f, stage_timeout=2.0, judge_check=False)
     assert report["questions"], [w for w in report["run"]["warnings"] if "clarify" in w]
+
+
+@_bug("01", "один сбой записи файла этапа runs/<id>/stages/*.json (Windows: файл держит антивирус или веб-демо читает "
+            "прогресс → PermissionError в os.replace) роняет весь прогон: failed, 0 замечаний (pipeline.stage — "
+            "save_stage вне try; runs.save_stage без повтора)")
+def test_transient_stage_file_write_error_does_not_abort_run(tmp_path, monkeypatch):
+    from bcc_review.v2 import runs
+    real = runs.RunDir.save_stage
+    hit = {"n": 0}
+
+    def flaky(self, name, record):
+        if name == "segment" and not hit["n"]:
+            hit["n"] = 1
+            raise PermissionError(13, "файл занят другим процессом")
+        return real(self, name, record)
+
+    monkeypatch.setattr(runs.RunDir, "save_stage", flaky)
+    report, _, out = _review(tmp_path, OFFICIAL, provider="mock")
+    assert report["run"]["status"] != "failed" and report["findings"]
