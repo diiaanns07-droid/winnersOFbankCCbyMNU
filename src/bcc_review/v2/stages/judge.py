@@ -627,6 +627,57 @@ def _build_messages(ctx: Any, block: str, checklist: str, n_candidates: int, com
     return "", user
 
 
+_ID_SPLIT_RE = re.compile(r"[\s,;]+")
+
+
+def _conform(value: Any, schema: dict) -> Any:
+    """Ответ модели → типы схемы этапа (только то, что описано в схеме; лишние поля остаются как есть).
+
+    Схему держит провайдер, но не всегда (локальная модель без структурированного вывода, ответ из чужого
+    кэша): одно поле не того типа — «candidate_ids» строкой, элемент «findings» строкой, «finding_keys»
+    числом — роняло весь этап судьи, и отчёт уходил в «частичный» без отсева ложных. Здесь: объект — только
+    dict (иначе элемент массива выбрасывается), массив строк из строки — по запятым и пробелам, строка из
+    числа — ``str``, целое из bool/строки/дроби — число или 0, bool — только настоящий bool."""
+    t = schema.get("type")
+    if t == "object":
+        if not isinstance(value, dict):
+            return None
+        out = dict(value)
+        for k, sub in (schema.get("properties") or {}).items():
+            if k in out:
+                out[k] = _conform(out[k], sub)
+        return out
+    if t == "array":
+        items = schema.get("items") or {}
+        if isinstance(value, str) and items.get("type") == "string":
+            value = [x for x in _ID_SPLIT_RE.split(value) if x]
+        elif isinstance(value, dict):
+            value = [value]
+        elif not isinstance(value, list):
+            return []
+        conformed = (_conform(x, items) for x in value)
+        return [x for x in conformed if x is not None]
+    if t == "string":
+        if isinstance(value, str):
+            return value
+        if isinstance(value, bool) or value is None or isinstance(value, (list, dict)):
+            return ""
+        return str(value)
+    if t == "integer":
+        if isinstance(value, bool):
+            return 0
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float) and value == value and abs(value) < 10 ** 9:
+            return int(value)
+        if isinstance(value, str) and re.fullmatch(r"\s*-?\d{1,9}\s*", value):
+            return int(value)
+        return 0
+    if t == "boolean":
+        return value if isinstance(value, bool) else False
+    return value
+
+
 def _ask(ctx: Any, system: str, user: str, schema: dict) -> dict:
     llm = getattr(ctx, "llm", None)
     if llm is None:
@@ -638,7 +689,7 @@ def _ask(ctx: Any, system: str, user: str, schema: dict) -> dict:
     missing = [k for k in schema.get("required") or [] if not isinstance(data, dict) or k not in data]
     if missing:  # ответ не по схеме этапа — это сбой вызова, а не пустой реестр
         raise ValueError(f"ответ модели без полей {', '.join(missing)}")
-    return data
+    return _conform(data, schema)
 
 
 def _call_judge(ctx: Any, cands: list[dict], clusters: list[list[str]], checklist: str,
@@ -1940,6 +1991,21 @@ def candidates_from_v1(report: dict, view: dict) -> list[dict]:
 # --- этап -------------------------------------------------------------------------------------
 
 
+def _clean_candidate(c: dict) -> dict:
+    """Кандидат → типы контракта 2.3: цитаты — список объектов, ID требований — список строк.
+    Линзы почти всегда держат схему; строка вместо списка требований ломала сравнение (``set("R-04")`` — буквы),
+    число — роняло этап."""
+    c = dict(c)
+    ev = c.get("evidence")
+    ev = [ev] if isinstance(ev, dict) else ev if isinstance(ev, list) else []
+    c["evidence"] = [e for e in ev if isinstance(e, dict)]
+    reqs = c.get("requirement_ids")
+    reqs = [x for x in _ID_SPLIT_RE.split(reqs) if x] if isinstance(reqs, str) else reqs if isinstance(
+        reqs, list) else []
+    c["requirement_ids"] = [_s(x) for x in reqs if isinstance(x, (str, int)) and not isinstance(x, bool) and _s(x)]
+    return c
+
+
 def run(ctx: Any, candidates: list[dict]) -> dict:
     """Этап «судья»: ``{"findings", "rejected", "checklist", "verdict_summary", "fix_first", "warnings"}``."""
     warnings: list[str] = []
@@ -1947,7 +2013,10 @@ def run(ctx: Any, candidates: list[dict]) -> dict:
     good: list[dict] = []
     pre_rejected: list[dict] = []
     for i, c in enumerate(candidates or [], 1):
-        c = dict(c)
+        if not isinstance(c, dict):
+            _warn(ctx, warnings, f"судья: кандидат №{i} не объект ({type(c).__name__}) — пропущен")
+            continue
+        c = _clean_candidate(c)
         c["id"] = _s(c.get("id")) or f"C-{i:03d}"
         if c["id"] in seen:
             c["id"] = f"{c['id']}-{i}"
