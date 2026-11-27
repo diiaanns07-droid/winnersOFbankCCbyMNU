@@ -267,3 +267,20 @@ def test_gated_pair_text_says_why_it_is_not_two_outcomes():
     assert "пример" in c["problem"] and "не второй исход" in c["problem"]
     assert c["question"] and len(c["title"].split()) <= C.MAX_TITLE_WORDS
     assert set(C.GATE_TEXT) <= set(C.GATE_RU)
+
+@pytest.mark.parametrize(("receipt", "expected"), [
+    ("В 09:08 — операция разрешена; в 09:25 — ответ 410", "critical"),
+    ("В 09:01 — операция разрешена; в 09:08 — ответ 410", None),
+])
+def test_shorter_named_deadline_in_acceptance(receipt, expected):
+    rule = "Разрешение действует 20 минут, но не дольше permitEnd."
+    row = f"| permitEnd — 18.02.2026 09:05, разрешение выдано в 09:00 | Проверить доступ | {receipt} |"
+    view = {"lines": [
+        {"n": 1, "text": rule, "page": None, "section": "Функциональные требования"},
+        {"n": 2, "text": row, "page": None, "section": "Критерии приемки"},
+    ]}
+    reqs = [{"id": f"R-0{i}", "kind": kind, "line_start": i, "line_end": i, "text": text}
+            for i, (kind, text) in enumerate([("functional", rule), ("acceptance", row)], 1)]
+    proposed = pair(1, 2, kind="boundary_conflict", qa=rule, qb=receipt, subject="срок разрешения")
+    out = C.postprocess({"pair_checks": [proposed]}, view, reqs)
+    assert [c["severity"] for c in out["candidates"]] == ([expected] if expected else [])

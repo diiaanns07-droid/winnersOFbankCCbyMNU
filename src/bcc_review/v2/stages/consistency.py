@@ -707,6 +707,37 @@ def _section(ev: dict, view: Any) -> str:
     return _s(ev.get("section"))
 
 
+_CUTOFF_FIELD = re.compile(r"(?:не дольше|не позднее|не позже|ограничен[ао]? значением)\s+[`«\"]?((?a:[a-z]\w*(?:\.[a-z]\w*)*))", re.I)
+_CLOCK_TEXT = r"(?<!\d)((?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?)(?![\d:])"
+_CLOCK_AFTER_FIELD = re.compile(r"[`»\"\s:=—–-]*(?:(?:\d{2}[./-]\d{2}[./-]\d{4}|\d{4}-\d{2}-\d{2})[T\s]+)?" + _CLOCK_TEXT)
+_TIMED_RESULT = re.compile(_CLOCK_TEXT + r"\s*(?:—|–|->|→|:|-)\s*([^;|\n]+)")
+
+
+def _past_named_deadline(rule: str, acceptance_line: str, result_quote: str) -> bool:
+    """Две границы срока. Приёмка явно даёт результат позже дополнительного предела."""
+    field = _CUTOFF_FIELD.search(rule)
+    if not field:
+        return False
+    # Имя поля связывает независимый предел с конкретным временем в предпосылках этой строки.
+    field_in_row = re.search(r"(?<!\w)" + re.escape(field[1]) + r"(?!\w)", acceptance_line, re.I)
+    if not field_in_row:
+        return False
+    cutoff = _CLOCK_AFTER_FIELD.match(acceptance_line, field_in_row.end())
+    if not cutoff:
+        return False
+
+    def clock_value(value: str) -> tuple[int, int, int]:
+        hour, minute, *seconds = map(int, value.split(":"))
+        return hour, minute, seconds[0] if seconds else 0
+
+    deadline = clock_value(cutoff[1])
+    for result in _TIMED_RESULT.finditer(result_quote):
+        if (clock_value(result[1]) > deadline and not _REFUSAL.search(result[2])
+                and not re.search(r"\b5\d\d\b", result[2])):
+            return True
+    return False
+
+
 def conflict_gate(pair: dict, ev_a: dict, ev_b: dict, view: Any, known: dict[str, dict] | None) -> str:
     """Проверка конфликта кодом: пустая строка — конфликт держится на цитатах; иначе — причина (ключ ``GATE_RU``)."""
     kind, qa, qb = pair["kind"], pair["quote_a"], pair["quote_b"]
@@ -757,7 +788,8 @@ def conflict_gate(pair: dict, ev_a: dict, ev_b: dict, view: Any, known: dict[str
     # Граница срока: строка приёмки с конкретным временем против «действует N минут» без «включительно».
     if kind == "boundary_conflict":
         for (ev, q, r), (_ev2, q2, _r2) in ((sides[0], sides[1]), (sides[1], sides[0])):
-            if _in_acceptance(ev, known) and _DURATION.search(q2) and not re.search(r"включительно", q2, re.I):
+            if (_in_acceptance(ev, known) and _DURATION.search(q2) and not re.search(r"включительно", q2, re.I)
+                    and not _past_named_deadline(q2, _line_text(view, ev), q)):
                 return "acceptance_duration"
     # Пример: значение примера (дата, сумма) зависит от его входа; коды и форматы примера сверяет status/unit.
     if kind in ("event_conflict", "boundary_conflict") and any(_EXAMPLE.search(q) for q in quotes):
