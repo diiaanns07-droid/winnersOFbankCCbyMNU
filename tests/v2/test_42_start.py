@@ -83,6 +83,7 @@ def test_start_cmd_is_ascii_and_calls_start_ps1():
     assert 'cd /d "%~dp0"' in text
     assert 'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start.ps1" %*' in text
     assert re.search(r"if errorlevel 1 pause", text)
+    assert "title BCC Review" in text
 
 
 def test_start_ps1_bom_and_powershell51_syntax():
@@ -95,7 +96,8 @@ def test_start_ps1_bom_and_powershell51_syntax():
     assert code.count("{") == code.count("}") and code.count("(") == code.count(")")
     for must in ('"-3.12"', '"-3.11"', 'Test-Python @("python")', "winget install -e --id Python.Python.3.12",
                  "Read-Host", "https://www.python.org/downloads/", "-LiteralPath", ".bcc-req",
-                 "-m pip install -q -r requirements.txt", "-m bcc_review.v2.web --open @args"):
+                 "-m pip install -r requirements.txt", "-m bcc_review.v2.web --open @args",
+                 '$Host.UI.RawUI.WindowTitle = "BCC Review"'):
         assert must in text, must
 
 

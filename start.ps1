@@ -16,6 +16,33 @@ $env:PIP_DISABLE_PIP_VERSION_CHECK = "1"
 # код агента — из этой копии (без `pip install -e .`: ему нужен setuptools из интернета)
 $src = Join-Path $Root "src"
 if ($env:PYTHONPATH) { $env:PYTHONPATH = "$src;$($env:PYTHONPATH)" } else { $env:PYTHONPATH = $src }
+try { $Host.UI.RawUI.WindowTitle = "BCC Review" } catch { }
+
+# Экран: одна тихая строка состояния, которая обновляется на месте (без переноса), ошибки — красным
+function Get-Width {
+    $w = 80
+    try { $w = [Console]::WindowWidth } catch { }
+    if ($w -lt 20) { $w = 80 }
+    return $w
+}
+function Show-Status([string]$Text) {
+    $w = Get-Width
+    if ($Text.Length -gt $w - 1) { $Text = $Text.Substring(0, $w - 1) }
+    Write-Host -NoNewline ("`r" + $Text.PadRight($w - 1)) -ForegroundColor DarkGray
+}
+function Clear-Status {
+    $w = Get-Width
+    Write-Host -NoNewline ("`r" + "".PadRight($w - 1) + "`r")
+}
+function Say([string]$Text) {
+    Clear-Status
+    Write-Host $Text -ForegroundColor DarkGray
+}
+function Fail([string]$Text) {
+    Clear-Status
+    Write-Host $Text -ForegroundColor Red
+    exit 1
+}
 
 function Test-Python([string[]]$Cmd) {
     $exe = $Cmd[0]
@@ -49,6 +76,20 @@ function Find-Python {
     return $null
 }
 
+function Get-PipStep([string]$Path) {
+    # какой пакет сейчас: последняя строка pip «Collecting …» / «Downloading …»
+    $lines = @()
+    try { $lines = @(Get-Content -LiteralPath $Path -Tail 40 -ErrorAction Stop) } catch { return "" }
+    for ($i = $lines.Count - 1; $i -ge 0; $i--) {
+        $l = [string]$lines[$i]
+        if ($l -match "^Collecting ([A-Za-z0-9_.\-]+)") { return $Matches[1] }
+        if ($l -match "^\s*Downloading ([A-Za-z0-9_.]+)-[0-9]") { return $Matches[1] }
+        if ($l -match "^Installing collected") { return "раскладываю пакеты" }
+        if ($l -match "^Successfully installed") { return "почти готово" }
+    }
+    return ""
+}
+
 $Py = Join-Path $Root ".venv\Scripts\python.exe"
 if (Test-Path -LiteralPath (Join-Path $Root ".venv")) {
     $ok = $false
@@ -57,7 +98,7 @@ if (Test-Path -LiteralPath (Join-Path $Root ".venv")) {
         $ok = ($LASTEXITCODE -eq 0)
     }
     if (-not $ok) {
-        Write-Host "Окружение .venv повреждено или создано другим Python — создаю заново."
+        Say "BCC Review · окружение .venv повреждено или создано другим Python — создаю заново"
         Remove-Item -LiteralPath (Join-Path $Root ".venv") -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
@@ -76,17 +117,15 @@ if (-not (Test-Path -LiteralPath $Py)) {
         }
     }
     if (-not $base) {
-        Write-Host "Установите Python 3.12: https://www.python.org/downloads/ (отметьте «Add python.exe to PATH»), затем снова START.cmd" -ForegroundColor Red
-        exit 1
+        Fail "Установите Python 3.12: https://www.python.org/downloads/ (отметьте «Add python.exe to PATH»), затем снова START.cmd"
     }
-    Write-Host "Создаю окружение .venv ($($base -join ' '))…"
+    Show-Status "BCC Review · первый запуск: создаю окружение ($($base -join ' '))"
     $exe = $base[0]
     $pre = @($base | Select-Object -Skip 1)
     & $exe @pre -m venv (Join-Path $Root ".venv")
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $Py)) {
         Remove-Item -LiteralPath (Join-Path $Root ".venv") -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Host "Не удалось создать .venv — сообщение Python выше." -ForegroundColor Red
-        exit 1
+        Fail "Не удалось создать .venv — сообщение Python выше."
     }
 }
 
@@ -97,22 +136,28 @@ $have = ""
 if (Test-Path -LiteralPath $stamp) { $have = ([string](Get-Content -LiteralPath $stamp -Raw)).Trim() }
 if ($have -ne $want) {
     $t0 = Get-Date
+    $out = Join-Path $Root ".venv\pip.log"
+    $err = Join-Path $Root ".venv\pip-errors.log"
     # пути относительно корня: в аргументах нет пробелов, даже если они есть в пути к папке
-    $p = Start-Process -FilePath $Py -ArgumentList "-m pip install -q -r requirements.txt --log .venv\pip.log" -WorkingDirectory $Root -NoNewWindow -PassThru
+    $p = Start-Process -FilePath $Py -ArgumentList "-m pip install -r requirements.txt" -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
     $null = $p.Handle  # без этого у Start-Process в PowerShell 5.1 пустой ExitCode
     while (-not $p.HasExited) {
         $s = [int]((Get-Date) - $t0).TotalSeconds
-        Write-Host -NoNewline "`rУстанавливаю зависимости (только при первом запуске, 1–3 минуты)… $s с "
+        $step = Get-PipStep $out
+        if ($step) { $step = " · $step" }
+        Show-Status "BCC Review · первый запуск: ставлю зависимости$step · $s с"
         Start-Sleep -Milliseconds 1000
     }
     $p.WaitForExit()
-    Write-Host ""
     if ($p.ExitCode -ne 0) {
-        Write-Host "Установка зависимостей не удалась (журнал: .venv\pip.log). Проверьте интернет и запустите START.cmd ещё раз." -ForegroundColor Red
-        exit 1
+        Clear-Status
+        $lines = @()
+        try { $lines = @(Get-Content -LiteralPath $err -Tail 15 -ErrorAction Stop) } catch { }
+        foreach ($l in $lines) { Write-Host $l }
+        Fail "Установка зависимостей не удалась (журнал: .venv\pip.log и .venv\pip-errors.log). Проверьте интернет и запустите START.cmd ещё раз."
     }
     $s = [int]((Get-Date) - $t0).TotalSeconds
-    Write-Host "Зависимости установлены за $s с."
+    Say "BCC Review · зависимости установлены за $s с"
     Set-Content -LiteralPath $stamp -Value $want -Encoding ASCII
 }
 
