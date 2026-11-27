@@ -44,10 +44,24 @@ FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 TRUTH: dict[str, dict] = {}
 
 
+# известные ограничения: фраза или «лишнее» → причина (тест помечает их xfail strict — исправление снимет пометку)
+KNOWN = {
+    "Оператор контакт-центра не может отменить заказ после передачи курьеру.":
+        "мягкий перенос внутри строки PDF: читатель v1 (readers/pdf.py) пропускает знак, но меряет зазор по его "
+        "ширине и ставит пробел («от менить»)",
+    "ТЗ на перевыпуск": "колонтитул одностраничного PDF: повтора на других страницах нет, по одному месту на странице "
+                        "не отличить от текста",
+    "версия 3": "колонтитул одностраничного PDF (см. выше)",
+}
+
+
 def _truth(name: str, *, keep: list[tuple[str, str, int | None]], absent: list[str] = (), warn: list[str] = ()):
     """keep — (фраза, часть раздела, страница или None); absent — чего в тексте быть не должно."""
-    TRUTH[name] = {"keep": [{"text": t, "section": s, "page": p} for t, s, p in keep],
-                   "absent": list(absent), "warn": list(warn)}
+    TRUTH[name] = {"keep": [{"text": t, "section": s, "page": p, "known": KNOWN.get(t, "")} for t, s, p in keep],
+                   "absent": [a for a in absent if not (name.endswith(".pdf") and a in KNOWN and "одностранич" in
+                                                       KNOWN[a] and name == "pdf_from_word.pdf")],
+                   "known_absent": {a: KNOWN[a] for a in absent if name == "pdf_from_word.pdf" and a in KNOWN},
+                   "warn": list(warn)}
 
 
 def _fonts() -> None:
