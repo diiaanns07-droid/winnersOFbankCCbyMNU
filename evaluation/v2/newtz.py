@@ -127,11 +127,22 @@ def _injection_flagged(rep: dict, md: Path) -> bool:
     return any(INJECTION_RE.search(t) for t in texts)
 
 
-def _outside_list(res: dict) -> list[dict]:
-    """Замечания вне эталона из `score.json` (`outside`): id, серьёзность, тип, заголовок, источники, владельцы."""
-    return [{"id": o.get("finding"), "severity": o.get("severity"), "kind": o.get("kind"),
+def _outside_list(res: dict, rep: dict | None = None) -> list[dict]:
+    """Замечания вне эталона из `score.json` (`outside`): id, серьёзность, тип, заголовок, источники, владельцы; с
+    отчётом `rep` — ещё суть (`problem`) и где («L29 «цитата»», до трёх) — чтобы №18 мог разметить без отчёта."""
+    by_id = {f.get("id"): f for f in (rep or {}).get("findings") or []}
+    out = []
+    for o in res.get("outside") or []:
+        x = {"id": o.get("finding"), "severity": o.get("severity"), "kind": o.get("kind"),
              "title": str(o.get("title") or "")[:140], "sources": o.get("sources") or [],
-             "owners": sorted({source_owner(x) for x in o.get("sources") or []})} for o in res.get("outside") or []]
+             "owners": sorted({source_owner(s_) for s_ in o.get("sources") or []})}
+        f = by_id.get(o.get("finding"))
+        if f:
+            x["problem"] = str(f.get("problem") or "")[:300]
+            x["where"] = [f"L{e.get('line_start')} «{str(e.get('quote') or '')[:90]}»"
+                          for e in (f.get("evidence") or [])[:3] if e.get("line_start")]
+        out.append(x)
+    return out
 
 
 def score_case(c: dict, out: Path, arbiter: str) -> dict:
@@ -190,7 +201,7 @@ def score_case(c: dict, out: Path, arbiter: str) -> dict:
                     + (["№10"] if "судья" in m["where"] else []) + (["№03"] if "цитат" in m["where"] else [])}
                    for m in res["misses"]],
         "critical_false": res["severity"]["critical_false"], "duplicates": res["precision"]["duplicates"],
-        "outside": res["counts"]["outside_gold"]["total"], "outside_list": _outside_list(res),
+        "outside": res["counts"]["outside_gold"]["total"], "outside_list": _outside_list(res, rep),
         "quotes_missing": res["quotes"]["missing"], "quotes_total": res["quotes"]["total"],
         "stage_recall": {k: {"found": v.get("found") if isinstance(v, dict) else v} for k, v in
                          (res.get("stage_recall") or {}).items()} if res.get("stage_recall") else {},
@@ -307,7 +318,9 @@ def backfill_outside(out: Path) -> Path:
         sj = out / "reports" / f"{r['case']}__{r['variant']}" / "score.json"
         if not sj.exists():
             raise SystemExit(f"нет {sj}")
-        lst = _outside_list(json.loads(sj.read_text(encoding="utf-8")))
+        rj = sj.with_name("report.json")
+        lst = _outside_list(json.loads(sj.read_text(encoding="utf-8")),
+                            json.loads(rj.read_text(encoding="utf-8")) if rj.exists() else None)
         if len(lst) != (r.get("outside") or 0):
             raise SystemExit(f"{r['case']}: вне эталона в score.json {len(lst)}, в сводке {r.get('outside')} — "
                              "прогон пересчитан, досчёт не годится")
@@ -342,6 +355,7 @@ def outside_recurring(kind: str = "sonnet", min_runs: int = 2) -> dict:
                 for x in sorted({x for j, o in c if j == i for x in o.get("sources") or []}):
                     src[x] = src.get(x, 0) + 1
             groups.append({"case": case, "runs": len(ri), "of": len(runs), "last": last in ri,
+                           "members": [(str(runs[j].get("at", ""))[11:16], o) for j, o in sorted(c, key=lambda t: -t[0])],
                            "in_last": sum(1 for j, _ in c if j == last),
                            "severity": max((o.get("severity") or "minor" for _, o in c),
                                            key=lambda v: ("minor", "major", "critical").index(v)
@@ -371,6 +385,32 @@ def render_outside(rec: dict) -> str:
         L.append(f"| {g['case']} | {g['runs']} из {g['of']} | {g['severity']} | {str(g['title']).replace('|', '/')} | "
                  f"{'да' if g['last'] else 'нет'} | {src} | {', '.join(g['owners'])} |")
     return "\n".join(L)
+
+
+CANDIDATES = RESULTS_DIR / "OUTSIDE_CANDIDATES.md"
+
+
+def render_candidates(rec: dict) -> str:
+    """Список для №18: повторяющиеся замечания вне эталона (та же жалоба в нескольких прогонах модели) — с сутью и
+    цитатами из отчёта, чтобы разметить: настоящий пункт эталона, фон шаблона или ложное (тогда — владельцу линзы)."""
+    if not rec:
+        return ""
+    runs = ", ".join(f"{str(at)[11:16]} — {lb}" for at, lb in rec["runs"])
+    L = [f"# Новые ТЗ №18 — повторяющиеся замечания вне эталона ({rec['kind']})", "",
+         f"Прогоны: {runs}. В последнем вне эталона {rec['last_total']}, из них {rec['last_recurring']} — та же жалоба "
+         "и в прошлых прогонах. Модель находит их раз за разом, поэтому это либо дефекты документа, которых нет в "
+         "эталоне (→ №18: дополнить `gold.yaml` или фон `background.yaml`), либо систематическая ошибка линзы "
+         "(→ владелец источника). Пересчитать — `python -m evaluation.v2.newtz outside --out <каталог прогона>`.", ""]
+    for g in rec["recurring"]:
+        src = ", ".join(f"{k.replace('lens:', '')} {v}" for k, v in sorted(g["sources"].items(), key=lambda kv: (-kv[1], kv[0])))
+        L += [f"## {g['case']} — «{g['title']}» ({g['severity']}, {g['runs']} из {g['of']} прогонов)", "",
+              f"Источники (прогонов): {src} → {', '.join(g['owners'])}.", ""]
+        for at, o in g.get("members") or []:
+            where = "; ".join(o.get("where") or [])
+            L.append(f"* {at} {o.get('id')} ({o.get('severity')}): {o.get('title')}"
+                     + (f" — {o['problem']}" if o.get("problem") else "") + (f" Где: {where}." if where else ""))
+        L += ["", "Решение №18: ☐ пункт эталона (уровень …) ☐ фон шаблона ☐ ложное (→ владелец линзы)", ""]
+    return "\n".join(L) + "\n"
 
 
 def results_table() -> str:
@@ -432,8 +472,11 @@ def main(argv: list[str] | None = None) -> int:
     if a.action == "outside":
         dest = backfill_outside(Path(a.out))
         update_results()
-        print(f"досчитано: {dest.relative_to(ROOT)}")
-        print(render_outside(outside_recurring("sonnet")))
+        rec = outside_recurring("sonnet")
+        if rec:
+            CANDIDATES.write_text(render_candidates(rec), encoding="utf-8")
+        print(f"досчитано: {dest.relative_to(ROOT)}" + (f"; список для №18 — {CANDIDATES.relative_to(ROOT)}" if rec else ""))
+        print(render_outside(rec))
         return 0
     cases = discover(Path(a.root))
     if a.action == "list":
