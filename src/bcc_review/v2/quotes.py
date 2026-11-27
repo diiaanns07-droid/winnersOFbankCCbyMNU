@@ -285,12 +285,12 @@ def verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iter
     raw = _LINE_PREFIX.sub(" ", quote).strip() if _LINE_PREFIX.search(quote) else quote.strip()
     raw = re.sub(r"\s{2,}", " ", raw) if raw != quote.strip() else raw
     needle = _clean_quote(raw)
-    if len(needle) < MIN_QUOTE:
-        return None
     idx = _index(view)
     if not idx.full:
         return None
     hint, near = _anchors(line_hint, near_lines)
+    if len(needle) < MIN_QUOTE:
+        return _short_term(idx, needle, raw, hint, near)
 
     # 1–3: точное (после нормализации) вхождение, в том числе через соседние строки;
     # если не нашлось — та же цитата без ведущего номера пункта («5. …»: в DOCX нумерация не в тексте)
@@ -374,6 +374,20 @@ def _unescape(q: str) -> str:
         import html
         out = html.unescape(out)
     return _TENGE_WORD.sub(r"\1 ₸", out)
+
+
+def _short_term(idx: _Index, needle: str, raw: str, hint: int | None, near: list[int]) -> dict | None:
+    """Термин из двух букв или цифр («СК», «OK»): только целым словом и только у строки модели (±2) или если такое
+    слово в документе одно — иначе это не цитата (дефект терминологии «СК без расшифровки» держится на ней)."""
+    if len(needle) != 2 or not needle.isalnum():
+        return None
+    spans = [(x.start(), x.end()) for x in re.finditer(rf"(?<!\w){re.escape(needle)}(?!\w)", idx.full)]
+    best = _pick(idx, spans, hint, near)
+    if not best or (best[0][0] > 1 and len(spans) > 1):
+        return None
+    _, a, b, ls, le = best
+    text = idx.original(a, b)
+    return _match(idx, a, b, ls, le, "exact" if raw.strip("«»\"' ") == text else "normalized", text)
 
 
 def _same_words(idx: _Index, needle: str, hint: int | None, near: list[int]) -> dict | None:

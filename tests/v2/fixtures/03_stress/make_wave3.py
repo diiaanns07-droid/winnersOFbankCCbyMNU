@@ -8,6 +8,12 @@
   Читатель v1 (PyMuPDF без нейросети вёрстки, как у жюри по ``requirements.txt``) отдаёт таблицу колонками, а знаки
   препинания уносит в конец строки. Проверяет ``docview``: таблица собирается по строкам, знаки на месте.
 
+* ``cell_paragraphs.docx`` — Word: в ячейке критерия приёмки абзац и маркированный список; строка таблицы должна
+  остаться одной строкой («Итог 50 000 ₸; Один push; Счётчик не сбрасывается»).
+* ``ru_styles.docx`` — Word без заголовка-названия: части A и B — стилем «Заголовок 1» (уровень структуры), свой
+  стиль «МойЗаголовок», подзаголовок «Требования к данным» — просто жирным абзацем.
+* ``numbered_headings.docx`` — Word: заголовки с автонумерацией («1. Общие сведения», «2. Требования»: номер Word
+  показывает, в тексте XML его нет), требование ссылается на «п. 2».
 * ``textbox.docx`` — Word: требование в надписи (текстовом поле, ``w:txbxContent`` с запасной копией VML),
   вложенная таблица, комментарий рецензента, гиперссылка. Читатель v1 надписи не видит — ``docview`` их добавляет.
 
@@ -111,8 +117,79 @@ def make_textbox_docx(path: Path) -> None:
     d.save(path)
 
 
+def make_cell_paragraphs(path: Path) -> None:
+    from docx import Document
+    d = Document()
+    d.add_heading("ТЗ: Уведомление о пороге", 0)
+    d.add_heading("Критерии приемки", 1)
+    t = d.add_table(rows=2, cols=3)
+    t.style = "Table Grid"
+    for i, h in enumerate(["Исходные условия", "Действие", "Ожидаемый результат"]):
+        t.cell(0, i).text = h
+    t.cell(1, 0).text = "Расходы 48 500 ₸, порог 50 000 ₸"
+    t.cell(1, 1).text = "Покупка на 1 500 ₸"
+    c = t.cell(1, 2)
+    c.text = "Итог 50 000 ₸"
+    c.add_paragraph("Один push", style="List Bullet")
+    c.add_paragraph("Счётчик не сбрасывается", style="List Bullet")
+    d.add_paragraph("После таблицы.")
+    d.save(path)
+
+
+def make_ru_styles(path: Path) -> None:
+    from docx import Document
+    from docx.enum.style import WD_STYLE_TYPE
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import Pt
+    d = Document()
+
+    def style(name: str, lvl: int):
+        st = d.styles.add_style(name, WD_STYLE_TYPE.PARAGRAPH)
+        st.font.size, st.font.bold = Pt(16 - 2 * lvl), True
+        o = OxmlElement("w:outlineLvl")
+        o.set(qn("w:val"), str(lvl))
+        st.element.get_or_add_pPr().append(o)
+        return st
+    h1, h2, own = style("Заголовок 1", 0), style("Заголовок 2", 1), style("МойЗаголовок", 1)
+    d.add_paragraph("Часть A. Новый функционал", style=h1)
+    d.add_paragraph("Функциональные требования", style=h2)
+    d.add_paragraph("Ф-1. Порог от 1 000 до 1 000 000 ₸.")
+    d.add_paragraph("Часть B. REST API", style=h1)
+    d.add_paragraph("Логика метода", style=own)
+    d.add_paragraph("1. Проверить сессию.")
+    d.add_paragraph("Требования к данным").runs[0].bold = True
+    d.add_paragraph("Хранить идентификатор карты.")
+    d.save(path)
+
+
+def make_numbered_headings(path: Path) -> None:
+    from docx import Document
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    d = Document()
+    num_id = d.styles["List Number"].element.pPr.find(qn("w:numPr")).find(qn("w:numId")).get(qn("w:val"))
+
+    def numbered(p, lvl: int) -> None:
+        n, i, x = OxmlElement("w:numPr"), OxmlElement("w:ilvl"), OxmlElement("w:numId")
+        i.set(qn("w:val"), str(lvl))
+        x.set(qn("w:val"), num_id)
+        n.append(i)
+        n.append(x)
+        p._p.get_or_add_pPr().append(n)
+    d.add_heading("ТЗ: Кэшбэк", 0)
+    numbered(d.add_heading("Общие сведения", 1), 0)
+    d.add_paragraph("Кэшбэк начисляется за покупки в выбранных категориях.")
+    numbered(d.add_heading("Требования", 1), 0)
+    d.add_paragraph("Ф-1. Лимит кэшбэка — 10 000 ₸ в месяц; исключения — в п. 1.")
+    d.save(path)
+
+
 def main() -> int:
+    make_numbered_headings(HERE / "numbered_headings.docx")
+    make_ru_styles(HERE / "ru_styles.docx")
     make_textbox_docx(HERE / "textbox.docx")
+    make_cell_paragraphs(HERE / "cell_paragraphs.docx")
     md = HERE / "borderless.md"
     md.write_text(BORDERLESS, encoding="utf-8")
     pandoc = shutil.which("pandoc")

@@ -142,8 +142,10 @@ def test_official_fixture_covers_every_line(official_view):
 
 
 def test_dropped_requirement_is_detected_and_followup_called(official_view):
+    """Модель пропустила 4+ строк — дозапрос; 1–3 строки код добавляет сам, без лишнего вызова."""
+    dropped = {46, 49, 52, 117}
     raw = _official_raw()
-    raw["requirements"] = [r for r in raw["requirements"] if r["line_start"] != 46]
+    raw["requirements"] = [r for r in raw["requirements"] if r["line_start"] not in dropped]
     calls = []
 
     def followup(uncovered, done):
@@ -153,9 +155,19 @@ def test_dropped_requirement_is_detected_and_followup_called(official_view):
                 "excluded": []}
 
     out = sg.segment_from_response(official_view, raw, followup)
-    assert calls == [[46]]
-    assert out["coverage"]["uncovered"] == [] and out["coverage"]["auto_added"] == 0
+    assert calls == [sorted(dropped)]
+    assert out["coverage"]["uncovered"] == [] and out["coverage"]["auto_added"] == 3
     assert any(r["line_start"] == 46 and r["kind"] == "nonfunctional" for r in out["requirements"])
+
+
+def test_few_dropped_lines_filled_by_code_without_call(official_view):
+    raw = _official_raw()
+    raw["requirements"] = [r for r in raw["requirements"] if r["line_start"] != 46]
+    calls = []
+    out = sg.segment_from_response(official_view, raw, lambda u, d: calls.append(u) or {})
+    assert calls == [] and out["coverage"]["uncovered"] == [] and out["coverage"]["auto_added"] == 1
+    r = next(x for x in out["requirements"] if x["line_start"] == 46)
+    assert r["summary"].startswith("Сервис передаёт push") and r["section"]
 
 
 def test_gaps_filled_by_code_when_followup_fails(official_view):
@@ -803,3 +815,14 @@ def test_offline_kind_by_section_words():
         == "functional"
     assert sg._guess_kind("Модуль › 1.2 Требования", "КИБ-1.2. Параметр «сумма» ограничен значением 100.", False) \
         == "constraint"
+
+
+def test_very_long_document_at_most_four_chunks(tmp_path):
+    """№14: на ≈ 2000 строк нарезка тратила 10–11 из 16 вызовов — судье и вопросам не оставалось бюджета."""
+    p = tmp_path / "x10.md"
+    p.write_text(OFFICIAL_MD.read_text(encoding="utf-8") * 10, encoding="utf-8")
+    chunks = sg.plan_chunks(sg.load_view(str(p)))
+    assert len(chunks) <= sg.MAX_CHUNKS and chunks[0][0] == 1 and chunks[-1][1] >= 1980
+    assert all(b2 == a1 - 1 for (_, b2), (a1, _) in zip(chunks, chunks[1:]))  # без дыр и пересечений
+    long_view = sg.load_view(str(STRUCT / "long.md"))  # 616 строк — по-прежнему части до 250 строк
+    assert all(b - a + 1 <= sg.CHUNK_MAX_LINES for a, b in sg.plan_chunks(long_view))

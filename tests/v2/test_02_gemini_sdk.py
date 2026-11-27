@@ -65,7 +65,8 @@ def sdk_provider(plan):
         adapter._client = Client()
         return adapter
 
-    holder["p"] = GeminiProvider(api_key="k", env={}, adapter_factory=factory, sleep=sleeps.append)
+    holder["p"] = GeminiProvider(api_key="k", env={}, adapter_factory=factory, sleep=sleeps.append,
+                                 fallback_models=["gemini-3.6-flash", "gemini-3.5-flash-lite"])
     return holder["p"], fakes, sleeps
 
 
