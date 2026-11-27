@@ -469,8 +469,6 @@ ANSWERS = ("Q-01 [месяц расходов]: Месяц расходов оп
            "Q-02: B\n")
 
 
-@_bug("11", "файл ответов в cp1251 (Блокнот Windows) роняет пересмотр: recheck.load_answers читает только UTF-8 "
-            "(UnicodeDecodeError)")
 def test_answers_file_in_cp1251_is_read(tmp_path):
     ans = tmp_path / "answers.md"
     ans.write_bytes(ANSWERS.encode("cp1251"))
