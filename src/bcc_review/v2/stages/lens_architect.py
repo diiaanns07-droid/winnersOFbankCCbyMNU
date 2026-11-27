@@ -156,6 +156,66 @@ def success_body_ref(c: dict) -> bool:
         bool(BODY_GAP_TITLE.search(t)) and not OWN_SUCCESS.search(t)
 
 
+# Раздел требований к данным (по пути раздела DocView): там должен быть атрибут, которого «нет в хранимых данных».
+DATA_SECTION = re.compile(r"требовани\w*\s+к\s+(хранени\w*\s+)?данн|модел\w*\s+данн|хранимы\w*\s+данн|^данные$|"
+                          r"структур\w*\s+данн", re.I)
+DATA_GAP_TITLE = re.compile(r"данн|хранени|хранит|хранимы|хранят|перече?н", re.I)
+MAX_EVIDENCE = 3
+
+
+def data_section_lines(view: Any) -> list[dict]:
+    """Непустые строки раздела требований к данным (не заголовки), в порядке документа."""
+    out = []
+    for ln in (view or {}).get("lines") or []:
+        sec = str(ln.get("section") or "").split("›")[-1].strip()
+        if sec and DATA_SECTION.search(sec) and not ln.get("heading") and str(ln.get("text") or "").strip():
+            out.append(ln)
+    return out
+
+
+def add_data_list_evidence(candidates: list[dict], view: Any) -> int:
+    """Замечание «атрибута нет в хранимых данных» без цитаты перечня данных получает первую строку перечня.
+
+    Правило 2 системного промпта: отсутствие доказывается цитатой места, где элемент должен быть. haiku пишет такое
+    замечание по строке параметра и по правилу, а сам перечень не цитирует (официальный ТЗ, замер №29) — читатель
+    не видит, что именно перечислено. Цитата — дословный текст строки документа. Возвращает число правок."""
+    data = data_section_lines(view)
+    if not data:
+        return 0
+    lines = {int(x.get("n") or 0) for x in data}
+    first = data[0]
+    n = 0
+    for c in candidates:
+        if not isinstance(c, dict) or c.get("kind") not in ("missing_element", "incomplete"):
+            continue
+        ev = c.get("evidence") or []
+        if not DATA_GAP_TITLE.search(str(c.get("title") or "")) or len(ev) >= MAX_EVIDENCE:
+            continue
+        if any(int(e.get("line") or 0) in lines for e in ev if isinstance(e, dict)):
+            continue
+        ev.append({"quote": str(first.get("text") or "").strip()[:200], "line": int(first.get("n") or 0)})
+        c["evidence"] = ev
+        n += 1
+    return n
+
+
+# «Прямой вызов в одной схеме, путь через промежуточный компонент в другой» — промпт (проверка 8) прямо говорит, что
+# путь через промежуточный компонент — это связь, а не расхождение. haiku пишет это major на чистых ТЗ (qr_clean, замер
+# №29 и прогоны open2 05:20, 08:35). Нужны обе приметы: заголовок о прямом пути против пути «через», цитаты — схемы со
+# стрелками. «Связи нет в архитектуре» (без «через», официальный С16) не трогаем.
+VIA_TITLE = re.compile(r"напрям|прям\w*\s+(вызов|путь|связ)|минует|в\s+обход|(вызов|путь|связ)\w*.{0,60}\bчерез\b",
+                       re.I)
+ARROW = re.compile(r"→|->")
+
+
+def via_intermediate(c: dict) -> bool:
+    """Расхождение схем, которое сводится к пути через промежуточный компонент (не дефект по проверке 8)."""
+    if c.get("kind") not in ("contradiction", "terminology", "incomplete"):
+        return False
+    arrows = [e for e in c.get("evidence") or [] if isinstance(e, dict) and ARROW.search(str(e.get("quote") or ""))]
+    return len(arrows) >= 2 and bool(VIA_TITLE.search(str(c.get("title") or "")))
+
+
 def error_body_gap(c: dict) -> bool:
     """Замечание проверки 4а: поле ответа без условия отсутствует в телах ошибок."""
     return c.get("kind") == "api_contract" and bool(ERROR_BODY_TITLE.search(str(c.get("title") or "")))
@@ -195,7 +255,8 @@ def postprocess(data: dict, requirement_ids: set[str] | None = None,
             c["severity"] = "major"  # шкала линзы: противоречия правил и единицы — major (их critical — набор №09)
         if unpromised_critical(c):
             c["severity"] = "major"
-        if c["severity"] != "minor" and (error_body_gap(c) or data_list_only(c) or success_body_ref(c)):
+        if c["severity"] != "minor" and (error_body_gap(c) or data_list_only(c) or success_body_ref(c)
+                                         or via_intermediate(c)):
             c["severity"] = "minor"
         if requirement_ids is not None:
             c["requirement_ids"] = [r for r in c.get("requirement_ids") or [] if r in requirement_ids]
@@ -537,6 +598,7 @@ def run(ctx: Any) -> dict:
     if extra:
         raw["candidates"] = list(raw.get("candidates") or []) + extra
     cap_defined_repeats(raw["candidates"], getattr(ctx, "view", None))
+    add_data_list_evidence(raw["candidates"], getattr(ctx, "view", None))
     reqs = {r.get("id") for r in getattr(ctx, "requirements", None) or [] if isinstance(r, dict)}
     result = postprocess(raw, requirement_ids=reqs or None)
     extras = {k: v for k, v in raw.items() if k not in ("candidates", "inventory")}

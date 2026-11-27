@@ -59,3 +59,36 @@ def test_no_data_section_no_change():
     view = {"lines": [{"n": 1, "text": "Метод возвращает остаток.", "section": "API", "heading": False}]}
     c = _c("Остаток не хранится в данных", [(1, "Метод возвращает остаток.")])
     assert A.add_data_list_evidence([c], view) == 0
+
+
+FIX = ROOT / "tests" / "v2" / "fixtures" / "29_measure" / "answers"
+
+
+def _saved_raw(name: str) -> dict:
+    import json
+    d = json.loads((FIX / name).read_text(encoding="utf-8"))
+    return d["raw"][0] if isinstance(d["raw"], list) else d["raw"]
+
+
+def test_via_intermediate_is_minor_on_clean_qr():
+    """qr_clean (haiku, 17:30): «прямой вызов или через сервис QR-кодов» — путь через промежуточный компонент."""
+    raw = _saved_raw("qr_clean.architect.haiku.v1a.json")
+    out = A.postprocess(raw)
+    via = [c for c in out["candidates"] if "через" in c["title"]]
+    assert via and all(c["severity"] == "minor" for c in via)
+
+
+def test_missing_link_in_architecture_stays_major():
+    """Официальный (С16-тип): вызова нет в архитектуре — не «путь через», серьёзность модели не меняется."""
+    raw = _saved_raw("official.architect.haiku.v0a.json")
+    out = A.postprocess(raw)
+    link = [c for c in out["candidates"] if c["kind"] == "contradiction" and "архитектур" in c["title"]]
+    assert link and all(c["severity"] == "major" for c in link)
+
+
+def test_via_intermediate_needs_two_arrow_quotes():
+    c = _c("Путь вызова: напрямую или через сервис", [(1, "Приложение → сервис"), (2, "Сервис без стрелок")],
+           kind="contradiction")
+    assert not A.via_intermediate(c)
+    c["evidence"][1]["quote"] = "Приложение → контроллер → сервис"
+    assert A.via_intermediate(c)
