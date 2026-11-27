@@ -511,6 +511,7 @@ def _text_lines(text: str, doc: dict | None, tab_cells: bool = False) -> list[di
     kinds: list[str] = [""] * (n_lines + 1)
     levels: list[int] = [0] * (n_lines + 1)
     covered: list[bool] = [False] * (n_lines + 1)
+    list_levels: dict[int, int] = {}
     if doc:
         for b in doc.get("blocks") or []:
             loc = b.get("loc") or {}
@@ -534,6 +535,9 @@ def _text_lines(text: str, doc: dict | None, tab_cells: bool = False) -> list[di
                 if i == 0 and prefix:
                     part = prefix + part
                 texts[ln_no] = part if texts[ln_no] is None else f"{texts[ln_no]} {part}"
+                if i == 0 and b.get("kind") == "list_item" and isinstance(loc.get("list"), dict) \
+                        and isinstance(loc["list"].get("depth"), int):
+                    list_levels[ln_no] = loc["list"]["depth"]
                 sections[ln_no] = sec
                 block_ids[ln_no] = b.get("id", "")
                 kinds[ln_no] = str(b.get("kind") or "")
@@ -576,6 +580,8 @@ def _text_lines(text: str, doc: dict | None, tab_cells: bool = False) -> list[di
         out.append({"n": k, "text": t, "page": None, "section": sections[k] or cur_section,
                     "src_line": k, "block_id": block_ids[k], "kind": kind,
                     "level": levels[k] if kind == "heading" else 0, "heading": kind == "heading"})
+        if k in list_levels and t:
+            out[-1]["list_level"] = list_levels[k]
     return out
 
 
@@ -689,14 +695,48 @@ def _block_lines(doc: dict, sizes: dict | None = None, warnings: list | None = N
                 t = _BULLET_GLYPH.sub("", t.lstrip())
                 if label and not t.startswith(label):
                     t = f"{label} {t}"
-            out.append({"n": len(out) + 1, "text": _clean(t), "page": page, "section": sec,
-                        "src_line": None, "block_id": b.get("id", ""), "kind": str(b.get("kind") or ""),
-                        "level": _level(b) if b.get("kind") == "heading" else 0,
-                        "heading": b.get("kind") == "heading"})
+            row = {"n": len(out) + 1, "text": _clean(t), "page": page, "section": sec,
+                   "src_line": None, "block_id": b.get("id", ""), "kind": str(b.get("kind") or ""),
+                   "level": _level(b) if b.get("kind") == "heading" else 0,
+                   "heading": b.get("kind") == "heading"}
+            if i == 0 and b.get("kind") == "list_item" and not sizes:
+                lst = loc.get("list") if isinstance(loc.get("list"), dict) else {}
+                lvl = lst.get("level", lst.get("depth"))
+                if isinstance(lvl, int):
+                    row["list_level"] = lvl
+            elif i == 0 and sizes and b.get("kind") in ("list_item", "paragraph") and _bbox(b):
+                row["_x0"] = _bbox(b)[0]
+            out.append(row)
+    if sizes:
+        _pdf_list_levels(out)
     out, toc = drop_toc(out)
     if toc:
         warnings.append(f"Оглавление убрано из текста ({toc} строк): оно повторяет заголовки разделов.")
     return out
+
+
+_ITEM_MARK = re.compile(r"^\s*(?:\d{1,2}(?:\.\d{1,2})*[.)]|[a-zа-я][.)])\s+\S", re.I)
+
+
+def _pdf_list_levels(lines: list[dict]) -> None:
+    """Уровень пункта нумерованного списка в PDF — по отступу: разные левые края пунктов с номером (допуск 6 pt),
+    слева направо — уровни 0, 1, 2. Без номера («•») и вне списков уровень не ставится."""
+    by_sec: dict[str, list[dict]] = {}
+    for ln in lines:
+        x = ln.get("_x0")
+        if x is not None and _ITEM_MARK.match(ln["text"]):
+            by_sec.setdefault(ln["section"], []).append(ln)
+    for group in by_sec.values():  # отступы сравниваются внутри раздела: у разделов разные поля и стили
+        marks: list[float] = []
+        for x in sorted(round(ln["_x0"], 1) for ln in group):
+            if not marks or x - marks[-1] > 6:
+                marks.append(x)
+        if len(marks) < 2:
+            continue  # один уровень — вложенности нет, пункты как были
+        for ln in group:
+            ln["list_level"] = max(k for k, m in enumerate(marks) if ln["_x0"] >= m - 6)
+    for ln in lines:
+        ln.pop("_x0", None)
 
 
 _TOC_ENTRY = re.compile(r"^(?P<title>.*?\S)(?:\s*(?:\.{2,}|…+|_{3,}|·{3,}))?\s*(?P<page>\d{1,4})\s*$")
