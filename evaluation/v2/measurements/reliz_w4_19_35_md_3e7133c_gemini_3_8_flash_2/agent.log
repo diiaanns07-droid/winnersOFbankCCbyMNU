@@ -1,0 +1,37 @@
+$ /usr/local/bin/python -m bcc_review release/input/requirements.md /home/user/repo/evaluation/v2/measurements/reliz_w4_19_35_md_3e7133c_gemini_3_8_flash_2/report.md --provider gemini --model gemini-3.8-flash --no-cache
+rc=0
+--- stdout
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 18 дефектов (критичных 3, существенных 14, незначительных 1), вопросов 5
+Разработка: нельзя · тестирование: нельзя — блокеров 3, каждый останавливает разработку и тестирование:
+  D-01 Противоречие в определении месяца покупки между правилом Ф-2 и критерием приёмки
+  D-02 Обещано чтение данных, но в спецификации API нет ни одной операции чтения
+  D-03 Возврат ошибки валидации с кодом HTTP 200 вместо 400
+Прогон завершён полностью: 10 мин 45 с, 11 вызовов модели, gemini-3.6-flash, gemini-3.5-flash-lite; цитат сверено 50 из 50
+Отчёт: /home/user/repo/evaluation/v2/measurements/reliz_w4_19_35_md_3e7133c_gemini_3_8_flash_2/report.md и /home/user/repo/evaluation/v2/measurements/reliz_w4_19_35_md_3e7133c_gemini_3_8_flash_2/report.json
+  ! судья пропустил 3 кандидат(ов); распределены повторным вызовом
+  ! проверка серьёзности понизила 1 дефект: критичный→существенный 1, существенный→незначительный 0
+  ! судья: «Противоречие в ключевом событии покупки: авторизация или…» понижен до существенного…
+HTML: /home/user/repo/evaluation/v2/measurements/reliz_w4_19_35_md_3e7133c_gemini_3_8_flash_2/report.html
+
+--- stderr
+Документ: release/input/requirements.md
+  segment: запуск
+  consistency: запуск
+  lens_analyst: запуск
+  lens_architect: запуск
+  lens_risk: запуск
+  lens_qa: запуск
+  lens_analyst: готово за 434 с, вызовов 1, кандидатов 6
+  lens_qa: готово за 438 с, вызовов 1, кандидатов 4
+  segment: готово за 449 с, вызовов 1
+  consistency: готово за 445 с, вызовов 1, кандидатов 6
+  lens_risk: готово за 529 с, вызовов 1, кандидатов 6
+  lens_architect: готово за 570 с, вызовов 1, кандидатов 9
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 46
+  judge: запуск
+  judge: готово за 27 с, вызовов 3
+  clarify: запуск
+  clarify: готово за 40 с, вызовов 1
