@@ -20,6 +20,9 @@ STAGE = "lens_qa"
 SOURCE = "lens:qa"
 MAX_TEST_CASES = 12
 MAX_MODEL_CANDIDATES = 12
+# Лимит ответа сразу 32 000: у моделей с рассуждением (haiku через claude -p) 16 000 включают рассуждение,
+# и на документе с 4 строками приёмки ответ иногда не помещается — обрезанная попытка стоит целого вызова (3–5 мин).
+MAX_OUTPUT_TOKENS = 32000
 UNDEFINED_PREFIX = "Не определено требованиями"
 
 KINDS = ["event_conflict", "status_conflict", "unit_mismatch", "boundary_conflict", "contradiction",
@@ -428,7 +431,8 @@ def _is_truncation(exc: BaseException) -> bool:
 
 def _ask_rows(ctx: Any, system: str, user: str, rows: list[str], stage: str, warnings: list[str]) -> list:
     try:
-        extra = ctx.llm.ask(stage, system, user + retry_instruction(rows), SCHEMA) or {}
+        extra = ctx.llm.ask(stage, system, user + retry_instruction(rows), SCHEMA,
+                            max_output_tokens=MAX_OUTPUT_TOKENS) or {}
     except Exception as exc:  # дополнительный вызов — улучшение, а не условие работы линзы
         warnings.append(f"{STAGE}: строки приёмки {', '.join(rows)} не исполнены: {exc}")
         return []
@@ -451,7 +455,7 @@ def run(ctx: Any) -> dict:
     partial = False
     main_user = user + focus_instruction(first, len(later)) if later else user
     try:
-        data = dict(ctx.llm.ask(STAGE, system, main_user, SCHEMA) or {})
+        data = dict(ctx.llm.ask(STAGE, system, main_user, SCHEMA, max_output_tokens=MAX_OUTPUT_TOKENS) or {})
     except Exception as exc:
         if not _is_truncation(exc):
             raise
@@ -460,7 +464,8 @@ def run(ctx: Any) -> dict:
         later = rows  # все строки — пакетами ниже
         short = SHORT_INSTRUCTION + (NO_ROWS if rows else "")
         try:
-            data = dict(ctx.llm.ask(f"{STAGE}_short", system, user + short, SCHEMA) or {})
+            data = dict(ctx.llm.ask(f"{STAGE}_short", system, user + short, SCHEMA,
+                                        max_output_tokens=MAX_OUTPUT_TOKENS) or {})
         except Exception as exc2:
             if not _is_truncation(exc2):
                 raise
@@ -481,9 +486,10 @@ def run(ctx: Any) -> dict:
     if missing_rows(out["acceptance_checks"], reqs):
         partial = True
     warn = getattr(ctx, "warn", None)
-    if callable(warn):
+    if callable(warn):  # каркас сам кладёт ctx.warnings в файл этапа и в паспорт — без дубля в out["warnings"]
         for w in out["warnings"]:
             warn(w)
+        out["warnings"] = []
     if partial:
         out["_partial"] = True
     return out

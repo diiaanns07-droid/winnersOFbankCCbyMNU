@@ -270,6 +270,7 @@ class _LLM:
 
     def ask(self, stage, system, user, schema, **kw):
         self.calls.append((stage, user))
+        self.kw = kw
         return self.answers.pop(0)
 
 
@@ -300,6 +301,8 @@ def test_run_without_missing_rows_makes_one_call():
     llm = _LLM([full])
     out = lens_qa.run(_Ctx(llm, REQS))
     assert len(llm.calls) == 1 and out["candidates"] == []
+    # лимит ответа сразу 32 000: на haiku 16 000 включают рассуждение, обрезанная попытка стоит целого вызова
+    assert llm.kw.get("max_output_tokens") == lens_qa.MAX_OUTPUT_TOKENS == 32000
 
 
 def test_other_topic_both_acceptance_conflicts_found():
