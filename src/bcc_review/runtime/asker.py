@@ -67,7 +67,12 @@ class Asker:
         ctx_text, policy = self.context.render(payload.get("context"))
         messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
         if ctx_text:
-            messages.append({"role": "user", "content": ctx_text, "cache": True})
+            msg = {"role": "user", "content": ctx_text}
+            if getattr(self.adapter, "supports_cache_hint", False):
+                # подсказка кэширования промпта — только адаптерам, которые её понимают; остальные получают
+                # строго {role, content}: лишнее поле Claude API отклоняет с HTTP 400
+                msg["cache"] = True
+            messages.append(msg)
         body = (f"ЭТАП: {stage}\n\nЗАДАЧА ЭТАПА:\n{task.strip()}\n\nВХОДНЫЕ ДАННЫЕ (JSON):\n"
                 + json.dumps(payload.get("input"), ensure_ascii=False, indent=1))
         messages.append({"role": "user", "content": body})

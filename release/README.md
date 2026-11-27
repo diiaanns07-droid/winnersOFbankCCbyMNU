@@ -1,9 +1,9 @@
-# Комплект релиза bcc-review: сборка 70d2617 (2026-11-27)
+# Комплект релиза bcc-review: сборка 12ed4d7 (2026-11-27)
 
 Агент статического ревью ТЗ (BCC-HUB × MNU FinTech Hackathon). Комплект нужен, чтобы
 повторить прогон с нуля и сверить отчёт с источником без доверия к автору отчёта.
 
-**Версия агента:** ветка `bcc/integration`, коммит сборки `70d26174e7f448eb2f061f6268b2c566baacf7c1`
+**Версия агента:** ветка `bcc/integration`, коммит сборки `12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3`
 (контракт Report v1.0, `contracts/v1.json`). Коммит записан в паспорте каждого отчёта
 (`run.agent_commit`) без пометки `-dirty`.
 
@@ -26,7 +26,8 @@ Python 3.11 или 3.12. Windows PowerShell:
 ```powershell
 git clone https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU
 cd winnersOFbankCCbyMNU
-git switch bcc/integration
+git switch --detach 12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3
+if ($LASTEXITCODE) { throw 'Проверьте SHA агента' }
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -e ".[all]"
 ```
@@ -46,29 +47,28 @@ macOS и Linux: `python3.12 -m venv .venv && .venv/bin/python -m pip install -e 
 
 ## Итоговый живой прогон (владелец ключа)
 
-Ключ держите в переменной окружения текущей сессии, не в файлах репозитория. Кэш выключен,
-чтобы все ответы модели были получены в этом прогоне.
+Для официального входа используйте чистый клон на `12ed4d7` и командный `ANTHROPIC_API_KEY`. Команда выполняет один прогон с выключенным кэшем. Код 5 означает неполный результат. После кода 0 сверьте источник и паспорт, затем передайте файлы Max. [Пошаговый запуск и проверка полученного отчёта](reports/live/README.md)
 
 ```powershell
-$env:ANTHROPIC_API_KEY = "<ключ>"
-.venv\Scripts\python -m bcc_review release\input\requirements.md release\reports\live\requirements.md --provider anthropic --no-cache --export html,jira --max-calls 40 --max-seconds 1800
-.venv\Scripts\python -m bcc_review verify release\reports\live\requirements.json release\input\requirements.md
-.venv\Scripts\python -m bcc_review release\input\other_topic_cashback.md release\reports\live\other_topic_cashback.md --provider anthropic --no-cache --export html --max-calls 40 --max-seconds 1800
-.venv\Scripts\python -m bcc_review verify release\reports\live\other_topic_cashback.json release\input\other_topic_cashback.md
+.venv\Scripts\python -m bcc_review release\input\requirements.md out\live\requirements.md --provider anthropic --no-cache --fail-on partial --export html,jira --max-calls 40 --max-seconds 1800
+if ($LASTEXITCODE) { throw 'См. причину в out/live/requirements.json или выводе CLI.' }
+.venv\Scripts\python -m bcc_review verify out\live\requirements.json release\input\requirements.md
 ```
 
-Запасной воспроизводимый профиль (бесплатный ключ Google AI Studio):
+Для дополнительного кейса о кэшбэке вход — `release/input/other_topic_cashback.md`, выход — `out/live/other_topic_cashback.md`. Замените оба имени в команде генерации и укажите соответствующие JSON и исходник в `verify`. [Полная приёмка паспорта официального ТЗ](reports/live/README.md)
+
+Для отдельного запуска с Gemini используется `GEMINI_API_KEY` из Google AI Studio.
 
 ```powershell
 $env:GEMINI_API_KEY = "<ключ>"
-.venv\Scripts\python -m bcc_review release\input\requirements.md release\reports\live\requirements.gemini.md --provider gemini --no-cache
+.venv\Scripts\python -m bcc_review release\input\requirements.md out\live-gemini\requirements.md --provider gemini --no-cache --fail-on partial
 ```
 
 Прогон годится для сдачи, если в `requirements.json`:
 
 * `run.mode = "rules_plus_llm"`, `run.status = "complete"`, `run.incomplete_stages = []`;
 * `run.model` — фактическая модель из ответа провайдера, `run.calls.physical > 0`, `run.calls.cache_hits = 0`;
-* `run.agent_commit` — SHA сборки (`70d2617…` или новее) без `-dirty`;
+* `run.agent_commit` совпадает с полным SHA выбранной сборки `12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3`;
 * `verify` печатает `OK`.
 
 Если бюджет или лимиты провайдера оборвали прогон, отчёт всё равно пишется: `run.status = partial`,
@@ -83,15 +83,18 @@ $env:GEMINI_API_KEY = "<ключ>"
 
 ## Отчёты офлайн-прогона в этом комплекте
 
-Сгенерированы на коммите `70d2617` командой из раздела «Повторить офлайн-отчёты» (`--no-cache`), `verify` — OK.
+Сгенерированы на коммите `12ed4d7` командой из раздела «Повторить офлайн-отчёты» (`--no-cache`), `verify` — OK.
 
 | Вход | Длительность прогона | Требований | Замечаний (крит./сущ./незн.) | Опор проверено verify | Готовность разр./тест. | `.md` | `.json` | `.html` |
 | :--- | ---: | ---: | :--- | ---: | :--- | ---: | ---: | ---: |
-| `requirements.md` | 1,1 с | 53 | 27 (2/11/14) | 594 | нельзя / нельзя | 341 КБ | 889 КБ | 1 065 КБ |
-| `requirements.pdf` | 3,5 с | 53 | 25 (2/10/13) | 589 | нельзя / нельзя | 338 КБ | 1 164 КБ | 1 052 КБ |
-| `other_topic_cashback.md` | 0,8 с | 20 | 19 (1/10/8) | 178 | нельзя / нельзя | 152 КБ | 323 КБ | 426 КБ |
+| `requirements.md` | 1.2 с | 53 | 27 (2/11/14) | 594 | нельзя / нельзя | 341 КБ | 889 КБ | 1065 КБ |
+| `requirements.pdf` | 6.2 с | 53 | 25 (2/10/13) | 589 | нельзя / нельзя | 338 КБ | 1164 КБ | 1052 КБ |
+| `other_topic_cashback.md` | 0.7 с | 20 | 19 (1/10/8) | 181 | нельзя / нельзя | 152 КБ | 326 КБ | 430 КБ |
 
-На официальном входе правила без модели подтверждают два критичных дефекта: приёмка №2 противоречит Ф-2
-(строки 64 и 38) и обещанное чтение настроек без метода чтения в API (строки 52, 29, 103). Противоречие
-Ф-3 и Ф-4 и неопределённое событие процессинга находят только этапы с моделью. Режим `rules_only` и статус
-`partial` честно отмечены в паспорте; «нельзя начинать» следует из подтверждённых критичных замечаний.
+### Три решения для аналитика
+
+- **F-001, месяц покупки.** По Ф-2 покупка 31 января в 23:58 относится к январю (строка 38). Приёмка ожидает пополнения февральского счётчика после проведения 1 февраля в 00:03 (строка 64). Владельцу нужно выбрать момент учёта и уточнить часовой пояс первого события, иначе тест и реализация могут разнести одну покупку по разным месяцам.
+- **F-002, загрузка экрана.** Часть A обещает чтение и сохранение настроек (строка 52). На экране нужны порог и накопленная сумма (строка 29). В части B описано сохранение через `/alerts/saveLimit`. Для реализации и приёмки загрузки экрана нужны операция чтения и состав её ответа.
+- **F-004, сравнение сумм.** Покупка хранится в тиынах, порог в тенге (строка 49). API задаёт порог целым числом тенге (строка 124). Владелец может зафиксировать сравнение в тиынах и ожидаемый результат для покупки на один тиын ниже порога.
+
+Для официального Markdown команда `verify` подтвердила 594 вхождения опор. В диагностике есть две опоры вне блока связанного требования и две повторяющиеся в блоке цитаты. Полный перечень доступен через `verify --json`. Официальный онлайн-прогон выполняет владелец ключа.

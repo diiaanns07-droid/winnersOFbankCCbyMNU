@@ -46,7 +46,7 @@ REVIEW_STATUSES = ("reviewed", "partial", "not_reviewed")
 CHECK_MARKS = ("yes", "no", "na", "unknown")
 BLOCK_KINDS = ("heading", "paragraph", "list_item", "table_header", "table_row", "code", "quote", "other")
 DOC_FORMATS = ("markdown", "text", "pdf", "docx", "html")
-PROVIDERS = ("anthropic", "gemini", "mock", "none")
+PROVIDERS = ("anthropic", "gemini", "claude_cli", "mock", "none")
 BLOCKS_TARGETS = ("development", "testing")
 FINDING_KINDS = (
     "ambiguity", "unverifiable", "incomplete", "conflict", "omission", "non_singular",
@@ -220,7 +220,7 @@ ASK_PAYLOAD_KEYS = ("task", "input", "context")
 class RunOptions:
     """Параметры ``run_review``. CLI и веб (№15) передают один и тот же объект (или dict)."""
 
-    provider: str = "anthropic"            # anthropic | gemini | mock | none
+    provider: str = "anthropic"            # anthropic | gemini | claude_cli | mock | none
     model: Optional[str] = None            # по умолчанию из ANTHROPIC_MODEL / GEMINI_MODEL
     offline_lint: bool = False             # только детерминированные правила
     answers_path: Optional[str] = None     # --answers answers.md

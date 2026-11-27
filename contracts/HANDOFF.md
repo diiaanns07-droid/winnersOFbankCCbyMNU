@@ -1,6 +1,6 @@
 # HANDOFF: контракт v1 и состояние интеграции 18 модулей
 
-**Интеграционная ветка:** `bcc/integration`. **Сборка для официального прогона:** `70d26174e7f448eb2f061f6268b2c566baacf7c1` (комплект `release/`, CLI
+**Интеграционная ветка:** `bcc/integration`. **Сборка для официального прогона:** `12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3` (комплект `release/`, CLI
 `python -m bcc_review`). Независимая оценка GPT Pro запечатана на прежнем кандидате `f91d3b6`.
 Контракт v1 зафиксирован в `431f76d9fdd7cc26623e10335098e0ed878da1fb`, дополнения v1 (необязательные
 поля) — в последующих коммитах этой ветки; несовместимых изменений не было.
@@ -40,10 +40,33 @@ py -3.12 -m venv .venv
 | 15 | Веб-демо | `claude/gallant-wozniak-e9i4q8` @ `fd0b1e5` | team | 56/68: разбор `answers.md`/`questions.md` нового формата №08, 2 обрыва соединения | веб вручную не проверялся |
 | 16 | Оценка | `claude/sleepy-gates-1zbw4l` @ `a79a47d` | team | 81/86 | — |
 | 17 | Markdown и Jira | `bcc/p17-reports` @ `419f86c` | team | 137/138: кодировка вывода подпроцесса в тесте (Windows) | — |
-| 18 | Выпуск | ветки нет | нет | — | **блокирует сдачу: корневой README и `.env.example` (п. 7 ТЗ)** |
+| 18 | Выпуск | `bcc/p18-release` @ `feb1187` | team | `tests/p18` | Windows, Linux и Docker описаны в протоколе владельца |
 
 Ворота Max на сборке: `tests/contract` 29 ✓, `tests/integration` 138 ✓. Офлайн-отчёты сборки и `verify` —
 `release/reports/offline/`; официальный онлайн-прогон — `release/reports/live/README.md`.
+
+Снимок всех веток для сборки опубликован в [BRANCHES.md](BRANCHES.md). Обновления №10 и №16 включены из `896b49c` и `a4fc5de`.
+
+## План Б: выпуск на движке v1 (для №01 v2)
+
+`bcc/integration` держит v1 готовым к выпуску, если в 12:00 v2 не пройдёт ворота качества.
+
+1. Влить `bcc/integration` в `bcc/v2`. Код движка сливается без конфликтов; конфликтуют только файлы
+   упаковки, которые завели и №18 v1, и №16 v2 (`README.md`, `.env.example`, `Dockerfile`, `.dockerignore`) —
+   в `bcc/v2` оставить версии v2: `git checkout --ours README.md .env.example Dockerfile .dockerignore`.
+   Проверено на временном слиянии: `tests/contract` + `tests/integration` зелёные, `--engine v1` работает.
+2. Живой прогон v1 без API-ключа — в сессии с Claude Code CLI:
+
+```sh
+python -m bcc_review --engine v1 release/input/requirements.md out/planb/requirements.md --provider claude_cli --no-cache --export html,jira --max-calls 40 --max-seconds 2700
+python -m bcc_review verify out/planb/requirements.json release/input/requirements.md
+```
+
+   Модель — `CLAUDE_CLI_MODEL` (по умолчанию `opus`). Прежний прогон v1 через `claude -p` на Opus: 28 мин,
+   17 вызовов, ≈ $6,3, все К1–К5. С ключом API вместо CLI — `--provider anthropic` (сборка `f84f730` или новее:
+   в старых Claude отвечал 400 на поле `cache`).
+3. Годность: `run.mode = rules_plus_llm`, `run.status = complete`, `verify` — OK. Обрезанные пакеты теперь
+   делятся пополам (`ask_split` в трассе), цитаты привязываются к блоку своего требования.
 
 ## Что движок выравнивает на стыках (просьбы к владельцам)
 

@@ -36,8 +36,9 @@ def _review_parser() -> argparse.ArgumentParser:
         epilog="Другие команды: verify REPORT.json SOURCE — перепроверка отчёта; contract — схема Report v1.")
     p.add_argument("input", help="файл требований (.md, .txt, .pdf, .docx)")
     p.add_argument("output", help="путь отчёта .md; рядом пишется .json из того же Report")
-    p.add_argument("--provider", choices=["anthropic", "gemini", "mock"], default="anthropic",
-                   help="anthropic (основной профиль), gemini (воспроизводимый запасной), mock (синтетика для тестов)")
+    p.add_argument("--provider", choices=["anthropic", "gemini", "claude_cli", "mock"], default="anthropic",
+                   help="anthropic (основной профиль), gemini (воспроизводимый запасной), claude_cli (Claude Code CLI "
+                        "`claude -p` без API-ключа), mock (синтетика для тестов)")
     p.add_argument("--model", help="модель (по умолчанию ANTHROPIC_MODEL / GEMINI_MODEL или встроенная)")
     p.add_argument("--offline-lint", action="store_true", help="только детерминированные правила, без модели")
     p.add_argument("--answers", metavar="ANSWERS.md", help="ответы аналитика: применить правки и проверить новую редакцию")

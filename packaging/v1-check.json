@@ -1,0 +1,356 @@
+{
+  "release_package": "0ffbbaa1c36d547840d8831329eb173013bff4b4",
+  "agent_commit": "12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3",
+  "official_input": "release/input/requirements.md",
+  "official_input_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
+  "branch_audit": {
+    "snapshot_utc": "2026-11-27T04:47:03+00:00",
+    "old_manifest_entries": 83,
+    "remote_heads": 86,
+    "distinct_head_commits": 66,
+    "distinct_json_blobs_at_heads": 578,
+    "new_branch_names": [
+      "claude/busy-heisenberg-2puz3f",
+      "claude/happy-ramanujan-35zqaf",
+      "claude/zen-feynman-k0yxtp"
+    ],
+    "release_live_json_at_heads": 0,
+    "v1_reports_for_official_source_by_mode": {
+      "rules_only / partial / none": 3
+    },
+    "branch_shas": {
+      "bcc/eval-independent": "22a8709399fa18e8f4b29d7f2dd11b4af5c82339",
+      "bcc/integration": "d0bc06d8e3e20fe9d60d7ff8c18fa9cb0961f9d2",
+      "bcc/p03-word": "05130b3105b0b8b66eceee3c401cd02f338c6ba9",
+      "bcc/p07-evidence": "82c09047710ae4bd95ef8a50c6b21513b8a1cc4d",
+      "bcc/p09-versions": "cddf0d9ed5a3fd2bb1554827c8c77e3b4af69abb",
+      "bcc/p14-annotated-pdf": "3ed0ba2baec8e69b037aa4e0686415c717b3254f",
+      "bcc/p17-reports": "419f86ce5cf3b29b73e4a7b69217d9edb82113e2",
+      "bcc/p18-release": "feb118790a812890abf6512065d6759659f65e65",
+      "bcc/v2": "9c5ea31adc1704bbd4a2f18c2c0c459779737dad",
+      "claude/admiring-knuth-mhl1hf": "12f028e35ee2a645e14e00df0a1d91bc1857814d",
+      "claude/affectionate-hawking-vnw96d": "296dcb6feafce1c2323744631cb2ae96cb681e5e",
+      "claude/amazing-cerf-1hd1xi": "b9610677ba071a0d809d3aeea414a497a81fff63",
+      "claude/anthropic-adapter-errors-v5roi9": "e90c3ae2213b248657667554b4964cf812d4245a",
+      "claude/awesome-dirac-clfkmr": "41307fd2a8afbd112f44f1b294120e6463a3ccab",
+      "claude/bcc-hub-hackathon-solutions-5o4h1p": "c5d1493ed9d29cbcb5b2ff599e8377780825c531",
+      "claude/blissful-galileo-ip4h2p": "33f431df57434c61893d0e2d54025b938eb92e03",
+      "claude/busy-heisenberg-2puz3f": "7b42797e1c302b278df1e8601a47c73c121326b1",
+      "claude/compassionate-cannon-xc9gxg": "557c0b1ae879867318dc23493cefa51517773f3e",
+      "claude/compassionate-sagan-qm4td0": "2d396120e8b3fa399fac80c8e400f110321dd100",
+      "claude/compassionate-wright-qln5yb": "9c5ea31adc1704bbd4a2f18c2c0c459779737dad",
+      "claude/cool-cannon-aeden9": "b57f055e59b4a5804b411db8ee30a241c7ac8e33",
+      "claude/cool-fermi-bgi80k": "6a3e2bce26039e8a306768d32f0a3b5933a058e0",
+      "claude/dazzling-meitner-ptmc1o": "9a79c20730314c5415f2567ed9db6c0b055a8cb2",
+      "claude/determined-thompson-xk1ay2": "05130b3105b0b8b66eceee3c401cd02f338c6ba9",
+      "claude/dreamy-franklin-3sf0h5": "23b9b8b10da91ddde3556a9d8bf2e53dea4454b3",
+      "claude/elegant-fermi-5vbfxc": "a51a21722ee49b45c96d02b56346de2e480a4ed0",
+      "claude/elegant-pascal-qp35fj": "5ad1dab27f59203ffc2fcee4983f4d8b3fa008da",
+      "claude/eloquent-pascal-p7ukvk": "cddf0d9ed5a3fd2bb1554827c8c77e3b4af69abb",
+      "claude/epic-cerf-wp9k86": "3d337b44db4e920e21f6201b1e9a695f2f2e425a",
+      "claude/epic-mccarthy-uhlsri": "2cdb9d3278cf811dde0d49753a074218c564ba6f",
+      "claude/festive-knuth-lgh1td": "4645655233e3504a50d9b1492fcfab8cb7565df9",
+      "claude/friendly-curie-ju3ffz": "8a9c855c7e2a615f48a8e5c6060aa3706e1ba9d3",
+      "claude/gallant-gauss-vbjqc8": "339254e6e28e6d4dd19accec4b38ac59668f7fd1",
+      "claude/gallant-goldberg-4ux9as": "c5f97652b044c426bfba4ed385c76b13a866fbb5",
+      "claude/gallant-wozniak-e9i4q8": "fd0b1e5aa853b872fe286c852436b3f49d25abc3",
+      "claude/gifted-fermat-tsjmxi": "19c59092f0ee6f08e12dabfdc2c83de27dfa4f0f",
+      "claude/gifted-feynman-kpb8ls": "e5a1e80753966a693bd208d78ddcd77b1aab159c",
+      "claude/gifted-volta-5srcrx": "d3180a47a7be8b8ec1cb426044b0b5e0f9948bf0",
+      "claude/happy-dijkstra-5r5emb": "4e7477e73ac6dc71afa5f5dd737a96d40fc5fbc9",
+      "claude/happy-ramanujan-35zqaf": "d665e84ab3f2480af9297ef00cf00defdc30de89",
+      "claude/inspiring-carson-qntp94": "9de54c849a69c712addbddec7c2e2246e16e1bcd",
+      "claude/inspiring-heisenberg-optydp": "44565c51f2262e993de341b7a3e27cee6dab9ca9",
+      "claude/intelligent-carson-8de0or": "44c1f01cd9fd59115ab0f8ae80a6e5cc8615dd82",
+      "claude/jolly-albattani-txetyd": "62fb18c3cc90f28d269e3485830758b87b8c9c87",
+      "claude/jolly-dijkstra-oakxea": "11a8f1f01b7674dbd9959f0bc98a9a484b3562a9",
+      "claude/kind-dijkstra-e32j8v": "6fd8d2de311204a574cc4f5cafbcdd867f437e7d",
+      "claude/kind-johnson-tu7ps7": "9901fd041cb729b5bd2a6e4a0d88ac8942c51fa3",
+      "claude/loving-mayer-2em9lt": "94d38b8f0b37ebd697fa4d72c29fdad9585a03e3",
+      "claude/modest-archimedes-9v29rn": "1dba10f02397b4a43b0f87157281783b4f4e5afb",
+      "claude/modest-noether-1dyn5q": "fb5007d4746a689f1eb3ed35aff8a2a593c6e6ed",
+      "claude/nice-edison-gpkcfl": "76ab9768df577d4a45a9e2e57b73de90537aed96",
+      "claude/p16-composition-audit": "a4fc5deda2e5c28a09300ca0d6741f381a87f51d",
+      "claude/practical-heisenberg-ij697x": "44498e06177f3d876fd0c56bc2997c3c29583369",
+      "claude/practical-ride-4z65ch": "975142e1a75c420930893f4626f15c55334c74d3",
+      "claude/relaxed-goodall-r8p6yr": "a305d11b8e4258d2f24caae9c86bb2c37dd3468b",
+      "claude/relaxed-hamilton-o05z02": "e694dea699a26deb679cec9bb4ac0bd1c7de2e91",
+      "claude/release-readme-ci-reports-m9c5lj": "75d6c81993b89225e01bac7a939d93d516ab843e",
+      "claude/serene-hypatia-hd8wns": "2d9027f0663b97080e58c40e692b5ec25b666b0c",
+      "claude/sleepy-gates-1zbw4l": "a79a47d887bf5265c946019c004ca8d3e4f2b988",
+      "claude/stoic-pasteur-sbuepk": "896b49cf9c7e04fbf44247f6ee87f03f1deec52a",
+      "claude/sweet-brahmagupta-ow1jn1": "82c09047710ae4bd95ef8a50c6b21513b8a1cc4d",
+      "claude/trusting-meitner-3b9w1h": "6fe36e4f64c7d3b6dbbf56fdfdb0523fff99c0b8",
+      "claude/upbeat-einstein-jjph53": "352b4f6a3e9f9dd060198b223e4a27a1e68ff673",
+      "claude/v2-18-open-set-xr7ef7": "82284b82078b8500436413ee492663fb9ac56e5a",
+      "claude/vigilant-sagan-xjr7yo": "ecba6abb757607b36fa4f56f1d9e365c284ef7b3",
+      "claude/wonderful-carson-3a62ep": "ace6b1afc8c33faafd7a7b6c1ab8a1ad19dc6a8a",
+      "claude/youthful-gates-h0mvp2": "3ed0ba2baec8e69b037aa4e0686415c717b3254f",
+      "claude/youthful-mayer-67swfl": "6383421681b128260b0e09b2d9647f43bff7b76e",
+      "claude/zen-feynman-k0yxtp": "5a60d963757f428636d7f79620d2ce387e163613",
+      "v2/02-providers": "7b42797e1c302b278df1e8601a47c73c121326b1",
+      "v2/03-docview": "2d9027f0663b97080e58c40e692b5ec25b666b0c",
+      "v2/04-segment": "d3180a47a7be8b8ec1cb426044b0b5e0f9948bf0",
+      "v2/05-analyst": "5a60d963757f428636d7f79620d2ce387e163613",
+      "v2/06-qa": "12f028e35ee2a645e14e00df0a1d91bc1857814d",
+      "v2/07-architect": "44c1f01cd9fd59115ab0f8ae80a6e5cc8615dd82",
+      "v2/08-risk": "94d38b8f0b37ebd697fa4d72c29fdad9585a03e3",
+      "v2/09-consistency": "296dcb6feafce1c2323744631cb2ae96cb681e5e",
+      "v2/10-judge": "e694dea699a26deb679cec9bb4ac0bd1c7de2e91",
+      "v2/11-clarify": "6fe36e4f64c7d3b6dbbf56fdfdb0523fff99c0b8",
+      "v2/12-rules": "62fb18c3cc90f28d269e3485830758b87b8c9c87",
+      "v2/13-report": "352b4f6a3e9f9dd060198b223e4a27a1e68ff673",
+      "v2/14-html-web": "607cc351db9b5ec33a423f3e33b8b69b7cb75453",
+      "v2/14-reviewer": "2f6156554a1530e17b9b4ec7d53cb9f42bca307b",
+      "v2/15-eval": "41307fd2a8afbd112f44f1b294120e6463a3ccab",
+      "v2/16-release": "d665e84ab3f2480af9297ef00cf00defdc30de89",
+      "v2/18-open-set": "82284b82078b8500436413ee492663fb9ac56e5a"
+    }
+  },
+  "runtime": {
+    "windows": "Windows-11-10.0.26300-SP0",
+    "windows_python": "3.13.6",
+    "windows_user_site_enabled": false,
+    "distribution_versions": {
+      "bcc-review": "0.1.0",
+      "jsonschema": "4.26.0",
+      "anthropic": "2.14.0",
+      "pytest": "9.2.0",
+      "PyMuPDF": "2.2"
+    },
+    "linux": "Debian 12 in Docker, CPython 3.12.16",
+    "docker_engine": "29.1.5",
+    "docker_image_id": "sha256:006a8446ace78dac0db397ec84aab08f77d23bcba3f41b3667654a5745e2fa6c",
+    "docker_image_bytes": 218946896,
+    "docker_network_during_offline_demo": "none"
+  },
+  "clean_runs": {
+    "windows_cold": {
+      "report_sha256": "cd666e8828c0ef1fd1e96381033f1c88abafe88ae7fc81e550e4c21edb284121",
+      "markdown_sha256": "aff43ee770d7350e70fcfd0364d34ab0771025b87ec99742d9a01e56fa4fa9d6",
+      "agent_commit": "12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3",
+      "status": "partial",
+      "mode": "rules_only",
+      "provider": "none",
+      "model": null,
+      "physical": 0,
+      "cache_hits": 0,
+      "incomplete_stages": [
+        "individual",
+        "cross",
+        "verify_meaning",
+        "questions",
+        "bank"
+      ],
+      "started_at": "2026-11-27T04:36:52Z",
+      "duration_s": 2.135,
+      "verify": {
+        "exit": 0,
+        "evidence": 594,
+        "warnings": 5
+      }
+    },
+    "windows_repeat": {
+      "report_sha256": "48223fe8183f57d05bb6afc61a41cf33bb7dd7980f6a12dcd402f4aac42cba16",
+      "markdown_sha256": "52aa478f0c2299b868b557ee11b7fbee057d9e53b07e335f1ac307677bef7d16",
+      "agent_commit": "12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3",
+      "status": "partial",
+      "mode": "rules_only",
+      "provider": "none",
+      "model": null,
+      "physical": 0,
+      "cache_hits": 0,
+      "incomplete_stages": [
+        "individual",
+        "cross",
+        "verify_meaning",
+        "questions",
+        "bank"
+      ],
+      "started_at": "2026-11-27T04:36:56Z",
+      "duration_s": 0.918,
+      "verify": {
+        "exit": 0,
+        "evidence": 594,
+        "warnings": 5
+      }
+    },
+    "docker": {
+      "report_sha256": "31e17e4f783693698dc7380ac402f9d794a983013de9115d7eff6477bc973b43",
+      "markdown_sha256": "8da4f6772c6091f72460ccf8c916abf9e8b349ec9473700eccf8c22f2bf39358",
+      "agent_commit": "12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3",
+      "status": "partial",
+      "mode": "rules_only",
+      "provider": "none",
+      "model": null,
+      "physical": 0,
+      "cache_hits": 0,
+      "incomplete_stages": [
+        "individual",
+        "cross",
+        "verify_meaning",
+        "questions",
+        "bank"
+      ],
+      "started_at": "2026-11-27T04:38:43Z",
+      "duration_s": 1.667,
+      "verify": {
+        "exit": 0,
+        "evidence": 594,
+        "warnings": 5
+      }
+    }
+  },
+  "reference_fields_equal": [
+    "document",
+    "requirements",
+    "checks",
+    "findings",
+    "questions",
+    "checklist",
+    "test_cases",
+    "verdict"
+  ],
+  "published_reports": {
+    "requirements": {
+      "source": "requirements.md",
+      "source_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
+      "report_sha256": "07e014604f3190969c88d4b8274d359daed9ee9356e4a70fd871a02c98e5552f",
+      "findings": 27,
+      "verify": {
+        "exit": 0,
+        "evidence": 594,
+        "warnings": 5
+      },
+      "jira_rows_checked": 26
+    },
+    "requirements_pdf": {
+      "source": "requirements.pdf",
+      "source_sha256": "fbca9c8282f440754d43c2ec689a27a9ccc32ac07a1c4b30a7ca22c21d7e4de2",
+      "report_sha256": "327344b56f8f39a5360c1841379074e3fed6974f8e72b29e1ac4c4064dfce1fb",
+      "findings": 25,
+      "verify": {
+        "exit": 0,
+        "evidence": 589,
+        "warnings": 5
+      },
+      "jira_rows_checked": 24
+    },
+    "other_topic_cashback": {
+      "source": "other_topic_cashback.md",
+      "source_sha256": "dba611718f649983b808d5f502e79fea4f8abe64b29b10da325bc0581ecd0b4b",
+      "report_sha256": "44af66c57b8866002eaa701ad7d0cee0aa23cf03ece6e60c72ca32762955a775",
+      "findings": 19,
+      "verify": {
+        "exit": 0,
+        "evidence": 181,
+        "warnings": 2
+      },
+      "jira_rows_checked": 17
+    }
+  },
+  "official_markdown_counts": {
+    "requirements": 53,
+    "findings": 27,
+    "questions": 17,
+    "checklist": 14,
+    "test_cases": 36
+  },
+  "release_tests": {
+    "windows": {
+      "p18": 9,
+      "p11": 28,
+      "p08": 1
+    },
+    "linux_container": {
+      "p18": 9,
+      "p11": 28,
+      "p08": 1
+    }
+  },
+  "official_online": {
+    "completed": false,
+    "provider": "anthropic",
+    "sdk_key_available": false,
+    "claude_code": {
+      "cli_version": "2.1.181",
+      "logged_in": false
+    },
+    "no_key_control": {
+      "generation_exit": 5,
+      "receiving_powershell_block_exit": 1,
+      "verify": {
+        "exit": 0,
+        "evidence": 594,
+        "warnings": 5
+      },
+      "status_reasons": [
+        "individual: anthropic: not_configured: Не задан ANTHROPIC_API_KEY: живой вызов Claude API невозможен.",
+        "cross: anthropic: not_configured: Не задан ANTHROPIC_API_KEY: живой вызов Claude API невозможен.",
+        "verify_meaning: anthropic: not_configured: Не задан ANTHROPIC_API_KEY: живой вызов Claude API невозможен.",
+        "questions: вопросы построены по правилам без модели",
+        "bank: чек-лист размечен по правилам без модели"
+      ],
+      "report_sha256": "16b8e5f8dbb2e32aff133a4d919d4ae0d3123fbb183082c52cdc6d9c0e0d5357",
+      "markdown_sha256": "42733e4e81f29343e9a175bb57cbcb551f51aa31956aebab1ba992eadd331f82",
+      "agent_commit": "12ed4d70e5d91ba9a8ba8ec1b89b5fc7921ac1a3",
+      "status": "partial",
+      "mode": "rules_only",
+      "provider": "anthropic",
+      "model": null,
+      "physical": 0,
+      "cache_hits": 0,
+      "incomplete_stages": [
+        "individual",
+        "cross",
+        "verify_meaning",
+        "questions",
+        "bank"
+      ],
+      "started_at": "2026-11-27T04:44:10Z",
+      "duration_s": 6.879
+    },
+    "v1_cli_fallback_control": {
+      "checked_sha": "d0bc06d8e3e20fe9d60d7ff8c18fa9cb0961f9d2",
+      "mode": "rules_only",
+      "status": "partial",
+      "physical": 0,
+      "reasons": [
+        "individual: claude_cli: not_configured: адаптер claude_cli не подключён: модуль ещё не влит",
+        "cross: claude_cli: not_configured: адаптер claude_cli не подключён: модуль ещё не влит",
+        "verify_meaning: claude_cli: not_configured: адаптер claude_cli не подключён: модуль ещё не влит",
+        "questions: вопросы построены по правилам без модели",
+        "bank: чек-лист размечен по правилам без модели"
+      ]
+    }
+  },
+  "demonstration": {
+    "pdf": {
+      "pages": 6,
+      "annotations": 104,
+      "bytes": 1002140,
+      "sha256": "2409d1a4f5baa4b0577a3ba92e9da5b81d83b3c1dd619fd337cffb6b5208155b",
+      "verify": "verify: OK — SHA-256 источника совпадает, опор подтверждено 589, счётчики и паспорт согласованы (team:bcc_review.verification:verify_report)"
+    },
+    "decision": {
+      "checklist_id": "CHK-06",
+      "finding": "F-017",
+      "question": "Q-01",
+      "answer": "B",
+      "status": "accepted",
+      "revision": "requirements.rev-p18-demo.md",
+      "revision_sha256": "0be2b3d50e25f865de2893193f79bad0bdaabe16894897d131e0a0385bf9e574",
+      "verify": "verify: OK — SHA-256 источника совпадает, опор подтверждено 575, счётчики и паспорт согласованы (team:bcc_review.verification:verify_report)"
+    }
+  },
+  "access": {
+    "judge_package_anonymous_http": 404,
+    "authenticated_clean_clone": true
+  },
+  "github_actions": {
+    "package_run": "https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/actions/runs/45939618631",
+    "jobs_started": 0,
+    "conclusion": "failure",
+    "annotation": "Account payment or spending limit; GitHub did not start the hosted CLI jobs."
+  }
+}

@@ -30,8 +30,8 @@ from .runtime.modules import Modules
 from .runtime.verdict import build_summary, build_verdict, default_blocks
 
 READERS = {".md": "read_text", ".markdown": "read_text", ".txt": "read_text", ".pdf": "read_pdf", ".docx": "read_docx"}
-DEFAULT_MODELS = {"anthropic": "claude-opus-5-5", "gemini": "gemini-2.5-flash", "mock": "mock-1"}
-MODEL_ENV = {"anthropic": "ANTHROPIC_MODEL", "gemini": "GEMINI_MODEL"}
+DEFAULT_MODELS = {"anthropic": "claude-opus-5-5", "gemini": "gemini-2.5-flash", "mock": "mock-1", "claude_cli": "opus"}
+MODEL_ENV = {"anthropic": "ANTHROPIC_MODEL", "gemini": "GEMINI_MODEL", "claude_cli": "CLAUDE_CLI_MODEL"}
 LLM_STAGES = ("individual", "cross", "verify_meaning", "questions", "bank")
 SLEEP: Callable[[float], None] = time.sleep  # тесты подменяют, чтобы не ждать Retry-After
 # отметки производителя у кандидатов: source модуля (№05, правила) или origin/confirmed_by (№06: facts — сверка фактов)
@@ -56,6 +56,40 @@ def source_label(parts: set[str]) -> str:
     if "unknown" in parts or not parts:
         return "unknown"
     return "mixed" if len(parts) > 1 else next(iter(parts))
+
+
+MAX_SPLIT_DEPTH = 3  # обрезанный пакет делится не глубже 1/8
+SPLIT_KEYS = ("requirements", "items", "candidates", "pairs", "obligations", "findings", "checklist", "blocks")
+
+
+def split_payload(payload: Any) -> Optional[tuple[dict[str, Any], dict[str, Any]]]:
+    """Разделить пакет этапа пополам по списку во ``input`` (требования, кандидаты, пары…)."""
+    if not isinstance(payload, dict):
+        return None
+    inp = payload.get("input")
+    if not isinstance(inp, dict):
+        return None
+    key = next((k for k in SPLIT_KEYS if isinstance(inp.get(k), list) and len(inp[k]) > 1), None)
+    if key is None:
+        return None
+    items = inp[key]
+    mid = len(items) // 2
+
+    def part(chunk: list) -> dict[str, Any]:
+        return {**payload, "input": {**inp, key: chunk}}
+
+    return part(items[:mid]), part(items[mid:])
+
+
+def merge_split_results(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
+    """Склеить ответы половин: списки верхнего уровня объединяются, прочие поля берутся из первой половины."""
+    out = dict(first)
+    for key, value in second.items():
+        if isinstance(value, list) and isinstance(out.get(key), list):
+            out[key] = out[key] + value
+        elif key not in out:
+            out[key] = value
+    return out
 
 
 class UsageError(ValueError):
@@ -156,7 +190,7 @@ class Engine:
         o = self.opts
         self.provider = "none" if o.offline_lint else o.provider
         if self.provider not in C.PROVIDERS:
-            raise UsageError(f"неизвестный провайдер {self.provider!r}: anthropic | gemini | mock")
+            raise UsageError(f"неизвестный провайдер {self.provider!r}: anthropic | gemini | claude_cli | mock")
         self.requested_model = None
         self.adapter = None
         self.adapter_label = None
@@ -191,7 +225,7 @@ class Engine:
                            max_retries=self.opts.max_retries, timeout_s=self.opts.timeout_s, sleep=SLEEP)
         engine = self
 
-        def ask(stage: str, payload: Any, schema: Any) -> dict:
+        def ask(stage: str, payload: Any, schema: Any, _depth: int = 0) -> dict:
             if engine.unavailable:
                 raise AskError(stage, "provider_unavailable", engine.unavailable)
             try:
@@ -202,7 +236,14 @@ class Engine:
                 if exc.kind in ("auth", "not_configured", "quota", "not_found"):
                     # без ключа или модели повторять бессмысленно: остальные этапы — без модели
                     engine.unavailable = f"{engine.provider}: {exc.kind}: {exc.message}"
-                raise
+                parts = split_payload(payload) if exc.kind == "truncated" and _depth < MAX_SPLIT_DEPTH else None
+                if not parts:
+                    raise
+                # обрезанный ответ: пакет делится пополам, обе половины — в том же общем бюджете вызовов
+                engine.tracer.emit("ask_split", stage=stage, reason="truncated", count=_depth + 1)
+                first = ask(f"{stage}#a", parts[0], schema, _depth + 1)
+                second = ask(f"{stage}#b", parts[1], schema, _depth + 1)
+                return merge_split_results(first, second)
 
         return ask
 
@@ -283,6 +324,7 @@ class Engine:
         self.mark("inventory", inv_status, inv_reason, implementation=inv_mod.label, t=t)
         self.save_stage("inventory", inv)
         context.set_requirements(requirements)
+        self.req_blocks = {r["id"]: list(r["block_ids"]) for r in requirements}
         self.context_policy = context.policy
 
         # общий конфиг критериев (№05) — коды и названия для проверки стыков
@@ -606,8 +648,42 @@ class Engine:
         self.save_stage("cross", out)
         return out
 
+    def prefer_requirement_occurrence(self, document, candidate: dict[str, Any]) -> dict[str, Any]:
+        """Цитата, которая встречается в нескольких блоках, привязывается к блоку требования этого замечания.
+
+        Иначе опора уходит к другому вхождению (например, к тому же слову в «Целях») и verify это ловит."""
+        req_blocks = {b for rid in candidate.get("req_ids") or [] for b in getattr(self, "req_blocks", {}).get(rid, [])}
+        if not req_blocks:
+            return candidate
+        texts = getattr(self, "_block_texts", None)
+        if texts is None:
+            texts = self._block_texts = [(b["id"], b["text"]) for b in document["blocks"]]
+
+        def fix(h: Any) -> Any:
+            if not isinstance(h, dict) or not h.get("quote"):
+                return h
+            q = h["quote"]
+            hits = [bid for bid, text in texts if q in text]
+            if len(hits) <= 1:
+                return h
+            preferred = [bid for bid in hits if bid in req_blocks]
+            if not preferred or h.get("block_id") in preferred:
+                return h
+            return {**h, "block_id": preferred[0]}
+
+        out = dict(candidate)
+        out["hints"] = [fix(h) for h in candidate.get("hints") or []]
+        if isinstance(candidate.get("witness"), dict):
+            w = dict(candidate["witness"])
+            for side in ("hint_a", "hint_b"):
+                if side in w:
+                    w[side] = fix(w[side])
+            out["witness"] = w
+        return out
+
     def resolve(self, document, candidate) -> dict[str, Any]:
         mod = self.mods.get("resolve_candidate")
+        candidate = self.prefer_requirement_occurrence(document, candidate)
         res = dict(mod.func(document, candidate))
         if "witness" not in res and candidate.get("witness"):
             hint = self.mods.get("resolve_hint").func

@@ -1,0 +1,694 @@
+{
+  "tested_code": "70d26174e7f448eb2f061f6268b2c566baacf7c1",
+  "release_artifacts_commit": "099dd32ddbc3525c8e09dfcf79514eb32f80921a",
+  "first_two_files_commit": "f8b0db41e777437508b5445311f5bfa3728c72f3",
+  "date_local": "2026-11-27",
+  "source": "release/input/requirements.md",
+  "sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
+  "public_report": "release/reports/offline/requirements.md",
+  "fresh_windows": {
+    "platform": "Windows-11-10.0.26300-SP0",
+    "python": "3.13.6",
+    "pip": "25.2",
+    "user_site": false,
+    "editable_package": "0.1.0",
+    "initial_install_seconds": 13.496,
+    "runs": [
+      {
+        "name": "cold",
+        "sha": "70d26174e7f448eb2f061f6268b2c566baacf7c1",
+        "source_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
+        "seconds_cli": 2.07,
+        "report_sha256": "477f063a64a4a1495d3658eef0d818ce4d2be5debfd64125bcddab667fcee376",
+        "markdown_sha256": "1885073a895787ea44768b06f6b69407f34c4ea02a49d20add6aae33b362eab0",
+        "calls": {
+          "physical": 0,
+          "cache_hits": 0,
+          "failed": 0,
+          "retries": 0
+        },
+        "verify_exit": 0,
+        "verified_evidence": 594
+      },
+      {
+        "name": "repeat",
+        "sha": "70d26174e7f448eb2f061f6268b2c566baacf7c1",
+        "source_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
+        "seconds_cli": 1.601,
+        "report_sha256": "d9ff9a777cdad021af1ce9e4bb8022fc79fb8f661370df9c4915202483886317",
+        "markdown_sha256": "1f653489440c8dd6ad968a3d1959ec08db84928846b54ea590d64b0134e4defb",
+        "calls": {
+          "physical": 0,
+          "cache_hits": 0,
+          "failed": 0,
+          "retries": 0
+        },
+        "verify_exit": 0,
+        "verified_evidence": 594
+      }
+    ]
+  },
+  "fresh_linux": {
+    "distribution": "Debian GNU/Linux 12, clean python:3.12-slim-bookworm container on Linux/WSL2",
+    "python": "3.12.16",
+    "user_site": false,
+    "source_checkout": "local bare copy of the authenticated GitHub clone, git checkout of official SHA",
+    "runs": [
+      {
+        "name": "cold",
+        "seconds": 1.63,
+        "source_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
+        "sha": "70d26174e7f448eb2f061f6268b2c566baacf7c1",
+        "md_sha256": "42164fb702078f7fd1a458908cee99ef1635627de7187184d600a9692ec43724",
+        "report_sha256": "bdef46a54fb391cb545d10b41d2e5a4bbb7dd0911ba1c437742774ef0395db7d",
+        "physical_calls": 0,
+        "status": "partial",
+        "count": 27,
+        "verify": "verify: OK — SHA-256 источника совпадает, опор подтверждено 594, счётчики и паспорт согласованы (team:bcc_review.verification:verify_report)"
+      },
+      {
+        "name": "warm",
+        "seconds": 0.97,
+        "source_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
+        "sha": "70d26174e7f448eb2f061f6268b2c566baacf7c1",
+        "md_sha256": "35304aa9006e38f22d1546bc9d583b6967f29b11088e23e477eded685686fab0",
+        "report_sha256": "e8ef4831838c1684916703a63e75f25fd4684beeab624f5756ee3b575ea59b1b",
+        "physical_calls": 0,
+        "status": "partial",
+        "count": 27,
+        "verify": "verify: OK — SHA-256 источника совпадает, опор подтверждено 594, счётчики и паспорт согласованы (team:bcc_review.verification:verify_report)"
+      }
+    ]
+  },
+  "offline": {
+    "mode": "rules_only",
+    "status": "partial",
+    "actual_model": null,
+    "provider": "none",
+    "physical_calls": 0,
+    "stages": [
+      {
+        "name": "read",
+        "status": "ok"
+      },
+      {
+        "name": "inventory",
+        "status": "ok"
+      },
+      {
+        "name": "rules",
+        "status": "ok"
+      },
+      {
+        "name": "individual",
+        "status": "skipped"
+      },
+      {
+        "name": "cross",
+        "status": "skipped"
+      },
+      {
+        "name": "evidence",
+        "status": "ok"
+      },
+      {
+        "name": "verify_meaning",
+        "status": "skipped"
+      },
+      {
+        "name": "merge",
+        "status": "ok"
+      },
+      {
+        "name": "facts",
+        "status": "ok"
+      },
+      {
+        "name": "questions",
+        "status": "partial"
+      },
+      {
+        "name": "bank",
+        "status": "partial"
+      },
+      {
+        "name": "verdict",
+        "status": "ok"
+      }
+    ],
+    "matched_reference_fields": [
+      "document",
+      "requirements",
+      "checks",
+      "findings",
+      "questions",
+      "checklist",
+      "test_cases",
+      "verdict"
+    ],
+    "counts": {
+      "requirements": 53,
+      "findings": 27,
+      "questions": 17,
+      "checklist": 14,
+      "test_cases": 36
+    },
+    "confirmed": 26,
+    "verify_warnings": [
+      "опора замечания уровня требования лежит вне текста его требования: строка 188, раздел «Статусы»; требования R-039",
+      "опора замечания уровня требования лежит вне текста его требования: строка 110, раздел «Общие параметры»; требования R-014",
+      "опора верна по координатам, но та же цитата встречается в блоке несколько раз: «enabled»: строка 144, таблица 6, строка 3, столбец 1 «Parameter», раздел «Query-параметры»; ещё 1 вхождение в блоке (столбец 7); в отчёте нет признака, выделяющего это вхождение, кроме координат",
+      "опора верна по координатам, но та же цитата встречается в блоке несколько раз: «enabled»: строка 157, таблица 7, строка 3, столбец 1 «Parameter», раздел «Ответ»; ещё 1 вхождение в блоке (столбец 5); в отчёте нет признака, выделяющего это вхождение, кроме координат",
+      "прогон помечен как незавершённый: partial"
+    ]
+  },
+  "packaging_smoke": {
+    "18": {
+      "tests": 8,
+      "skipped": 0,
+      "errors": 0,
+      "failures": 0
+    },
+    "11": {
+      "tests": 28,
+      "skipped": 0,
+      "errors": 0,
+      "failures": 0
+    },
+    "08final": {
+      "tests": 1,
+      "skipped": 0,
+      "errors": 0,
+      "failures": 0
+    }
+  },
+  "passed_local": 37,
+  "mock_calls": {
+    "first": {
+      "physical": 6,
+      "cache_hits": 0,
+      "failed": 0,
+      "retries": 0
+    },
+    "second": {
+      "physical": 0,
+      "cache_hits": 6,
+      "failed": 0,
+      "retries": 0
+    },
+    "external_requests": 0
+  },
+  "annotated_pdf": {
+    "input": "release/input/requirements.pdf",
+    "source_sha256": "fbca9c8282f440754d43c2ec689a27a9ccc32ac07a1c4b30a7ca22c21d7e4de2",
+    "artifact_sha256": "dc08f87ce4aecba00b8153996b85091f17ba712f9d455718fc1fcd7e15d93af5",
+    "bytes": 1002140,
+    "verify_exit": 0,
+    "pages": 6,
+    "annotations": 104
+  },
+  "docker": {
+    "engine": "29.1.5",
+    "image_id": "sha256:890173f6ca0bf50f23fb79c4e97f891ea992f22ca04de4536e4978c99eb4f0b4",
+    "image_bytes": 218912072,
+    "network_during_run": "none",
+    "mounts": "read-only input and host output",
+    "run": {
+      "name": "docker",
+      "sha": "70d26174e7f448eb2f061f6268b2c566baacf7c1",
+      "source_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
+      "seconds_cli": null,
+      "report_sha256": "bb186ff154e48d24adf184d6498e1d6318f75fb621fd221a34500c971455e6e2",
+      "markdown_sha256": "61851ed6b7c022eeeb823a52bae7aa5a0cdf9334a7b53aead099283130578086",
+      "calls": {
+        "physical": 0,
+        "cache_hits": 0,
+        "failed": 0,
+        "retries": 0
+      },
+      "verify_exit": 0,
+      "verified_evidence": 594
+    }
+  },
+  "reproducibility": {
+    "base_installed_distributions": {
+      "attrs": "26.1.0",
+      "jsonschema": "4.26.0",
+      "jsonschema-specifications": "2025.9.1",
+      "pip": "25.2",
+      "referencing": "0.37.0",
+      "rpds-py": "2026.9.1"
+    },
+    "clean_base_wheel_bytes": 425790,
+    "base_wheels": [
+      {
+        "file": "jsonschema-4.26.0-py3-none-any.whl",
+        "sha256": "d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce",
+        "bytes": 90630
+      },
+      {
+        "file": "attrs-26.1.0-py3-none-any.whl",
+        "sha256": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+        "bytes": 67548
+      },
+      {
+        "file": "jsonschema_specifications-2025.9.1-py3-none-any.whl",
+        "sha256": "98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe",
+        "bytes": 18437
+      },
+      {
+        "file": "referencing-0.37.0-py3-none-any.whl",
+        "sha256": "381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231",
+        "bytes": 26766
+      },
+      {
+        "file": "rpds_py-2026.9.1-cp313-cp313-win_amd64.whl",
+        "sha256": "3e93b2cd69a9830be33e03945cd7cda940a0a8bfcfbff41d6144f0cb0d3d8bd9",
+        "bytes": 222409
+      }
+    ],
+    "additional_windows_wheel_bytes": 137737750,
+    "additional_distributions": [
+      {
+        "name": "anthropic",
+        "version": "2.14.0",
+        "file": "anthropic-2.14.0-py3-none-any.whl",
+        "sha256": "5cf986851f61c0858ac88c6f7c28490369a68ff4a89c309849605b764da0664d",
+        "bytes": 2726387
+      },
+      {
+        "name": "anyio",
+        "version": "4.16.0",
+        "file": "anyio-4.16.0-py3-none-any.whl",
+        "sha256": "c66ae634e0b8228396b801741beb3294326d4b6102f7bba4041c0dfb58c29026",
+        "bytes": 134521
+      },
+      {
+        "name": "docstring_parser",
+        "version": "0.18.0",
+        "file": "docstring_parser-0.18.0-py3-none-any.whl",
+        "sha256": "b3fcbed555c47d8479be0796ef7e19c2670d428d72e96da63f3a40122860374b",
+        "bytes": 22484
+      },
+      {
+        "name": "google-genai",
+        "version": "3.6.1",
+        "file": "google_genai-3.6.1-py3-none-any.whl",
+        "sha256": "4b35064da644f61d7e5f6c0e9406bf63b945e7e96b4af18cadb3371cbc3acf74",
+        "bytes": 1472097
+      },
+      {
+        "name": "distro",
+        "version": "1.9.0",
+        "file": "distro-1.9.0-py3-none-any.whl",
+        "sha256": "7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2",
+        "bytes": 20277
+      },
+      {
+        "name": "google-auth",
+        "version": "2.63.1",
+        "file": "google_auth-2.63.1-py3-none-any.whl",
+        "sha256": "3c977ca57114a302c2589f3a24be7ca1b6862d30da7619f4230a78809f58a0e9",
+        "bytes": 271264
+      },
+      {
+        "name": "httpx2",
+        "version": "2.16.2",
+        "file": "httpx2-2.16.2-py3-none-any.whl",
+        "sha256": "f05c13aade4c45dbf1c9060647a1058f0acad62398fad96e741269edb33d46f5",
+        "bytes": 97893
+      },
+      {
+        "name": "httpcore2",
+        "version": "2.16.2",
+        "file": "httpcore2-2.16.2-py3-none-any.whl",
+        "sha256": "16051ae2a42f776007543f32de9349a317b23d2cbb4e1456b4bac0e88b87419a",
+        "bytes": 85551
+      },
+      {
+        "name": "jiter",
+        "version": "0.19.0",
+        "file": "jiter-0.19.0-cp313-cp313-win_amd64.whl",
+        "sha256": "050dd505e407c028aa76b9b4a379a06f79f484c3b256d99a7fea118d863c9a79",
+        "bytes": 223145
+      },
+      {
+        "name": "opentelemetry-api",
+        "version": "1.45.2",
+        "file": "opentelemetry_api-1.45.2-py3-none-any.whl",
+        "sha256": "2cbd737377e710ee740d261c94e93fa0f08e6d037c18f17513cc0a2d94479a34",
+        "bytes": 60335
+      },
+      {
+        "name": "pydantic",
+        "version": "2.14.4",
+        "file": "pydantic-2.14.4-py3-none-any.whl",
+        "sha256": "653a2ad9f6d8858529c77c72717d0ea991d6c6837fe683246b2f4b2bbfc3fadc",
+        "bytes": 494865
+      },
+      {
+        "name": "pydantic_core",
+        "version": "2.50.5",
+        "file": "pydantic_core-2.50.5-cp313-cp313-win_amd64.whl",
+        "sha256": "d34c0d4dd4a318f2be788a60a972c3a1ed5da0155a7c06d6dd810dc5d60ad704",
+        "bytes": 2268229
+      },
+      {
+        "name": "requests",
+        "version": "2.34.2",
+        "file": "requests-2.34.2-py3-none-any.whl",
+        "sha256": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0",
+        "bytes": 73075
+      },
+      {
+        "name": "charset-normalizer",
+        "version": "3.5.3",
+        "file": "charset_normalizer-3.5.3-cp313-cp313-win_amd64.whl",
+        "sha256": "cb18428af7399e0a6f7e3b45f110d57a1a47cf07fd4b3ce50e2366d99a38959a",
+        "bytes": 213792
+      },
+      {
+        "name": "idna",
+        "version": "3.20",
+        "file": "idna-3.20-py3-none-any.whl",
+        "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+        "bytes": 69583
+      },
+      {
+        "name": "sniffio",
+        "version": "1.3.1",
+        "file": "sniffio-1.3.1-py3-none-any.whl",
+        "sha256": "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2",
+        "bytes": 10235
+      },
+      {
+        "name": "tenacity",
+        "version": "9.1.4",
+        "file": "tenacity-9.1.4-py3-none-any.whl",
+        "sha256": "6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55",
+        "bytes": 28926
+      },
+      {
+        "name": "typing_extensions",
+        "version": "4.16.0",
+        "file": "typing_extensions-4.16.0-py3-none-any.whl",
+        "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+        "bytes": 45571
+      },
+      {
+        "name": "urllib3",
+        "version": "2.8.0",
+        "file": "urllib3-2.8.0-py3-none-any.whl",
+        "sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
+        "bytes": 135717
+      },
+      {
+        "name": "websockets",
+        "version": "17.4",
+        "file": "websockets-17.4-cp313-cp313-win_amd64.whl",
+        "sha256": "203e42eb77e06f85778a908b34c5ad032f34e98a68ef33920d6685c1e65a9420",
+        "bytes": 219560
+      },
+      {
+        "name": "annotated-types",
+        "version": "0.8.0",
+        "file": "annotated_types-0.8.0-py3-none-any.whl",
+        "sha256": "f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0",
+        "bytes": 13427
+      },
+      {
+        "name": "certifi",
+        "version": "2026.11.20",
+        "file": "certifi-2026.11.20-py3-none-any.whl",
+        "sha256": "7422df25243767b9877031a2248cb14d09ddac9beee846f4cef3d5c9191d488f",
+        "bytes": 127913
+      },
+      {
+        "name": "cryptography",
+        "version": "50.0.2",
+        "file": "cryptography-50.0.2-cp311-abi3-win_amd64.whl",
+        "sha256": "7afa5a6602a9f29af1f3a2965f831bae7c9d5d597b7cbb716d41ab3b7d89879c",
+        "bytes": 3824692
+      },
+      {
+        "name": "cffi",
+        "version": "2.1.1",
+        "file": "cffi-2.1.1-cp313-cp313-win_amd64.whl",
+        "sha256": "1aa5645c30469b09530c4ebca77ebf8f17618293c58f8549cb1a543a50236e7d",
+        "bytes": 185688
+      },
+      {
+        "name": "fonttools",
+        "version": "4.69.1",
+        "file": "fonttools-4.69.1-cp313-cp313-win_amd64.whl",
+        "sha256": "a1dedfe496cf57d0ff5f3874aaa87f618a61062e39d9cb6a8b809b87a8fe2ee9",
+        "bytes": 2966198
+      },
+      {
+        "name": "h11",
+        "version": "0.16.0",
+        "file": "h11-0.16.0-py3-none-any.whl",
+        "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+        "bytes": 37515
+      },
+      {
+        "name": "pdfplumber",
+        "version": "0.11.11",
+        "file": "pdfplumber-0.11.11-py3-none-any.whl",
+        "sha256": "81fd7c493ac69a0645a68da49320e4e2cace05d99824439accc7b5b3d955f3bc",
+        "bytes": 60456
+      },
+      {
+        "name": "pdfminer.six",
+        "version": "20260107",
+        "file": "pdfminer_six-20260107-py3-none-any.whl",
+        "sha256": "366585ba97e80dffa8f00cebe303d2f381884d8637af4ce422f1df3ef38111a9",
+        "bytes": 6592252
+      },
+      {
+        "name": "pillow",
+        "version": "13.0.0",
+        "file": "pillow-13.0.0-cp313-cp313-win_amd64.whl",
+        "sha256": "9dda0788a9932776a75d8bcc020076edc308ce2508b51f6739a45e3158b3fc42",
+        "bytes": 7284777
+      },
+      {
+        "name": "pyasn1_modules",
+        "version": "0.4.2",
+        "file": "pyasn1_modules-0.4.2-py3-none-any.whl",
+        "sha256": "29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a",
+        "bytes": 181259
+      },
+      {
+        "name": "pyasn1",
+        "version": "0.6.5",
+        "file": "pyasn1-0.6.5-py3-none-any.whl",
+        "sha256": "4017b0fce125096b8573b39c989fdb1a4b19cf761e683398184550fea0e66587",
+        "bytes": 84807
+      },
+      {
+        "name": "pymupdf",
+        "version": "2.2",
+        "file": "pymupdf-2.2-cp311-abi3-win_amd64.whl",
+        "sha256": "c22e081d07d4b5596ca11c4fda6c8a6bd882205cebe956e063796672374a5e76",
+        "bytes": 63054304
+      },
+      {
+        "name": "pymupdf_layout",
+        "version": "2.2",
+        "file": "pymupdf_layout-2.2-py3-none-any.whl",
+        "sha256": "098d17df7d7904fe1454a7d605539fd1d9098b876fd881b922fd9f8367245d5c",
+        "bytes": 1043
+      },
+      {
+        "name": "pymupdf4llm",
+        "version": "2.2",
+        "file": "pymupdf4llm-2.2-py3-none-any.whl",
+        "sha256": "0e453094d318c5b21cd86ff328383b217d432b8b5c22869adbea823ea2303c27",
+        "bytes": 1026
+      },
+      {
+        "name": "pypdfium2",
+        "version": "5.15.2",
+        "file": "pypdfium2-5.15.2-py3-none-win_amd64.whl",
+        "sha256": "74d1bace34fb01c660d0b64344d5a4b7d276942b7c6623c88ab59ea21c5acfbd",
+        "bytes": 4187589
+      },
+      {
+        "name": "pytest",
+        "version": "9.2.0",
+        "file": "pytest-9.2.0-py3-none-any.whl",
+        "sha256": "07acdcf88ec174f907dc01af70bf52d49b014bbab03faeeade31c96b18c2e588",
+        "bytes": 411776
+      },
+      {
+        "name": "pluggy",
+        "version": "1.7.0",
+        "file": "pluggy-1.7.0-py3-none-any.whl",
+        "sha256": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+        "bytes": 27082
+      },
+      {
+        "name": "colorama",
+        "version": "0.4.6",
+        "file": "colorama-0.4.6-py2.py3-none-any.whl",
+        "sha256": "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6",
+        "bytes": 25335
+      },
+      {
+        "name": "iniconfig",
+        "version": "2.3.1",
+        "file": "iniconfig-2.3.1-py3-none-any.whl",
+        "sha256": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+        "bytes": 7552
+      },
+      {
+        "name": "packaging",
+        "version": "26.4",
+        "file": "packaging-26.4-py3-none-any.whl",
+        "sha256": "81383611a09c1bc0b08b76e0fd5829d7c6824c65b27a6aee339da133f4233ea2",
+        "bytes": 140049
+      },
+      {
+        "name": "Pygments",
+        "version": "2.21.0",
+        "file": "pygments-2.21.0-py3-none-any.whl",
+        "sha256": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+        "bytes": 1250147
+      },
+      {
+        "name": "python-docx",
+        "version": "1.2.0",
+        "file": "python_docx-1.2.0-py3-none-any.whl",
+        "sha256": "3fd478f3250fbbbfd3b94fe1e985955737c145627498896a8a6bf81f4baf66c7",
+        "bytes": 252987
+      },
+      {
+        "name": "lxml",
+        "version": "6.1.3",
+        "file": "lxml-6.1.3-cp313-cp313-win_amd64.whl",
+        "sha256": "e477aca0bc0d19f3b4ae9e4f2a1cfd687c31bf772d78734910658186b40b2477",
+        "bytes": 4004091
+      },
+      {
+        "name": "reportlab",
+        "version": "5.1.2",
+        "file": "reportlab-5.1.2-py3-none-any.whl",
+        "sha256": "8ec602de18aff4db94f3b5846f877e66edbcb42969c4100b2ae5dd69a7f3e84e",
+        "bytes": 2017267
+      },
+      {
+        "name": "truststore",
+        "version": "0.10.5",
+        "file": "truststore-0.10.5-py3-none-any.whl",
+        "sha256": "9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c",
+        "bytes": 19017
+      },
+      {
+        "name": "typing-inspection",
+        "version": "0.4.5",
+        "file": "typing_inspection-0.4.5-py3-none-any.whl",
+        "sha256": "bc210535442b39e1bf2805e0c7a17dfd6a4ace760c84c7f7d16245d23a6b1c39",
+        "bytes": 14874
+      },
+      {
+        "name": "networkx",
+        "version": "3.7",
+        "file": "networkx-3.7-py3-none-any.whl",
+        "sha256": "e3fd2c13a7814cee3746340d8d7f8598a67f16a58bf47fb7f8793fab6efca1b0",
+        "bytes": 2142205
+      },
+      {
+        "name": "numpy",
+        "version": "2.5.5",
+        "file": "numpy-2.5.5-cp313-cp313-win_amd64.whl",
+        "sha256": "e0608d1585557b68dcb6a70a41654f7536567960afad79d91752d2863b242b68",
+        "bytes": 12573354
+      },
+      {
+        "name": "onnxruntime",
+        "version": "1.32.0",
+        "file": "onnxruntime-1.32.0-cp313-cp313-win_amd64.whl",
+        "sha256": "c7f9aa98036ba2a47aa041a4a8c6d0a1f7bfe1bde44c131dcd15ce334f2f148d",
+        "bytes": 16697937
+      },
+      {
+        "name": "protobuf",
+        "version": "7.36.2",
+        "file": "protobuf-7.36.2-cp310-abi3-win_amd64.whl",
+        "sha256": "a300819d441e078a5608c0d3c709796bb548136058fda017ae51d425b44fd353",
+        "bytes": 456514
+      },
+      {
+        "name": "flatbuffers",
+        "version": "25.12.19",
+        "file": "flatbuffers-25.12.19-py2.py3-none-any.whl",
+        "sha256": "7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4",
+        "bytes": 26661
+      },
+      {
+        "name": "psutil",
+        "version": "7.2.2",
+        "file": "psutil-7.2.2-cp37-abi3-win_amd64.whl",
+        "sha256": "eb7e81434c8d223ec4a219b5fc1c47d0417b12be7ea866e24fb5ad6e84b3d988",
+        "bytes": 137737
+      },
+      {
+        "name": "pycparser",
+        "version": "3.12",
+        "file": "pycparser-3.12-py3-none-any.whl",
+        "sha256": "a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e",
+        "bytes": 62600
+      },
+      {
+        "name": "PyYAML",
+        "version": "6.0.4",
+        "file": "pyyaml-6.0.4-cp313-cp313-win_amd64.whl",
+        "sha256": "0a3a351f04dc124f9357512bdb80ac37cd1750cf1371da33e7cbb96d80ac865f",
+        "bytes": 154298
+      },
+      {
+        "name": "tabulate",
+        "version": "0.10.0",
+        "file": "tabulate-0.10.0-py3-none-any.whl",
+        "sha256": "f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3",
+        "bytes": 39814
+      }
+    ],
+    "size_basis": "PyPI artifact sizes for selected Windows wheels. Excludes editable local package, build isolation, index/HTTP overhead and cache effects."
+  },
+  "live": {
+    "provider": "anthropic",
+    "executed": false,
+    "physical_calls": 0,
+    "actual_model": null,
+    "credential": "ANTHROPIC_API_KEY",
+    "coordinator": "Max"
+  },
+  "access": {
+    "authenticated_git_clone": true,
+    "anonymous_repository_api_http": 404,
+    "anonymous_git_clone_needs_login": true
+  },
+  "rehearsal_on_official_input": {
+    "example_choice": "Q-01 / B",
+    "checklist": "CHK-06",
+    "shared_findings": [
+      "F-017"
+    ],
+    "input": "requirements.md",
+    "source_sha256": "e7dae55e5453a250d93e335f5ff9c7f775f4457ccddd333f4a67e47b20d74381",
+    "revision": "requirements.rev-p18-demo.md",
+    "revision_sha256": "0be2b3d50e25f865de2893193f79bad0bdaabe16894897d131e0a0385bf9e574",
+    "decision_status": "accepted",
+    "decisions": 1,
+    "physical_calls": 0,
+    "verify_exit": 0
+  },
+  "packaging_smoke_linux": {
+    "platform": "Debian 12, packaged application, Python 3.12.16",
+    "p18_passed": 8,
+    "p11_passed": 28,
+    "p08_passed": 1
+  }
+}

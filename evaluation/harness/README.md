@@ -44,6 +44,7 @@ python -m evaluation.harness run --gold CLOSED/labels.jsonl --docs CLOSED/docs -
 | `adapt-labels` | плоские метки (`defect_id, type, criterion, severity, quote, line/locator, related_quote, explanation`) → эталон с `anchors` |
 | `compare` | таблица режимов: `--metrics rules_only=A/metrics.json --metrics rules_plus_llm=B/metrics.json --out compare.md` |
 | `selfcheck` | контрольная арифметика: ручной ответ (`controls/*/expected.json`) против счётчика, все перестановки строк, повтор формата |
+| `python -m evaluation.harness.audit` | состав прогонов до подсчёта: пары по ID и SHA, пропуски, повторы, режим, покрытие LLM (раздел ниже) |
 | `--version` | версия счётчика, версия политики и `harness_sha256` (хеш `*.py` и `taxonomy.toml`) |
 | `fingerprint`, `leakcheck` | проверка, что закрытые ответы не попали в открытый dev-набор (по хешам) |
 
@@ -187,6 +188,51 @@ selfcheck «открытый корпус».
 («тенге»/«тиынах», «UTC+5»/«UTC»), покрытия нет. Перемешанные ячейки PDF не засчитываются
 автоматически и уходят на разбор как частичное покрытие. Таблица случаев зафиксирована
 в `tests/p16/test_normalize.py`.
+
+## Проверка состава до подсчёта (`evaluation/harness/audit`, bcc-eval-audit/1)
+
+Запускается до `compare` и до любых F1. Читает только файлы каталогов прогона: `run_config.json`,
+`predictions.jsonl`, `reports/**/report.json`, `reports/index.json`, `reports/*/stderr.txt` и манифест.
+Продукт, сеть и код подсчёта (`score`, `matching`) не вызываются. Пакет лежит вне корня счётчика, поэтому
+`harness_sha256` от него не меняется (`7b54d224…` до и после).
+
+```bash
+python -m evaluation.harness.audit --gold CLOSED/labels.jsonl \
+  --run rules_only=out/closed/ro --run rules_plus_llm=out/closed/llm \
+  --expect-agent-commit 2821989 --out out/closed/audit
+```
+
+Понимает обе раскладки раннера: 0.1.0 (сборка 2821989: `reports/<case_id>__<fmt>/`) и 0.1.2
+(`reports/<12 hex>/` + `index.json`). Понимает и составной каталог, где `predictions.jsonl` объединён
+из подкаталогов с собственными `run_config.json`, как в `open_run`. Скопированный каталог тоже читается:
+`report_path` сопоставляется по хвосту пути.
+
+Пара — `case_id` эталона во всех прогонах, в основном представлении.
+
+| Код | Вид | Когда |
+| :--- | :--- | :--- |
+| `sha_mismatch` | нарушение | `report.run.source_sha256` ≠ SHA файла по манифесту (без манифеста — `source_sha256` эталона), или SHA различается между прогонами. Так выглядит файл, изменённый под тем же именем: раннер 0.1.0 пишет в строку run SHA из манифеста, и подсчёт молча сопоставит отчёт с эталоном прежнего файла |
+| `repeat` | нарушение | на кейс больше одной строки run или одного `report.json`; подсчёт объединил бы находки всех запусков |
+| `missing_report` | нарушение | в части прогонов нет `report.json`, `run.status=failed` или нет строки run. Для чистого кейса отмечено отдельно: его ложные тревоги выпадут, precision завысится. Если строка run осталась `complete`, а файла нет, подсчёт посчитает кейс измеренным |
+| `mode_mismatch` | нарушение | `report.run.mode` ≠ запрошенному; `rules_only` с `calls.physical > 0`; `rules_plus_llm` без единого этапа с вызовом модели в статусе ok/cached |
+| `config_mismatch` | нарушение | различаются манифест, кэш, версия счётчика, `agent_commit`/`agent_version` продукта (или не равен `--expect-agent-commit`), основной формат кейса. `case_id = *`: затронуты все пары |
+| `unknown` | неизвестно | в отчёте нет `run.source_sha256`/`document.id`, `run.mode`, `run.status` (для `rules_only` ещё `run.calls.physical`, для `rules_plus_llm` — `run.calls.physical` и `run.stages`), отчёт не читается или запрошенный режим неизвестен |
+| `missing_all` | справочно | кейс не измерен ни в одном прогоне: выпадает из обоих наборов одинаково (на открытом корпусе — `edge.empty`) |
+| `partial` | справочно, допустимо | `rules_plus_llm`, модель ответила хотя бы на одном этапе, но отчёт `partial` или в `stderr.txt` есть ошибки адаптера, которых нет в `run.calls.failed` («скрытый partial») |
+
+Фактическое покрытие LLM на отчёт:
+* этапы `run.stages` с `calls > 0` и их статус;
+* физические вызовы;
+* ошибки адаптера из `stderr.txt` (строки `anthropic {…"status": "error"…}`). В сборке 2821989 неуспешные
+  вызовы адаптера команды не попадают ни в `run.calls`, ни в `run.stages`, ни в `trace.jsonl`.
+
+Результаты в `--out`: `composition.md` (вердикт, матрица «нарушение → case_id → причина», покрытие LLM, пары
+по ID и SHA), `composition.json`, `matrix.jsonl`, `admissible_case_ids.txt`.
+Коды выхода: 0 — все пары допустимы; 3 — есть нарушения; 4 — нарушений нет, но есть неизвестные; 2 — ошибка входа.
+
+Существующий `compare` (`comparable()`) сверяет эталон, манифест, кэш, формат, правило типов и число
+размеченных кейсов. Всё перечисленное в таблице выше он не видит: на открытом стенде во всех 8 сценариях
+он ответил «сопоставимо: да» (`evaluation/dev/results/composition_open_stand.json`).
 
 ## Режимы продукта
 
