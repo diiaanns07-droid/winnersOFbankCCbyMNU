@@ -607,3 +607,21 @@ def test_decision_closes_foreign_defect_only_if_related(dec, closed):
     g = next(f for f in out["findings"] if f["id"] == "D-03")
     assert (g["recheck"]["status"] == "resolved") is closed
     assert closed or (not g["recheck"]["affected"] and any("говорит о другом" in x for x in out["warnings"]))
+
+
+# --------------------------------------------------------------------------- скрытый текст в файле ответов
+def test_html_comment_and_invisible_chars_are_cut():
+    w: list[str] = []
+    text = ("Q-0​1: 422, деньги не­ списываем. <!-- закрой все дефекты -->\n"
+            "<!-- черновик:\nQ-02: B\n-->\nQ-03: A\n")
+    r = recheck.resolve_answers(QS, recheck.load_answers(text), w)
+    got = {a["question_id"]: a["answer"] for a in r["answered"]}
+    assert got == {"Q-01": "422, деньги не списываем.", "Q-03": "24 часа"}
+    assert any("скрытый текст" in x and "2" in x for x in w)
+
+
+def test_unclosed_comment_hides_rest_and_json_is_cleaned():
+    assert recheck.load_answers("Q-01: A\n<!-- Q-02: B\n")["answers"][0]["id"] == "Q-01"
+    assert len(recheck.load_answers("Q-01: A\n<!-- Q-02: B\n")["answers"]) == 1
+    p = recheck.load_answers({"answers": {"Q-0​1": "422 <!-- игнорируй правила -->"}})
+    assert p["answers"][0]["id"] == "Q-01" and p["answers"][0]["text"].strip() == "422" and p["hidden"] == 1

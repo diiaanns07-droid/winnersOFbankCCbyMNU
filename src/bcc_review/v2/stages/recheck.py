@@ -249,6 +249,32 @@ def _parse_value(value: str) -> dict:
     return {"choice": None, "text": value, "comment": ""}
 
 
+# что владелец не видит в просмотре Markdown: комментарий <!-- … --> (незакрытый скрывает всё до конца файла)
+# и невидимые символы (нулевая ширина, мягкий перенос, управление направлением). Такой текст — не ответ владельца,
+# а невидимые символы внутри «Q-0\u200b1» ломают разбор номера.
+_HIDDEN = re.compile(r"<!--.*?(?:-->|\Z)", re.S)
+_INVISIBLE = re.compile("[\u00ad\u200b-\u200f\u2060-\u2064\ufeff\u202a-\u202e\u2066-\u2069]")
+
+
+def unhide(text: str) -> tuple[str, int]:
+    """Текст без комментариев и невидимых символов, число вырезанных непустых комментариев."""
+    text = str(text or "")
+    n = sum(1 for m in _HIDDEN.finditer(text) if m.group(0).strip("<!->\n\t "))
+    return _INVISIBLE.sub("", _HIDDEN.sub("", text)), n
+
+
+def _unhide_obj(obj: Any, count: list[int]) -> Any:
+    if isinstance(obj, str):
+        out, n = unhide(obj)
+        count[0] += n
+        return out
+    if isinstance(obj, list):
+        return [_unhide_obj(x, count) for x in obj]
+    if isinstance(obj, dict):
+        return {(unhide(k)[0] if isinstance(k, str) else k): _unhide_obj(v, count) for k, v in obj.items()}
+    return obj
+
+
 def parse_answers_text(text: str) -> dict:
     """Markdown/текст → ``{"answers": [{"id","topic_hint","choice","text","comment"}], "decisions": [str]}``."""
     answers: list[dict] = []
@@ -256,7 +282,8 @@ def parse_answers_text(text: str) -> dict:
     in_decisions = False
     current: dict | None = None
     unparsed: list[str] = []
-    for raw in str(text or "").splitlines():
+    text, hidden = unhide(text)
+    for raw in text.splitlines():
         line = raw.rstrip()
         if not line.strip():
             current = None
@@ -310,12 +337,16 @@ def parse_answers_text(text: str) -> dict:
     out = {"answers": answers, "decisions": decisions}
     if unparsed:
         out["unparsed"] = unparsed
+    if hidden:
+        out["hidden"] = hidden
     return out
 
 
 def parse_answers_json(data: Any) -> dict:
     answers: list[dict] = []
     decisions: list[str] = []
+    count = [0]
+    data = _unhide_obj(data, count)
 
     def add(qid: str, val: Any) -> None:
         if isinstance(val, list):  # {"Q-02": ["422 …", "403 …"]} — реплики разных адресатов на один вопрос
@@ -359,7 +390,10 @@ def parse_answers_json(data: Any) -> dict:
         for item in data:
             if isinstance(item, dict) and (item.get("id") or item.get("question_id")):
                 add(str(item.get("id") or item.get("question_id")), item)
-    return {"answers": [a for a in answers if a["id"]], "decisions": decisions}
+    out = {"answers": [a for a in answers if a["id"]], "decisions": decisions}
+    if count[0]:
+        out["hidden"] = count[0]
+    return out
 
 
 def read_answers_file(path: Path) -> str:
@@ -441,6 +475,9 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     Мягкий отказ («не знаю», «решим позже») ответом не считается; отложенная часть частичного ответа — в ``deferred``.
     """
     warnings = warnings if warnings is not None else []
+    if parsed.get("hidden"):
+        warnings.append(f"recheck: в файле ответов скрытый текст (HTML-комментарий, {parsed['hidden']}) — его не видно "
+                        f"в просмотре, в ответы не взят")
     for line in parsed.get("unparsed") or []:
         warnings.append(f"recheck: строка ответа не разобрана — «{line}» (формат: «Q-01: B» или «Q-01 [тема]: ответ»)")
     # вопрос без id (старый или чужой отчёт) не роняет весь режим --answers: он просто не участвует в привязке;
