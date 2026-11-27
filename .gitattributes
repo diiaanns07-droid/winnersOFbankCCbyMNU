@@ -9,3 +9,6 @@ tests/**/fixtures/** -text
 *.docx binary
 *.png binary
 release/input/** -text
+
+# Архив GitHub («Download ZIP», git archive): git вписывает в этот файл хеш коммита — паспорт отчёта без .git
+src/bcc_review/v2/COMMIT export-subst

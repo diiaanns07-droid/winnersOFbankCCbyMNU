@@ -125,7 +125,8 @@ def settings(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     fallbacks = list(DEFAULT_FALLBACKS) if raw_fb is None else (
         [] if raw_fb.strip().lower() in _OFF else _models(raw_fb))
     return {
-        "api_key": (env.get("GEMINI_API_KEY") or env.get("GOOGLE_API_KEY") or "").strip() or None,
+        # кавычки вокруг ключа: docker --env-file и set в cmd передают их как часть значения
+        "api_key": (env.get("GEMINI_API_KEY") or env.get("GOOGLE_API_KEY") or "").strip().strip("\"'").strip() or None,
         "model": (env.get("GEMINI_MODEL") or "").strip().removeprefix("models/") or DEFAULT_MODEL,
         "fallback_models": fallbacks,
         "max_output_tokens": int(_num(env, "GEMINI_MAX_OUTPUT_TOKENS", 0) or 0) or None,   # None — по профилю модели

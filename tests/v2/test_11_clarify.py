@@ -352,3 +352,26 @@ def test_sides_inside_one_line():
     assert clarify.count_sides([a, b]) == 2  # две разные цитаты одной строки — две стороны
     assert clarify.count_sides([a, c]) == 1  # вложенная цитата — та же сторона
     assert clarify.is_new_side({"line_start": 40, "quote": "x"}, [a])
+
+
+def test_reviewers_rank_majors(findings):
+    a = dict(findings[6], id="D-90", priority=0, sources=["lens:qa"])
+    b = dict(findings[6], id="D-91", priority=0, sources=["lens:qa", "consistency", "rules:api.status", "rules:api.x"])
+    assert clarify.reviewers(a) == 1 and clarify.reviewers(b) == 3  # правила одного вида — один ревьюер
+    sel = clarify.select_findings([a, b])
+    assert [f["id"] for f in sel] == ["D-91", "D-90"]
+    raw = {"questions": [_q("Один ревьюер", ["D-90"]), _q("Три ревьюера", ["D-91"])]}
+    qs = clarify.postprocess(raw, [a, b], load_view())
+    assert [q["topic"] for q in qs] == ["Три ревьюера", "Один ревьюер"]
+    assert "ревьюеров: 3" in clarify.format_findings([b])
+
+
+def test_placeholder_options_softened_only_when_needed():
+    opts = ["Все QR действуют 15 минут", "Без суммы — до 23:59:59 по <уточнить: часовой пояс банка>",
+            "Без суммы — 15 минут, но не дольше 23:59:59 по <уточнить: часовой пояс>"]
+    out = clarify.clean_options(opts)
+    assert len(out) == 3 and not any("<уточнить" in o for o in out)
+    assert "(часовой пояс банка — укажите)" in out[1]
+    # хватает двух конкретных — вариант с заглушкой отбрасывается
+    out2 = clarify.clean_options(["Первый вариант", "Второй вариант", "Третий <уточнить: срок>"])
+    assert out2 == ["Первый вариант", "Второй вариант"]

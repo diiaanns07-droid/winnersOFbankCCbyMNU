@@ -14,6 +14,7 @@ import hashlib
 import json
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
 
@@ -201,6 +202,11 @@ class LLMClient:
             self._emit({"stage": stage, "event": "rpm_wait", "seconds": round(wait, 1)})
             self._sleep(wait)
 
+    def restart_stage_clock(self, stage: str) -> None:
+        """Лимит времени этапа заново: поздний вызов вопросов после раннего (его часы шли вместе с судьёй)."""
+        with self._lock:
+            self._stage_t0.pop(stage, None)
+
     def call_timeout(self, stage: str) -> float:
         """Таймаут одного вызова: не больше остатка лимита времени этапа (но не меньше минуты)."""
         if not self.stage_timeout_s:
@@ -247,6 +253,9 @@ class LLMClient:
             with self._lock:
                 self.stats["cached"] += 1
                 self._stage_stats(stage)["cached"] += 1
+                m = cached.get("model")
+                if m and m not in self.stats["models_used"]:
+                    self.stats["models_used"].append(m)
             self._emit({"stage": stage, "cached": True, "model": cached.get("model"), "key": key[:16]})
             self._record(stage, cached["data"])
             return cached["data"]
@@ -308,6 +317,14 @@ class LLMClient:
                             "seconds": round(seconds, 1), "attempt": attempt})
                 if is_truncation(kind, str(msg)):
                     raise Truncated(stage, str(msg)) from None
+                if kind == "invalid_output" and not repaired and not handles_retries:
+                    # ответ пришёл, но не JSON / не по схеме на стороне провайдера (claude -p без structured_output):
+                    # одна попытка починки, как для ошибок схемы ниже; Gemini (handles_retries) повторяет сам
+                    repaired = True
+                    with self._lock:
+                        self.stats["repaired"] += 1
+                    cur_user = user + REPAIR_NOTE.format(errors=str(msg)[:300])
+                    continue
                 retry = (kind in TRANSIENT and not handles_retries and attempt < self.max_retries
                          and not (kind == "timeout" and timeouts >= MAX_TIMEOUT_RETRIES))
                 if retry:
@@ -372,11 +389,32 @@ class LLMClient:
             with self._lock:
                 self.stats["split"] += 1
                 self._stage_stats(stage)["split"] += 1
-            self._emit({"stage": stage, "event": "split", "items": len(items), "depth": _depth + 1})
+            # половинам — лимит, на котором споткнулся полный пакет (после расширения), иначе половина, которой мало
+            # 32 000, снова получает 16 000 и обрезается гарантированно; половины идут параллельно
+            limit = min(max_output_tokens * 2, MAX_OUTPUT_CEILING) if _depth == 0 else max_output_tokens
+            self._emit({"stage": stage, "event": "split", "items": len(items), "depth": _depth + 1,
+                        "max_output_tokens": limit})
             mid = len(items) // 2
-            parts = [self.ask_split(stage, build, part, schema, merge, max_output_tokens=max_output_tokens,
-                                    _depth=_depth + 1) for part in (items[:mid], items[mid:])]
-            return merge(parts)
+            halves = (items[:mid], items[mid:])
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                futs = [pool.submit(self.ask_split, stage, build, part, schema, merge, max_output_tokens=limit,
+                                    _depth=_depth + 1) for part in halves]
+                results: list[Any] = []
+                for fut in futs:
+                    try:
+                        results.append(fut.result())
+                    except LLMError as exc:  # Truncated, BudgetExceeded и прочие сбои одной половины
+                        results.append(exc)
+            ok = [r for r in results if not isinstance(r, LLMError)]
+            if not ok:
+                raise next(r for r in results if isinstance(r, LLMError))
+            if len(ok) < len(results):
+                # одна половина не удалась: этап получает ответ второй и помечается частичным (failed в статистике)
+                with self._lock:
+                    self.stats["failed"] += 1
+                    self._stage_stats(stage)["failed"] += 1
+                self._emit({"stage": stage, "event": "split_partial", "items": len(items), "depth": _depth + 1})
+            return merge(ok)
 
     def summary(self) -> dict:
         s = self.stats

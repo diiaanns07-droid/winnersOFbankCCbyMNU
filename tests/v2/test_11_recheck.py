@@ -364,3 +364,43 @@ def test_decisions_only_make_one_call(findings, questions):
     res = recheck.run(FakeCtx(llm), findings, "## Решения\n- Общее правило для всех.\n", questions)
     assert len(llm.calls) == 1
     assert {g["id"]: g["recheck"] for g in res["findings"]}[target["id"]]["status"] == "resolved"
+
+
+def test_topic_binding_uses_answer_text():
+    qs = [{"id": "Q-01", "topic": "Повторное уведомление после смены лимита", "finding_ids": ["D-01"],
+           "question": "Отправлять ли второе уведомление в месяце после смены лимита?",
+           "options": ["Нет, одно в месяц", "Да, после каждой смены"]},
+          {"id": "Q-02", "topic": "Возврат после отправленного уведомления", "finding_ids": ["D-02"],
+           "question": "Уменьшает ли возврат покупки сумму месяца, если уведомление уже отправлено?",
+           "options": ["Уменьшает, уведомление не отзывается", "Не уменьшает"]}]
+    text = ("Q-05 [возвраты и повторное уведомление]: Возврат покупки уменьшает сумму месяца исходной покупки, "
+            "уже отправленное уведомление не отзывается.\n"
+            "Q-06 [лимит уведомлений при изменении лимита]: Не более одного уведомления в месяц, в том числе "
+            "после смены лимита.\n")
+    res = recheck.resolve_answers(qs, recheck.load_answers(text))
+    got = {a["question_id"]: a["answer"] for a in res["answered"]}
+    assert got["Q-02"].startswith("Возврат покупки") and got["Q-01"].startswith("Не более одного")
+
+
+def test_empty_reason_is_filled_by_status(findings, questions):
+    q1 = questions[0]
+    fid = q1["finding_ids"][0]
+    resp = _resp([{"finding_id": fid, "status": "changed", "by": [q1["id"]], "reason": "", "severity": "major"}])
+    rc = {g["id"]: g["recheck"] for g in recheck.run(FakeCtx(FakeLLM(resp)), findings, f"{q1['id']}: A\n",
+                                                     questions)["findings"]}[fid]
+    assert rc["status"] == "changed" and rc["reason"] == f"частично снят ответом {q1['id']}"
+
+
+def test_answer_clash_from_reason_only(findings, questions, stub_judge):
+    q1 = questions[0]
+    fid = q1["finding_ids"][0]
+    resp = _resp([{"finding_id": fid, "status": "open", "by": [], "conflicting_answers": [],
+                   "reason": f"{q1['id']} задаёт одно значение, а Решение-1 — другое: ответы противоречат друг другу."}])
+    report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), report,
+                                 f"{q1['id']}: A\n\n## Решения\n- Другое правило.\n")["clarification"]
+    assert [c["finding_id"] for c in clar["answer_conflicts"]] == [fid]
+    # «противоречит документу» с одним ответом — не противоречие ответов
+    resp2 = _resp([{"finding_id": fid, "status": "open", "by": [], "reason": f"{q1['id']} противоречит пункту документа."}])
+    clar2 = recheck.apply_answers(FakeCtx(FakeLLM(resp2)), report, f"{q1['id']}: A\n")["clarification"]
+    assert clar2["answer_conflicts"] == []

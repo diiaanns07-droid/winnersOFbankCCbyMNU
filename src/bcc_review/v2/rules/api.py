@@ -159,6 +159,9 @@ def _kv(line: Line) -> tuple[str, str] | None:
 
 METHOD_HEADING = re.compile(r"^(?:метод|method|операция|endpoint)\s+[«\"]?([A-Za-z_][\w]*)[»\"]?\s*$", re.I)
 VERB_PATH = re.compile(r"^(GET|HEAD|POST|PUT|PATCH|DELETE)\s+(/\S*)")
+# метод в строке текста: «Эндпоинт сохранения: PUT /cards/{id}/limit», «Метод: GET /x — …»
+INLINE_METHOD = re.compile(r"^(?P<lead>[^:|]{0,60}?(?:эндпоинт|endpoint|метод|операци\w*|адрес|запрос)\w*[^:|]{0,40}):\s*"
+                           r"(?P<verb>GET|HEAD|POST|PUT|PATCH|DELETE)\s+(?P<url>/[\w\-{}/.]*[\w}])", re.I)
 
 
 def find_methods(doc: Doc) -> list[Method]:
@@ -178,6 +181,14 @@ def find_methods(doc: Doc) -> list[Method]:
             m = VERB_PATH.match(x.text)
             if m and x.cells is None and not x.is_code:
                 verb = m.group(1).upper()
+        if verb is None and x.cells is None:
+            im = INLINE_METHOD.match(x.text)
+            if im and not any(mm.verb == im.group("verb").upper() and mm.url == im.group("url") for mm in methods):
+                rest = x.text[im.end():].strip(" .—–-")
+                meth = Method(verb=im.group("verb").upper(), verb_line=x, start=x.n, url=im.group("url"), url_line=x,
+                              desc=(im.group("lead").strip() + (" — " + rest if rest else "")), desc_line=x)
+                methods.append(meth)
+                continue
         if verb is None and x.cells:
             # сводная таблица методов: «| 3. Данные QR | GET `/qr/{id}` | … |»
             for ci, cell in enumerate(x.cells):
@@ -351,7 +362,7 @@ def rule_content_type_without_body(doc: Doc, methods: list[Method], out: dict) -
         label = f" метода {m.label}" if m and m.label else ""
         out["candidates"].append(candidate(
             "api.content_type_without_body",
-            title=f"Для запроса{label} указан Content-Type, хотя тело запроса не используется",
+            title=(f"Content-Type указан{label if '/' not in label else ''}, хотя тела запроса нет"),
             kind="api_contract", criterion="set_consistent", severity="minor", blocks="development",
             evidence=[ev(ct, ct_frag), ev(nb, nb_frag)],
             problem=(f"В описании запроса{label} одновременно указано {quoted(ct_frag)} и {quoted(nb_frag)}. "
@@ -421,6 +432,26 @@ def collect_statuses(doc: Doc) -> tuple[list[Status], list[tuple[int, Line, str]
         for m in DECL_INLINE.finditer(x.text):  # «… Ответ 400 — поле отсутствует: {…}» внутри строки
             if m.start() > 0:
                 decls.append(Status(int(m.group(1)), x, "inline"))
+    # PDF/DOCX: объявление переносится на следующую строку («422. Ответ в случае, если клиент не» / «подходит по
+    # возрасту.») — условие нужно целиком, иначе тот же случай под другим кодом не сравнить
+    idx = {x.n: i for i, x in enumerate(doc.lines)}
+    for d in decls:
+        if d.kind != "list":
+            continue
+        t = d.text.rstrip()
+        i = idx.get(d.line.n)
+        if i is None or i + 1 >= len(doc.lines) or re.search(r"[.!?:;»)]$", t) or len(t) < 12:
+            continue
+        if not d.line.joined.rstrip().endswith(t[-20:]):
+            continue  # объявление не в конце строки — переноса нет
+        nx = doc.lines[i + 1]
+        if nx.text and nx.cells is None and not nx.is_heading and not nx.is_code and nx.text[:1].islower() \
+                and not DECL_LIST.match(nx.text):
+            k = DECL_LIST_INLINE.search(nx.text)
+            tail = nx.text[:k.start(1)] if k else nx.text
+            e = tail.find(". ")
+            tail = tail[:e + 1] if e != -1 else tail
+            d.seg = f"{t} {tail.strip()}"
     mentions: list[tuple[int, Line, str]] = []
     for x in doc.lines:
         if not x.text or x.is_code:
@@ -523,7 +554,7 @@ def _rule_same_case_declared(doc: Doc, methods: list[Method], decls: list[Status
         done.add((code, other.code))
         out["candidates"].append(candidate(
             f"api.same_case.{code}-{other.code}",
-            title=f"Один и тот же случай: код {code} в логике метода и {other.code} в перечне статусов",
+            title=f"Один случай — два кода: {code} в логике метода, {other.code} в перечне статусов",
             kind="status_conflict", criterion="set_consistent", severity="major", blocks="both",
             evidence=[ev(line, frag), ev(other.line, other.text)],
             problem=(f"В логике сказано {quoted(frag)}, а в перечне статусов тот же случай описан кодом {other.code}: "
@@ -591,7 +622,7 @@ def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
                     evidence.append(ev(same_case.line, same_case.text))
                     parts.append(f"Тот же случай в перечне статусов описан кодом {same_case.code}: "
                                  f"{quoted(same_case.text)}.")
-                    title = (f"Один и тот же случай получает код {code} в тексте и {same_case.code} "
+                    title = (f"Один случай — два кода: {code} в тексте, {same_case.code} "
                              f"в перечне статусов")
             else:
                 parts.append(f"Кода {code} нет в перечне статусов (описаны {decl_list}).")
@@ -604,7 +635,8 @@ def rule_statuses(doc: Doc, methods: list[Method], out: dict) -> None:
             if undeclared and p["mentions"]:
                 title = f"Код {code} упомянут, но не описан в перечне статусов"
                 if p["reason"]:
-                    title += f"; заголовок ответа {p['reason'][0][0].code} подписан как {p['reason'][0][1]}"
+                    title = (f"Код {code} не описан, а ответ {p['reason'][0][0].code} подписан "
+                             f"как «{p['reason'][0][1]}»")
             elif p["reason"]:
                 d, phrase = p["reason"][0]
                 title = f"Заголовок ответа {d.code} подписан как {phrase} (код {code})"
@@ -782,7 +814,8 @@ def rule_field_types(doc: Doc, methods: list[Method], out: dict) -> None:
         rid = "api.field_types" + (f".{_slug(m.label)}" if m and m.label else "")
         out["candidates"].append(candidate(
             rid,
-            title=f"Тип {'поля' if len(names) == 1 else 'полей'} {fmt_list(names)} в запросе и ответе{label} различается",
+            title=(f"Тип {'поля' if len(names) == 1 else 'полей'} {fmt_list(names)} в запросе и ответе"
+                   f"{label if '/' not in label else ''} различается"),
             kind="api_contract", criterion="set_consistent", severity="major", blocks="development",
             evidence=evidence,
             problem=("Одно и то же поле описано разными типами: " + "; ".join(desc) + ". "
@@ -839,7 +872,7 @@ def rule_result_field_missing(doc: Doc, methods: list[Method], out: dict) -> Non
         evidence = [cell_quote(row, ni, min(len(row.cells) - 1, ni + 2))] + [ev(x) for _, x in missing[:3]]
         out["candidates"].append(candidate(
             f"api.result_field_missing.{_slug(field)}",
-            title=f"Ответы {codes} не содержат поля {field}, хотя таблица ответа задаёт его для результата",
+            title=f"Ответы {codes} без поля {field} из таблицы ответа",
             kind="api_contract", criterion="set_consistent", severity="major", blocks="development",
             evidence=evidence,
             problem=(f"В таблице ответа поле {field} — признак результата ({quoted(' | '.join(row.cells[ni + 1:ni + 3]))}), "
