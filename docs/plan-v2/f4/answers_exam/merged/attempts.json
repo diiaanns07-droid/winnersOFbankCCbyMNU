@@ -1,0 +1,126 @@
+{
+  "official": {
+    "run_id": "f4-merged-official-reread",
+    "commit": "2eac95cb",
+    "started_at": "2026-11-27T16:58:17+05:00",
+    "finished_at": "2026-11-27T16:58:22+05:00",
+    "model_requested": "sonnet",
+    "models_used": [],
+    "calls": {
+      "total": 1,
+      "cached": 0,
+      "failed": 1,
+      "split": 0
+    },
+    "status": "failed",
+    "stages": {
+      "segment": "partial",
+      "rules": "ok",
+      "lens_analyst": "failed",
+      "lens_qa": "failed",
+      "lens_architect": "failed",
+      "lens_risk": "failed",
+      "consistency": "failed",
+      "quotes": "ok",
+      "judge": "ok",
+      "clarify": "ok"
+    },
+    "warnings": [
+      "Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса — другая модель (--model haiku) или --provider gemini с ключом GEMINI_API_KEY.\nПодробности: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY). [claude -p, модель sonnet: You've hit your 5-hour limit · resets 8pm (Asia/Qyzylorda)]",
+      "Этап segment выполнен частично: часть вызовов модели не удалась или упёрлась в бюджет",
+      "Этап consistency не выполнен: quota: модель недоступна в этом прогоне: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY). [claude -p, модель sonnet: You've hit your 5-hour limit · resets 8pm (Asia/Qyzylorda",
+      "Этап lens_architect не выполнен: quota: модель недоступна в этом прогоне: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY). [claude -p, модель sonnet: You've hit your 5-hour limit · resets 8pm (Asia/Qyzylorda",
+      "Этап lens_analyst не выполнен: quota: модель недоступна в этом прогоне: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY). [claude -p, модель sonnet: You've hit your 5-hour limit · resets 8pm (Asia/Qyzylorda",
+      "Этап lens_qa не выполнен: quota: модель недоступна в этом прогоне: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY). [claude -p, модель sonnet: You've hit your 5-hour limit · resets 8pm (Asia/Qyzylorda",
+      "Этап lens_risk не выполнен: quota: модель недоступна в этом прогоне: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY). [claude -p, модель sonnet: You've hit your 5-hour limit · resets 8pm (Asia/Qyzylorda",
+      "Нарезка строк 1–242 не удалась: segment: quota: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY). [claude -p, модель sonnet: You've hit your 5-hour limit · resets 8pm (Asia/Qyzylorda)]",
+      "Нарезка выполнена без модели (эвристика по строкам)",
+      "судья недоступен (LLMError: judge: quota: модель недоступна в этом прогоне: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--mo…); реестр собран кодом из кластеров без отсева ложных",
+      "судья: 3 замечаний (незаполненные поля шаблона) сведены в одно незначительное",
+      "судья не заполнил 14 пункт(ов) чек-листа; заполнены кодом",
+      "судья: уровни изменены кодом — обоснование вердикта собрано кодом"
+    ]
+  },
+  "qr": {
+    "run_id": "f4-merged-qr-reread",
+    "commit": "2eac95cb",
+    "started_at": "2026-11-27T16:57:47+05:00",
+    "finished_at": "2026-11-27T16:59:47+05:00",
+    "model_requested": "sonnet",
+    "models_used": [
+      "claude-sonnet-5-5"
+    ],
+    "calls": {
+      "total": 6,
+      "cached": 0,
+      "failed": 1,
+      "split": 0
+    },
+    "status": "partial",
+    "stages": {
+      "segment": "ok",
+      "rules": "ok",
+      "lens_analyst": "ok",
+      "lens_qa": "ok",
+      "lens_architect": "failed",
+      "lens_risk": "ok",
+      "consistency": "ok",
+      "quotes": "ok",
+      "judge": "ok",
+      "clarify": "ok"
+    },
+    "warnings": [
+      "Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса — другая модель (--model haiku) или --provider gemini с ключом GEMINI_API_KEY.\nПодробности: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY). [claude -p, модель sonnet: You've hit your 5-hour limit · resets 8pm (Asia/Qyzylorda)]",
+      "Этап lens_architect не выполнен: quota: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY). [claude -p, модель sonnet: You've hit your 5-hour limit · resets 8pm (Asia/Qyzylorda)]",
+      "судья недоступен (LLMError: judge: quota: модель недоступна в этом прогоне: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--mo…); реестр собран кодом из кластеров без отсева ложных",
+      "судья: 2 замечаний (незаполненные поля шаблона) сведены в одно незначительное",
+      "судья: критичных дефектов нет; 4 существенных, найденных одним ревьюером, понижены до незначительных",
+      "судья не заполнил 14 пункт(ов) чек-листа; заполнены кодом",
+      "clarify: ранний вызов не удался (LLMError); вопросы — по итоговым дефектам",
+      "clarify: модель не ответила (LLMError: clarify: quota: модель недоступна в этом прогоне: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider g); вопросы не сформированы"
+    ]
+  },
+  "car-loan": {
+    "run_id": "f4-merged-car-loan-reread",
+    "commit": "2eac95cb",
+    "started_at": "2026-11-27T16:57:16+05:00",
+    "finished_at": "2026-11-27T17:00:02+05:00",
+    "model_requested": "sonnet",
+    "models_used": [
+      "claude-sonnet-5-5"
+    ],
+    "calls": {
+      "total": 6,
+      "cached": 0,
+      "failed": 1,
+      "split": 0
+    },
+    "status": "partial",
+    "stages": {
+      "segment": "ok",
+      "rules": "ok",
+      "lens_analyst": "ok",
+      "lens_qa": "partial",
+      "lens_architect": "failed",
+      "lens_risk": "ok",
+      "consistency": "ok",
+      "quotes": "ok",
+      "judge": "ok",
+      "clarify": "ok"
+    },
+    "warnings": [
+      "Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса — другая модель (--model haiku) или --provider gemini с ключом GEMINI_API_KEY.\nПодробности: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY). [claude -p, модель sonnet: You've hit your 5-hour limit · resets 8pm (Asia/Qyzylorda)]",
+      "Этап lens_architect не выполнен: quota: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY). [claude -p, модель sonnet: You've hit your 5-hour limit · resets 8pm (Asia/Qyzylorda)]",
+      "lens_qa: строки приёмки R-75 не исполнены: lens_qa_rows: quota: модель недоступна в этом прогоне: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY). [claude -p, модель sonnet: You've hit your 5-hour limit · resets 8pm (Asia/Qyzylorda)]",
+      "lens_qa: строки приёмки R-75 не исполнены: lens_qa_retry: quota: модель недоступна в этом прогоне: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider gemini с GEMINI_API_KEY). [claude -p, модель sonnet: You've hit your 5-hour limit · resets 8pm (Asia/Qyzylorda)]",
+      "lens_qa: строка критериев приёмки R-75 не исполнена моделью",
+      "судья недоступен (LLMError: judge: quota: модель недоступна в этом прогоне: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--mo…); реестр собран кодом из кластеров без отсева ложных",
+      "судья: 'Метод экрана договора с baseRevision и графиком не описан' понижен до major (critical подтвердил только один ревьюер)",
+      "судья: критичных дефектов нет; 6 существенных, найденных одним ревьюером, понижены до незначительных",
+      "судья не заполнил 14 пункт(ов) чек-листа; заполнены кодом",
+      "судья: уровни изменены кодом — обоснование вердикта собрано кодом",
+      "clarify: ранний вызов не удался (LLMError); вопросы — по итоговым дефектам",
+      "clarify: модель не ответила (LLMError: clarify: quota: модель недоступна в этом прогоне: Исчерпан лимит подписки Claude Code. Сброс лимита: 8pm (Asia/Qyzylorda). До сброса выберите другую модель (--model haiku) или провайдера (--provider g); вопросы не сформированы"
+    ]
+  }
+}
