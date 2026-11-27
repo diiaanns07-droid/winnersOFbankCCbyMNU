@@ -475,6 +475,97 @@ def drop_unsettled(rewrites: list[dict], unsettled: set[str], warnings: list[str
     return out
 
 
+# правило 1 промпта кодом: «используй выбранное правило и его точные значения… не выдумывай числа, сроки и коды».
+# Число правки — «48», «23:59:59», «100 000», «0,5»; одна цифра («2 попытки», номер пункта) не проверяется
+_NUM = re.compile(r"(?<![\w.,:-])\d+(?:[.,:]\d+)*(?![\w-])")
+_NUMBERING = re.compile(r"(?m)^\s*(?:#{1,6}\s*\d+(?:\.\d+)*\.?|\d+(?:\.\d+)*[.)]|\d+(?:\.\d+)+)(?=\s)"
+                        r"|^\s*\|\s*\d+(?:\.\d+)*\s*(?=\|)")  # номер строки таблицы — первая ячейка
+
+
+def _nums(text: Any) -> set[str]:
+    s = _PENDING.sub(" ", str(text or ""))  # варианты внутри <уточнить: …> — вопрос владельцу, а не значение
+    s = _NUMBERING.sub(" ", s)  # нумерация раздела, пункта, строки таблицы
+    s = re.sub(r"(?<=\d)[\s\u00a0\u202f](?=\d{3}(?!\d))", "", s)  # «100 000» = «100000»
+    return {n.replace(",", ".") for n in _NUM.findall(s) if len(n) >= 2}
+
+
+def _answered(answers: Any) -> list[dict]:
+    if not answers:
+        return []
+    got = answers.get("answers") if "answers" in answers and "changes" in answers else answers.get("answered")
+    return [a for a in got or [] if isinstance(a, dict)]
+
+
+_RAW_NUM = re.compile(r"(?<![\w.,:-])(\d{1,3}(?:[\u00a0\u202f ]\d{3})+|\d+(?:[.,:]\d+)*)(?![\w-])"
+                      r"(\s*(?:[а-яёa-z]+|₸|%))?", re.I)
+
+
+def _mark_invented(text: str, invented: set[str]) -> str:
+    """«через 30 секунд» → «через <уточнить: 30 секунд>»: значение, которого владелец не давал, — вопрос, а не правило.
+    Строки таблиц (примеры, тестовые данные) не трогаются."""
+    def line(ln: str) -> str:
+        if ln.lstrip().startswith("|"):
+            return ln
+        parts = re.split(r"(<\s*уточнить\s*:[^>]*>)", ln, flags=re.I)  # внутри маркера не трогаем
+        for k in range(0, len(parts), 2):
+            parts[k] = _RAW_NUM.sub(lambda m: f"<уточнить: {m.group(0).strip()}>"
+                                    if _nums(m.group(1)) & invented else m.group(0), parts[k])
+        return "".join(parts)
+    return "\n".join(line(x) for x in str(text).split("\n"))
+
+
+def check_values(rewrites: list[dict], answers: Any, lines: list[str], by_id: dict, warnings: list[str]) -> list[dict]:
+    """Значения правок по ответам владельца (правило 1 промпта — кодом).
+
+    * Правка вписывает значение варианта, который владелец отверг, без выбранного им значения, — не вносится.
+    * В правке по ответу число, которого нет ни в документе, ни в ответах владельца, ни в дефекте (выдуманное
+      значение), — помечается маркером «<уточнить: …>»: решает владелец, а не модель.
+    """
+    known = _nums("\n".join(lines))
+    answered = _answered(answers)
+    for a in answered:
+        known |= _nums(a.get("answer")) | _nums(" ".join(str(r.get("text") or "") for r in a.get("replies") or []))
+    for d in (answers or {}).get("decisions") or []:
+        known |= _nums(d)
+    by_q = {a.get("question_id"): a for a in answered}
+    out = []
+    for r in rewrites:
+        if not r.get("answer_ids"):  # без ответа владельца сверять не с чем — правило 1 держит промпт
+            out.append(r)
+            continue
+        f = by_id.get(r["finding_id"]) or {}
+        quotes = " ".join(str(e.get("quote") or "") for e in f.get("evidence") or [] if isinstance(e, dict))
+        own = known | _nums(" ".join(str(f.get(k) or "") for k in
+                                     ("title", "problem", "scenario", "impact", "recommendation", "rewrite")) + " " + quotes)
+        picks = []  # (вопрос, выбранные числа, числа отвергнутых вариантов, ответ)
+        for qid in r["answer_ids"]:
+            a = by_q.get(qid) or {}
+            if a.get("rejected_options"):
+                chosen = _nums(a.get("answer"))
+                other = set().union(*(_nums(o) for o in a["rejected_options"])) - chosen
+                if other:
+                    picks.append((qid, chosen, other, str(a.get("answer") or "")))
+        edits = []
+        for e in r["edits"]:
+            new = str(e.get("new") or "")
+            body = "\n".join(x for x in new.split("\n") if not x.lstrip().startswith("|"))
+            vals = _nums(new)
+            wrong = next(((qid, sorted(vals & other), ans) for qid, chosen, other, ans in picks
+                          if vals & other and not vals & chosen), None)
+            if wrong:
+                warnings.append(f"revise: {r['finding_id']} — правка вписывает {', '.join(wrong[1])} из варианта, "
+                                f"который владелец отверг в {wrong[0]} (выбрано: «{wrong[2][:60]}»); правка не внесена")
+                continue
+            invented = _nums(body) - _nums(e.get("old")) - own
+            if invented:
+                warnings.append(f"revise: {r['finding_id']} — в правке {', '.join(sorted(invented))}: такого значения нет "
+                                f"ни в документе, ни в ответах владельца, ни в дефекте — помечено <уточнить: …>")
+                e = dict(e, new=_mark_invented(new, invented))
+            edits.append(e)
+        if edits:
+            out.append(dict(r, edits=edits))
+    return out
+
 # --------------------------------------------------------------------------- этап
 def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
     """``{"rewrites": [...], "revised_markdown": str, "stats": {...}}`` по critical и major."""
@@ -521,6 +612,7 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
     order = {f["id"]: i for i, f in enumerate(targets)}
     rewrites.sort(key=lambda r: order.get(r["finding_id"], 999))
     rewrites = drop_unsettled(rewrites, unsettled_findings(answers), warnings)
+    rewrites = check_values(rewrites, answers, lines, by_id, warnings)
     applied = apply_edits(lines, rewrites, warnings)
     opts = getattr(ctx, "options", None) or {}
     check = {"fixes": [], "stats": {}}

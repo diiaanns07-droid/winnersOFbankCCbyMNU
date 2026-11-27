@@ -605,16 +605,18 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
                 continue
             text = opts[a["choice"]]
             label = _cl.option_label(a["choice"])
+            rejected = [str(o) for i, o in enumerate(opts) if i != a["choice"]]
             if a.get("ambiguous_letter") and len(opts) >= 3:
                 warnings.append(f"recheck: {q['id']}: кириллическая «В» понята как вариант B («{text[:60]}»); "
                                 f"если имелся в виду третий вариант (А, Б, В), укажите C")
         else:
             text, deferred = split_deferred(a.get("text", ""))
-            label = ""
+            label, rejected = "", []
             # владелец скопировал текст варианта вместо буквы — это выбор варианта, а не «свой ответ»
             pick = _option_index(text, q.get("options") or [])
             if pick is not None:
                 text, label = q["options"][pick], _cl.option_label(pick)
+                rejected = [str(o) for i, o in enumerate(q["options"]) if i != pick]
         # свой текст уже разобран по предложениям (split_deferred); «как обычно» в варианте модели — не правило
         if not text or (label and _VAGUE.search(text)) or len(text) < 3:
             why = "откладывает решение" if deferred else "не задаёт правила"
@@ -638,6 +640,8 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
                                     "deferred": deferred})
             prev["answer"] = " / ".join(f"{r['label']}: {r['text']}" for r in prev["replies"])
             prev["choice"] = prev["choice"] if prev["choice"] == label else ""
+            if not prev["choice"]:
+                prev["rejected_options"] = []
             prev["deferred"] = prev["deferred"] + deferred
             # адресаты выбрали разные варианты одного вопроса — это конфликт по построению вариантов, без модели
             letters = {r["choice"] for r in prev["replies"] if r["choice"]}
@@ -647,6 +651,8 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
             continue
         answered[q["id"]] = {"question_id": q["id"], "topic": q.get("topic", ""), "question": q.get("question", ""),
                              "choice": label, "answer": full, "deferred": deferred,
+                             # отвергнутые владельцем варианты: правка редакции не должна вписать их значение
+                             "rejected_options": rejected,
                              "replies": [{"label": f"{q['id']}.1", "choice": label, "text": full, "deferred": deferred}],
                              "finding_ids": list(q.get("finding_ids") or [])}
     unanswered = [q["id"] for q in questions if q["id"] not in answered]
