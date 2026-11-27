@@ -267,6 +267,78 @@ def test_docker_and_scripts_install_with_constraints():
     assert "constraints.txt" in _read(WORKFLOWS / "tests.yml")
 
 
+# --------------------------------------------------------------------------- Python 3.11
+
+
+# Файлы с синтаксисом только для Python 3.12+ (PEP 701) — просьба владельцу в статусе №16; новых быть не должно.
+KNOWN_PY312_ONLY = {"evaluation/v2/aggregate.py", "evaluation/v2/newtz.py"}
+
+
+def _py312_only_fstrings(path: Path) -> list[int]:
+    """Строки, где внутри f-строки стоит строка в тех же кавычках: Python 3.11 такой файл не компилирует."""
+    import io
+    import tokenize
+
+    if not hasattr(tokenize, "FSTRING_START"):  # Python 3.11: проверит compile()
+        return []
+    lines, stack = [], []
+    for tok in tokenize.generate_tokens(io.StringIO(path.read_text(encoding="utf-8")).readline):
+        if tok.type == tokenize.FSTRING_START:
+            quote = tok.string.lstrip("rRfFbBuU")
+            if quote in stack:
+                lines.append(tok.start[0])
+            stack.append(quote)
+        elif tok.type == tokenize.FSTRING_END:
+            stack.pop()
+        elif tok.type == tokenize.STRING and stack:
+            body = tok.string.lstrip("rRbBuU")
+            quote = body[:3] if body[:3] in ('"""', "'''") else body[:1]
+            if quote in stack:
+                lines.append(tok.start[0])
+    return lines
+
+
+def _python_files() -> list[Path]:
+    out = []
+    for top in ("src", "evaluation", "scripts", "tests"):
+        out += [f for f in (ROOT / top).rglob("*.py") if "fixtures" not in f.parts]
+    return out
+
+
+def test_code_compiles_on_python_311():
+    """README обещает Python 3.11: синтаксис 3.12+ (f\'{d[\'k\']}\') ломает установку у жюри и задания CI на 3.11."""
+    bad = []
+    for f in _python_files():
+        rel = f.relative_to(ROOT).as_posix()
+        if rel in KNOWN_PY312_ONLY:
+            continue
+        try:
+            compile(f.read_text(encoding="utf-8"), rel, "exec")
+        except SyntaxError as exc:
+            bad.append(f"{rel}:{exc.lineno}: {exc.msg}")
+            continue
+        bad += [f"{rel}:{n}: строка в тех же кавычках внутри f-строки (только Python 3.12+)"
+                for n in _py312_only_fstrings(f)]
+    assert not bad, "\n".join(bad)
+
+
+@pytest.mark.xfail(strict=False, reason="просьба №15 (статус №16, «Волна 3»): f-строки с вложенными теми же "
+                                        "кавычками — на Python 3.11 tests/v2 не собираются (CI 3.11 красный)")
+def test_known_py312_only_files_are_fixed():
+    bad = []
+    for rel in sorted(KNOWN_PY312_ONLY):
+        f = ROOT / rel
+        if not f.exists():
+            continue
+        try:
+            compile(f.read_text(encoding="utf-8"), rel, "exec")
+        except SyntaxError as exc:
+            bad.append(f"{rel}:{exc.lineno}")
+            continue
+        bad += [f"{rel}:{n}" for n in _py312_only_fstrings(f)]
+    assert not bad, bad
+
+
 # --------------------------------------------------------------------------- CI и Docker
 
 
