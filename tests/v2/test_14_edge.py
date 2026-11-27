@@ -594,3 +594,20 @@ def test_fatal_error_mid_run_sets_model_error(tmp_path, monkeypatch):
                                lambda s, k: ProviderError("quota", "дневная квота исчерпана") if s == "lens_risk" else None)
     assert report["run"].get("model_error")
     assert report["run"]["warnings"][0] == report["run"]["model_error"]
+
+
+@_bug("01", "ранние вопросы: часы этапа clarify стартуют вместе с судьёй; если ранний вызов не удался, а судья шёл "
+            "дольше --stage-timeout, повторный вызов по итоговым дефектам сразу получает «исчерпан лимит времени "
+            "этапа» — вопросов 0 (без раннего запуска при тех же условиях — 8)")
+def test_failed_early_questions_survive_slow_judge(tmp_path, monkeypatch):
+    import time
+
+    def f(stage, k):
+        if stage == "judge" and k == 1:
+            time.sleep(2.5)                       # судья дольше лимита этапа (2 с)
+        if stage == "clarify" and k == 1:
+            return ProviderError("invalid_output", "ответ раннего вызова не JSON")
+        return None
+
+    report, _, _ = _faulty_run(tmp_path, monkeypatch, f, stage_timeout=2.0, judge_check=False)
+    assert report["questions"], [w for w in report["run"]["warnings"] if "clarify" in w]
