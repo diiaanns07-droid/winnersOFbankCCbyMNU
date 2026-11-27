@@ -116,3 +116,13 @@ def test_mock_official_answer_unchanged():
     out = _run(docview.load(OFFICIAL), data.get("candidates") or [])
     assert not [c for c in out["candidates"] if c.get("origin") == "doc_text"]
     assert any(R.REPEAT_TOPIC_RE.search(c["title"]) for c in out["candidates"])
+
+
+def test_dirty_segmentation_lines_do_not_crash():
+    view = docview.load(OFFICIAL)
+    n = next(x for x in view["lines"] if "Повторная доставка" in x["text"])["n"]
+    reqs = [{"id": "R-01", "line_start": "x", "line_end": None}, {"id": "R-02", "line_start": str(n), "line_end": "?"},
+            {"id": "R-03", "line_start": None}, {"id": "R-04", "line_start": n - 1, "line_end": n + 1}, "мусор"]
+    out = _run(view, [], reqs)
+    extra = [c for c in out["candidates"] if c.get("origin") == "doc_text"]
+    assert extra and extra[0]["requirement_ids"] == ["R-02", "R-04"]

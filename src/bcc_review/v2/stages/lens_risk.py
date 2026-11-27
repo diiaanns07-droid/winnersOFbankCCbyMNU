@@ -617,6 +617,19 @@ def _sentence_with(text: str, rx: re.Pattern) -> str:
     return hit[:200]
 
 
+def _int_or(v: Any, default: int) -> int:
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def _covers(req: dict, n: int) -> bool:
+    """Строка n внутри диапазона строк требования (нечисловые границы нарезки — не внутри)."""
+    a = _int_or(req.get("line_start"), 0)
+    return a > 0 and a <= n <= _int_or(req.get("line_end"), a)
+
+
 def repeat_key_candidates(kept: list[dict], view: Any, requirements: list | None = None) -> list[dict]:
     """Страховка: документ обещает, что повтор события не меняет итог, но не называет признак повтора, — а модель
     замечания о повторах не написала (haiku на официальном ТЗ, замер №08 v29: 6/8, нет замечания о повторах).
@@ -632,8 +645,7 @@ def repeat_key_candidates(kept: list[dict], view: Any, requirements: list | None
     quote = _sentence_with(line["text"], _REPEAT_PROMISE_RE)
     n = int(line["n"])
     req_ids = [r.get("id") for r in requirements or [] if isinstance(r, dict) and r.get("id")
-               and str(r.get("line_start") or "").isdigit()
-               and int(r["line_start"]) <= n <= int(r.get("line_end") or r["line_start"])]
+               and _covers(r, n)]
     return [{
         "title": "Повтор события: не назван признак, по которому повтор узнаётся",
         "kind": "ops_risk", "criterion": "risk", "severity": "major", "requirement_ids": req_ids[:2],
