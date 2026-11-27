@@ -44,7 +44,7 @@ SKELETON_MIN = 10      # «те же слова, другие знаки меж�
 REASON_MISSING = "цитата не найдена"
 
 _QUOTES = set("«»“”„‟\"'‘’‚‛`´ʹʺ〝〞＂")
-_DASHES = set("—–‑‒―−⁃﹘﹣－")
+_DASHES = set("—–‑‐‒―−⁃﹘﹣－")  # ‐ (U+2010): в него NFKC превращает неразрывный дефис Word (U+2011)
 _ZERO = set("\u200b\u200c\u200d\u2060\ufeff\u00ad")
 _ELLIPSIS = re.compile(r"\.{3,}")
 _LEAD = re.compile(r"^(?:\s|[#*•|>]|-(?=\s))+")
@@ -285,12 +285,12 @@ def verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iter
     raw = _LINE_PREFIX.sub(" ", quote).strip() if _LINE_PREFIX.search(quote) else quote.strip()
     raw = re.sub(r"\s{2,}", " ", raw) if raw != quote.strip() else raw
     needle = _clean_quote(raw)
-    if len(needle) < MIN_QUOTE:
-        return None
     idx = _index(view)
     if not idx.full:
         return None
     hint, near = _anchors(line_hint, near_lines)
+    if len(needle) < MIN_QUOTE:
+        return _short_term(idx, needle, raw, hint, near)
 
     # 1–3: точное (после нормализации) вхождение, в том числе через соседние строки;
     # если не нашлось — та же цитата без ведущего номера пункта («5. …»: в DOCX нумерация не в тексте)
@@ -349,7 +349,45 @@ def verify_quote(view: dict, quote: Any, line_hint: Any = None, near_lines: Iter
         m = _fuzzy(idx, needle, hint, points)
         if m:
             return m
+    # 6: модель экранировала разметку («limit\_kzt», «\*\*Ф-2.\*\*»), записала HTML-сущности («&laquo;») или
+    # «тенге» вместо «₸»
+    plain = _unescape(quote)
+    if plain != quote:
+        m = verify_quote(view, plain, line_hint, near_lines)
+        if m and m["verified"] == "exact":
+            m["verified"] = "normalized"  # модель писала не дословно — в документе другой текст
+        return m
     return None
+
+
+_MD_ESCAPE = re.compile(r"\\([\\`*_{}\[\]()#+\-.!|<>~\"'])")
+
+
+_TENGE_WORD = re.compile(r"(\d)\s*(?:тенге|тг\.?)(?![а-яё])", re.IGNORECASE)
+
+
+def _unescape(q: str) -> str:
+    """Цитата без экранирования Markdown и HTML-сущностей, «50 000 тенге» / «50 000 тг» → «50 000 ₸» (так в
+    документах банка); если менять нечего — та же строка."""
+    out = _MD_ESCAPE.sub(r"\1", q) if "\\" in q else q
+    if "&" in out and ";" in out:
+        import html
+        out = html.unescape(out)
+    return _TENGE_WORD.sub(r"\1 ₸", out)
+
+
+def _short_term(idx: _Index, needle: str, raw: str, hint: int | None, near: list[int]) -> dict | None:
+    """Термин из двух букв или цифр («СК», «OK»): только целым словом и только у строки модели (±2) или если такое
+    слово в документе одно — иначе это не цитата (дефект терминологии «СК без расшифровки» держится на ней)."""
+    if len(needle) != 2 or not needle.isalnum():
+        return None
+    spans = [(x.start(), x.end()) for x in re.finditer(rf"(?<!\w){re.escape(needle)}(?!\w)", idx.full)]
+    best = _pick(idx, spans, hint, near)
+    if not best or (best[0][0] > 1 and len(spans) > 1):
+        return None
+    _, a, b, ls, le = best
+    text = idx.original(a, b)
+    return _match(idx, a, b, ls, le, "exact" if raw.strip("«»\"' ") == text else "normalized", text)
 
 
 def _same_words(idx: _Index, needle: str, hint: int | None, near: list[int]) -> dict | None:

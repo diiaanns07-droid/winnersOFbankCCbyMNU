@@ -12,6 +12,7 @@
     "risk"
    ],
    "id": "S-01",
+   "covered": false,
    "lines": [
     23
    ],
@@ -28,6 +29,7 @@
     "architect"
    ],
    "id": "S-02",
+   "covered": false,
    "lines": [
     26
    ],
@@ -44,6 +46,7 @@
     "architect"
    ],
    "id": "S-03",
+   "covered": false,
    "lines": [
     26
    ],
@@ -60,6 +63,7 @@
     "qa"
    ],
    "id": "S-04",
+   "covered": true,
    "lines": [
     29,
     52,
@@ -79,6 +83,7 @@
     "consistency"
    ],
    "id": "S-05",
+   "covered": true,
    "lines": [
     49
    ],
@@ -95,6 +100,7 @@
     "consistency"
    ],
    "id": "S-06",
+   "covered": false,
    "lines": [
     64
    ],
@@ -110,6 +116,7 @@
     "architect"
    ],
    "id": "S-07",
+   "covered": true,
    "lines": [
     103,
     104,
@@ -127,6 +134,7 @@
     "architect"
    ],
    "id": "S-08",
+   "covered": false,
    "lines": [
     104
    ],
@@ -142,6 +150,7 @@
     "risk"
    ],
    "id": "S-09",
+   "covered": false,
    "lines": [
     109
    ],
@@ -157,6 +166,7 @@
     "architect"
    ],
    "id": "S-10",
+   "covered": true,
    "lines": [
     143,
     144,
@@ -170,17 +180,18 @@
    "kind": "status_conflict",
    "line": 151,
    "quote": "Если результат 200 или 201 — успешный.",
-   "message": "Код 201 упомянут, но не описан в перечне статусов; заголовок ответа 200 подписан как Created.",
+   "message": "Код 201 не описан, а ответ 200 подписан как «Created».",
    "audience": [
     "architect",
     "qa"
    ],
    "id": "S-11",
+   "covered": true,
    "lines": [
     151,
     165
    ],
-   "note": "Код 201 упомянут, но не описан в перечне статусов; заголовок ответа 200 подписан как Created."
+   "note": "Код 201 не описан, а ответ 200 подписан как «Created»."
   },
   {
    "rule": "language.open_list",
@@ -193,6 +204,7 @@
     "qa"
    ],
    "id": "S-12",
+   "covered": true,
    "lines": [
     151
    ],
@@ -208,6 +220,7 @@
     "architect"
    ],
    "id": "S-13",
+   "covered": true,
    "lines": [
     155,
     180,
@@ -227,6 +240,7 @@
     "qa"
    ],
    "id": "S-14",
+   "covered": false,
    "lines": [
     162
    ],
@@ -243,6 +257,7 @@
     "qa"
    ],
    "id": "S-15",
+   "covered": true,
    "lines": [
     163,
     165,
@@ -261,6 +276,7 @@
     "qa"
    ],
    "id": "S-16",
+   "covered": true,
    "lines": [
     188,
     189
@@ -304,7 +320,7 @@
    "rule_conflict": false
   },
   {
-   "title": "Денежные величины в разных единицах без правила пересчёта: «сумму покупки в тиынах» и «порог в тенге»",
+   "title": "Суммы в тиынах и в тенге без правила пересчёта",
    "kind": "unit_mismatch",
    "criterion": "unambiguous",
    "severity": "major",
@@ -403,7 +419,7 @@
    "rule_conflict": true
   },
   {
-   "title": "Код 201 упомянут, но не описан в перечне статусов; заголовок ответа 200 подписан как Created",
+   "title": "Код 201 не описан, а ответ 200 подписан как «Created»",
    "kind": "status_conflict",
    "criterion": "set_consistent",
    "severity": "major",
@@ -455,7 +471,7 @@
    "rule_conflict": false
   },
   {
-   "title": "Ответы 400, 401, 403 и 500 не содержат поля result, хотя таблица ответа задаёт его для результата",
+   "title": "Ответы 400, 401, 403 и 500 без поля result из таблицы ответа",
    "kind": "api_contract",
    "criterion": "set_consistent",
    "severity": "major",
@@ -676,7 +692,7 @@
    "rule_conflict": false
   },
   {
-   "title": "Для запроса метода saveLimit указан Content-Type, хотя тело запроса не используется",
+   "title": "Content-Type указан метода saveLimit, хотя тела запроса нет",
    "kind": "api_contract",
    "criterion": "set_consistent",
    "severity": "minor",

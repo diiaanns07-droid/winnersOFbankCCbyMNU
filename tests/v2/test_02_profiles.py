@@ -167,3 +167,40 @@ def test_measured_stage_profile_sonnet_and_gemini():
         cmd = p.build_command("sonnet", SCHEMA, None, stage)
         assert (cmd[cmd.index("--effort") + 1] if "--effort" in cmd else None) == effort, stage
     assert "opus" not in profiles.STAGE_EFFORT        # opus — контрольные прогоны, без непроверенных отступлений
+
+
+def test_rejected_thinking_level_is_remembered_per_level_not_per_model():
+    """Модель отвергла medium — этапы с medium идут без настройки, а нарезка со своим low её сохраняет."""
+    from bcc_review.contracts import ProviderError
+    seen = []
+
+    def factory(model, thinking, schema_mode="native"):
+        class Adapter:
+            def invoke(self, **_):
+                seen.append(dict(thinking))
+                if thinking.get("thinking_level") == "medium":
+                    raise ProviderError("bad_request", "Thinking level MEDIUM is not supported for this model", status=400)
+                return {"data": {"answer": "да"}, "usage": {}, "model": "m", "stop_reason": "STOP", "meta": {}}
+        return Adapter()
+
+    p = GeminiProvider(api_key="k", env={}, adapter_factory=factory, sleep=lambda s: None)
+    p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, stage="judge")
+    p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, stage="judge")
+    p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, stage="segment")
+    assert seen == [{"thinking_level": "medium"}, {}, {}, {"thinking_level": "low"}]
+
+
+def test_timing_clarify_parallel_with_judge_by_timestamps(tmp_path):
+    rows = [
+        {"t": "2026-11-27T10:00:30+05:00", "stage": "segment", "model": "m", "seconds": 30, "usage": {}},
+        {"t": "2026-11-27T10:01:30+05:00", "stage": "consistency", "model": "m", "seconds": 60, "usage": {}},
+        {"t": "2026-11-27T10:02:10+05:00", "stage": "clarify", "model": "m", "seconds": 40, "usage": {}},
+        {"t": "2026-11-27T10:03:00+05:00", "stage": "judge", "model": "m", "seconds": 80, "usage": {}},
+        {"t": "2026-11-27T10:03:10+05:00", "stage": "judge", "model": "m", "seconds": 10, "usage": {}},
+    ]
+    (tmp_path / "trace.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+    s = timing.summary(timing.load(tmp_path))
+    assert s["clarify_parallel"] is True
+    assert s["critical_path_s"] == 30 + 60 + 90          # вопросы спрятаны за судьёй
+    assert s["model_wall_s"] == 190
+    assert "параллельно" in timing.render(tmp_path, s)

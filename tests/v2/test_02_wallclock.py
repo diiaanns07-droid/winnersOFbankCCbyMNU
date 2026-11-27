@@ -52,9 +52,10 @@ class FreeTierServer:
     """Окно запросов в минуту по каждой модели; 429 несёт Retry-After, как настоящий ответ Google."""
 
     def __init__(self, clock: ScaledClock, *, rpm: int = 10, latency: dict | None = None, factor: float = 1.0,
-                 fail_503: int = 0):
+                 fail_503: int = 0, overloaded_until: float = 0.0, overloaded_model: str = gem.DEFAULT_MODEL):
         self.clock, self.rpm, self.latency, self.factor = clock, rpm, dict(latency or HAIKU_S), factor
         self.fail_503 = fail_503
+        self.overloaded_until, self.overloaded_model = overloaded_until, overloaded_model   # волна 503 по времени
         self.lock = threading.Lock()
         self.window: dict[str, deque] = {}
         self.log: list[tuple[float, str, str, str]] = []   # (время, модель, этап, исход)
@@ -71,6 +72,9 @@ class FreeTierServer:
                 retry = max(1.0, 60 - (now - win[0]) + 1)
                 self.log.append((now, model, stage, "429"))
                 raise ProviderError("rate_limit", "429 RESOURCE_EXHAUSTED per minute", retry_after_s=retry, status=429)
+            if model == self.overloaded_model and now < self.overloaded_until:
+                self.log.append((now, model, stage, "503"))
+                raise ProviderError("overloaded", "503 UNAVAILABLE (peak)", status=503)
             if self.fail_503 > 0:
                 self.fail_503 -= 1
                 self.log.append((now, model, stage, "503"))
@@ -114,10 +118,11 @@ def make_provider(server: FreeTierServer, clock: ScaledClock, **kw) -> SimProvid
 
 def run_graph(*, concurrency: int | None = None, client_rpm: float = 10.0, server_rpm: int = 10,
               factor: float = 1.0, latency: dict | None = None, fail_503: int = 0, env: dict | None = None,
-              scale: float = SCALE) -> dict:
+              scale: float = SCALE, overloaded_until: float = 0.0, clarify_early: bool = True) -> dict:
     """Один прогон графа вызовов. Возвращает модельное время, исходы запросов и максимум одновременных."""
     clock = ScaledClock(scale)
-    server = FreeTierServer(clock, rpm=server_rpm, latency=latency, factor=factor, fail_503=fail_503)
+    server = FreeTierServer(clock, rpm=server_rpm, latency=latency, factor=factor, fail_503=fail_503,
+                            overloaded_until=overloaded_until)
     kw = {"env": env or {}}
     if concurrency is not None:
         kw["concurrency"] = concurrency
@@ -131,17 +136,37 @@ def run_graph(*, concurrency: int | None = None, client_rpm: float = 10.0, serve
     ask("segment")
     with cf.ThreadPoolExecutor(max_workers=len(PARALLEL)) as ex:
         list(ex.map(ask, PARALLEL))
-    for stage in ("judge", "judge_check", "clarify"):
-        ask(stage)
+    if clarify_early:   # №01 9c5ea31: вопросы стартуют вместе с судьёй, итог собирается после проверки судьи
+        with cf.ThreadPoolExecutor(max_workers=2) as ex:
+            early = ex.submit(ask, "clarify")
+            ask("judge")
+            ask("judge_check")
+            early.result()
+    else:
+        for stage in ("judge", "judge_check", "clarify"):
+            ask(stage)
     return {"seconds": clock.now(), "outcomes": server.outcomes(), "max_in_flight": server.max_in_flight,
-            "calls": llm.stats["calls"], "log": server.log}
+            "calls": llm.stats["calls"], "log": server.log,
+            "models": sorted({m for _, m, _, o in server.log if o == "200"})}
 
 
 # --------------------------------------------------------------------------- тесты
 
 
-CRITICAL_S = HAIKU_S["segment"] + max(HAIKU_S[s] for s in PARALLEL) + sum(
-    HAIKU_S[s] for s in ("judge", "judge_check", "clarify"))   # 370 с: нарезка + набор + судья + проверка + вопросы
+try:
+    import pytest
+
+    @pytest.fixture(scope="module", autouse=True)
+    def _warm_up():
+        """Первый прогон в процессе платит за импорты — в ускоренных часах это десятки «секунд»."""
+        run_graph(scale=1000.0)
+except ImportError:  # pragma: no cover - запуск файлом без pytest
+    pass
+
+
+# нарезка + набор + судья + проверка судьи (вопросы идут параллельно с судьёй — №01 9c5ea31): 332 с
+CRITICAL_S = HAIKU_S["segment"] + max(HAIKU_S[s] for s in PARALLEL) + max(
+    HAIKU_S["judge"] + HAIKU_S["judge_check"], HAIKU_S["clarify"])
 
 
 def test_provider_window_runs_all_parallel_stages_at_once_without_429():
@@ -186,18 +211,36 @@ def test_503_wave_falls_back_and_completes():
     assert r["seconds"] <= CRITICAL_S + 60, r["seconds"]
 
 
+def test_peak_overload_whole_run_cools_primary_instead_of_retrying_every_stage():
+    """Часы пик: основная модель отвечает 503 весь прогон. Повторы тратятся один раз, дальше — сразу запасная."""
+    r = run_graph(client_rpm=0, overloaded_until=10_000.0)
+    assert r["outcomes"].count("200") == 9 and r["models"] == ["gemini-3.6-flash"]
+    assert len(r["outcomes"]) <= 25, len(r["outcomes"])            # было 45: по 4 запроса к основной на каждый этап
+    assert r["seconds"] <= CRITICAL_S + 30, r["seconds"]            # было +140 с
+
+
+def test_peak_overload_ends_and_primary_is_back():
+    r = run_graph(client_rpm=0, overloaded_until=300.0)
+    assert r["outcomes"].count("200") == 9 and "gemini-3.8-flash" in r["models"]
+
+
 def _table() -> None:  # pragma: no cover - ручной запуск
-    rows = [("параллельность 4 (было), окно --rpm 10", {"concurrency": 4, "client_rpm": 10}),
+    rows = [("вопросы после судьи (до 9c5ea31)", {"clarify_early": False}),
+            ("параллельность 4 (было), окно --rpm 10", {"concurrency": 4, "client_rpm": 10}),
             ("параллельность 5 (сейчас), окно --rpm 10", {"client_rpm": 10}),
             ("параллельность 5, только окно провайдера", {"client_rpm": 0}),
             ("сервер 5 RPM, GEMINI_RPM=5", {"server_rpm": 5, "client_rpm": 0, "env": {"GEMINI_RPM": "5"}}),
             ("сервер 5 RPM, окно 10 (не знаем лимит)", {"server_rpm": 5, "client_rpm": 0}),
-            ("вызовы ×1,5", {"factor": 1.5, "client_rpm": 0}), ("волна 503 ×6", {"fail_503": 6, "client_rpm": 0})]
+            ("вызовы ×1,5", {"factor": 1.5, "client_rpm": 0}), ("волна 503 ×6", {"fail_503": 6, "client_rpm": 0}),
+            ("основная перегружена первые 5 мин", {"overloaded_until": 300.0}),
+            ("основная перегружена весь прогон", {"overloaded_until": 10_000.0})]
+    run_graph(scale=1000.0)   # прогрев: первый прогон в процессе платит за импорты (×SCALE в модельном времени)
     print(f"{'вариант':42} {'модельное время':>16} {'запросов':>9} {'429':>4} {'одновременно':>13}")
     for name, kw in rows:
         r = run_graph(**kw)
         o = r["outcomes"]
-        print(f"{name:42} {r['seconds'] / 60:13.2f} мин {len(o):9} {o.count('429'):4} {r['max_in_flight']:13}")
+        print(f"{name:42} {r['seconds'] / 60:13.2f} мин {len(o):9} {o.count('429'):4} {r['max_in_flight']:13}"
+              f"  503: {o.count('503')}, модели: {', '.join(r['models'])}")
 
 
 if __name__ == "__main__":  # pragma: no cover

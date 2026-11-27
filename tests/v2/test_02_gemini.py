@@ -199,11 +199,29 @@ def test_deadline_stops_retries():
     assert len(script.calls) <= 3
 
 
-def test_missing_key_is_not_configured():
-    p = GeminiProvider(env={})
+def test_missing_key_is_not_configured_at_creation():
+    """Без ключа провайдер не создаётся (как Claude API): конвейер объясняет причину первой строкой."""
     with pytest.raises(ProviderError) as e:
-        p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
+        GeminiProvider(env={})
     assert e.value.kind == "not_configured" and "aistudio.google.com" in e.value.message
+
+
+def test_pipeline_without_gemini_key_explains_first_and_does_not_fail_each_stage(tmp_path, monkeypatch, capsys):
+    from bcc_review.v2 import __main__ as cli
+    from pathlib import Path
+    doc = Path(__file__).resolve().parents[2] / "release" / "input" / "requirements.md"
+    monkeypatch.chdir(tmp_path)
+    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    code = cli.main([str(doc), str(tmp_path / "r.md"), "--provider", "gemini", "--no-html"])
+    out = capsys.readouterr()
+    report = json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
+    assert code == 3
+    assert report["run"]["warnings"][0].startswith("Не задан ключ Gemini"), report["run"]["warnings"][:2]
+    assert "aistudio.google.com/apikey" in report["run"]["warnings"][0]
+    text = out.out + out.err
+    assert "СБОЙ" not in text                                     # этапы не «падают» по очереди
+    assert report["findings"]                                     # отчёт построен правилами
 
 
 def test_thinking_for():
@@ -272,3 +290,16 @@ def test_total_budget_is_call_timeout_plus_slack():
         p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=200)
     assert e.value.kind == "timeout"
     assert now[0] <= 200 + 120 + 10
+
+
+def test_overloaded_primary_cools_down_one_try_without_sleep_then_recovers():
+    """После исчерпанных повторов 503 модель «остывает»: следующий вызов пробует её один раз без пауз."""
+    p, s, sleeps = make({"gemini-3.8-flash": [err("overloaded", 503)] * 5 + [ok("gemini-3.8-flash")]})
+    r1 = p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
+    assert r1["meta"]["called_model"] == "gemini-3.6-flash" and sleeps == [2.0, 5.0, 10.0]
+    sleeps.clear()
+    r2 = p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)
+    assert r2["meta"]["called_model"] == "gemini-3.6-flash" and sleeps == []      # одна попытка, без пауз
+    assert s.calls.count("gemini-3.8-flash") == 5
+    r3 = p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60)      # основная ожила — снова она
+    assert r3["meta"]["called_model"] == "gemini-3.8-flash" and sleeps == []
