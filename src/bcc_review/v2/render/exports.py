@@ -55,8 +55,9 @@ CRITERIA = {
 JIRA_COLUMNS = ["Summary", "Description", "Issue Type", "Priority", "Labels"]
 AUTHOR = "BCC Review"
 SUFFIX = {"jira": ".jira.csv", "docx_annotated": ".annotated.docx", "docx": ".docx", "pdf_annotated": ".annotated.pdf",
-          "pdf": ".pdf"}
+          "pdf": ".pdf", "sarif": ".sarif", "gitlab": ".codequality.json"}
 FORMATS = ("jira", "docx", "pdf")
+CI_FORMATS = ("sarif", "gitlab")  # пометки на строках ТЗ в pull/merge request — render/ci.py
 os.environ.setdefault("PYMUPDF_SUGGEST_LAYOUT_ANALYZER", "0")  # без совета про pymupdf_layout в stdout (№16)
 
 
@@ -77,8 +78,12 @@ def export(report: dict, view: dict, input_path: str | Path, out_base: str | Pat
                 res = write_docx(report, view, input_path, base, markdown=markdown)
             elif fmt == "pdf":
                 res = write_pdf(report, view, input_path, base)
+            elif fmt in CI_FORMATS:
+                from . import ci
+                writer = ci.write_sarif if fmt == "sarif" else ci.write_gitlab
+                res = writer(report, input_path, base.with_name(base.name + SUFFIX[fmt]))
             else:
-                res = _res(fmt, "skipped", None, f"формат экспорта «{fmt}» не поддерживается: jira, docx, pdf")
+                res = _res(fmt, "skipped", None, f"формат экспорта «{fmt}» не поддерживается: jira, docx, pdf, sarif, gitlab")
         except Exception as exc:  # noqa: BLE001 — экспорт не должен ронять прогон
             res = _res(fmt, "failed", None, f"экспорт {fmt} не выполнен: {type(exc).__name__}: {exc}")
             res["traceback"] = traceback.format_exc(limit=5)
@@ -128,6 +133,8 @@ def _formats(formats: Iterable[str] | str) -> list[str]:
         f = f.strip().lower()
         if f in ("word",):
             f = "docx"
+        if f in ("codequality", "gitlab-codequality"):
+            f = "gitlab"
         if f and f not in ("html", "md", "json") and f not in out:
             out.append(f)
     return out

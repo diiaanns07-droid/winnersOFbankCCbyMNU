@@ -1,0 +1,160 @@
+name: Ревью ТЗ в pull request
+
+# Требования проверяются так же, как код: на каждый PR, где изменился документ требований, агент пишет отчёт,
+# ставит дефекты пометками на строки ТЗ во вкладке «Files changed», кладёт сводку в комментарий PR и
+# запрещает слияние, пока есть блокер разработки или тестирования (обязательная проверка в Branch protection).
+#
+# Модель: секрет репозитория GEMINI_API_KEY (Settings → Secrets and variables → Actions). Без секрета —
+# детерминированные правила (--provider offline, без сети, < 1 с): противоречия и пропуски с цитатами,
+# отчёт честно помечен как предварительный. Какие файлы считаются ТЗ — переменная REQ_PATHS ниже.
+
+on:
+  pull_request:
+    paths:
+      - "requirements/**"
+      - "docs/requirements/**"
+      - "release/input/**"
+      - "**/*.tz.md"
+  workflow_dispatch:
+    inputs:
+      files:
+        description: "Файлы требований через пробел"
+        default: "release/input/requirements.md"
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: write     # комментарий со сводкой
+  security-events: write   # SARIF в Code Scanning (где он доступен)
+
+concurrency:
+  group: tz-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  REQ_PATHS: "requirements/ docs/requirements/ release/input/"
+  REQ_EXT: "md markdown txt docx pdf html"
+  PYTHONUTF8: "1"
+
+jobs:
+  review:
+    name: BCC Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            constraints.txt
+
+      - name: Установка агента
+        run: python -m pip install -r requirements.txt -e .
+
+      - name: Какие документы требований изменились
+        id: files
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          MANUAL: ${{ inputs.files }}
+        run: |
+          if [ -n "$MANUAL" ]; then
+            files="$MANUAL"
+          else
+            files=""
+            for f in $(git diff --name-only --diff-filter=AMR "$BASE" "$HEAD"); do
+              ext="${f##*.}"; ext="${ext,,}"
+              case " $REQ_EXT " in *" $ext "*) ;; *) continue ;; esac
+              hit=""
+              for p in $REQ_PATHS; do case "$f" in "$p"*) hit=1 ;; esac; done
+              case "$f" in *.tz.md) hit=1 ;; esac
+              case "$f" in */PROVENANCE.md|*/README.md) hit="" ;; esac
+              [ -n "$hit" ] && files="$files $f"
+            done
+          fi
+          echo "files=$(echo $files)" >> "$GITHUB_OUTPUT"
+          echo "Документы: ${files:-нет}"
+
+      - name: Ревью
+        id: review
+        if: steps.files.outputs.files != ''
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          FILES: ${{ steps.files.outputs.files }}
+        run: |
+          provider=offline
+          [ -n "$GEMINI_API_KEY" ] && provider=gemini
+          mkdir -p tz-review
+          blocked=0
+          for f in $FILES; do
+            name="$(echo "${f%.*}" | tr '/' '_')"
+            set +e
+            python -m bcc_review "$f" "tz-review/$name.md" --provider "$provider" --no-cache \
+              --export sarif,gitlab,jira --fail-on blocker -q
+            code=$?
+            set -e
+            [ "$code" = "2" ] && blocked=1
+            if [ "$code" != "0" ] && [ "$code" != "2" ]; then
+              echo "::error file=$f::Агент завершился с кодом $code — отчёт неполный, см. артефакт tz-review"
+              blocked=1
+            fi
+            if [ -f "tz-review/$name.json" ]; then
+              # пометки на строках ТЗ во вкладке Files changed
+              python -m bcc_review.v2.render.ci "tz-review/$name.json" "$f" --format github
+              python -m bcc_review.v2.render.ci "tz-review/$name.json" "$f" --format summary \
+                | tee -a "$GITHUB_STEP_SUMMARY" >> tz-review/summary.md
+            fi
+          done
+          echo "blocked=$blocked" >> "$GITHUB_OUTPUT"
+          echo "provider=$provider" >> "$GITHUB_OUTPUT"
+
+      - name: Отчёты — в артефакт
+        if: always() && steps.files.outputs.files != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: tz-review
+          path: |
+            tz-review/
+            runs/
+          if-no-files-found: ignore
+
+      - name: SARIF в Code Scanning
+        # В приватном репозитории без GitHub Advanced Security загрузка недоступна — пометки выше остаются
+        if: always() && steps.files.outputs.files != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: tz-review
+          category: bcc-review
+
+      - name: Сводка — комментарием в PR
+        if: always() && github.event_name == 'pull_request' && steps.files.outputs.files != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -f tz-review/summary.md ] || exit 0
+          marker="<!-- bcc-review -->"
+          { echo "$marker"; cat tz-review/summary.md;
+            echo; echo "Полные отчёты (MD, HTML, JSON, Jira CSV, SARIF) — артефакт [tz-review]($RUN_URL)."; } > body.md
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments?per_page=100" \
+                 --jq "[.[] | select(.body | startswith(\"$marker\"))][0].id // empty")
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@body.md > /dev/null
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F body=@body.md > /dev/null
+          fi
+
+      - name: Блокер — слияние запрещено
+        if: steps.review.outputs.blocked == '1'
+        run: |
+          echo "::error::Есть дефекты, блокирующие разработку или тестирование. Исправьте ТЗ или ответьте на вопросы владельцу."
+          exit 1
