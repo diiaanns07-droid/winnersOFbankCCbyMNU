@@ -93,18 +93,38 @@ def test_readme_has_required_sections():
         assert heading in text, heading
 
 
-def test_readme_local_links_exist():
-    text = _read(README)
+def _local_links_missing(text: str) -> list[str]:
+    """Битые локальные ссылки. Файлы поздних этапов выпуска (отчёты, видео, слайды) пропускаются, пока их нет;
+    с BCC_RELEASE_CHECK=1 (проверка тега v2.0.0) проверяется всё."""
+    import os
+
+    strict = os.environ.get("BCC_RELEASE_CHECK") == "1"
     missing = []
     for target in re.findall(r"\]\(([^)#\s]+)(?:#[^)]*)?\)", text):
         if re.match(r"^[a-z]+://", target) or target.startswith("mailto:"):
             continue
         # каталоги и файлы, которые появляются на поздних этапах выпуска, проверяются после тега v2.0.0
-        if target.startswith(("reports/", "evaluation/v2/", "examples/v2/")) and not (ROOT / target).exists():
+        late = ("reports/", "evaluation/v2/", "examples/v2/", "presentation/deck.", "presentation/demo.")
+        if not strict and target.startswith(late) and not (ROOT / target).exists():
             continue
         if not (ROOT / target).exists():
             missing.append(target)
+    return missing
+
+
+def test_readme_local_links_exist():
+    missing = _local_links_missing(_read(README))
     assert not missing, f"битые ссылки в README: {missing}"
+
+
+def test_submission_lists_deliverables_and_operator_checklist():
+    text = _read(ROOT / "SUBMISSION.md")
+    missing = _local_links_missing(text)
+    assert not missing, f"битые ссылки в SUBMISSION.md: {missing}"
+    for needed in ("github.com/diiaanns07-droid/winnersOFbankCCbyMNU", "`release`", "reports/requirements.md",
+                   "release/input/requirements.md", "presentation/demo.mp4", "presentation/deck.pdf",
+                   "GEMINI_API_KEY", "Public", "Default branch"):
+        assert needed in text, needed
 
 
 @pytest.mark.skipif(not _v2_cli_ready(), reason="каркаса v2 ещё нет")
