@@ -47,7 +47,7 @@ Python с python.org 3.13 и 3.14, чистый клон `git clone --branch bcc
 | Вход из папки с кириллицей и пробелами `C:\t\Документы банка\ТЗ уведомления.{pdf,docx,md,txt,html}`, отчёт в `C:\t\Отчёты банка\тз *.md` | ✓ все 5 форматов: прогон 0, `verify` 0 |
 | `--export docx,pdf,jira` для DOCX | ✓ `.annotated.docx` (15 из 15 дефектов, 34 места), `.jira.csv`; для PDF — понятное сообщение «PDF с выделениями строится для входа PDF или Markdown» |
 | `scripts\jury_check.ps1 mock` | ✓ все ворота: К 5/5 (4 критичными), С 18/20, ложных критичных 0, `verify` OK, код 0 |
-| `scripts\jury_check.ps1 mock -Doc release\inputequirements.pdf` | `partial`, К 2/5 — ожидаемо: ответы mock записаны на Markdown (README так и говорит); с Gemini этот вход не проверить без ключа |
+| `scripts\jury_check.ps1 mock -Doc release\input\requirements.pdf` | `partial`, К 2/5 — ожидаемо: ответы mock записаны на Markdown (README так и говорит); с Gemini этот вход не проверить без ключа |
 
 Замечание для своих тестовых скриптов PowerShell: без BOM Windows PowerShell 5.1 читает кириллицу как ANSI —
 скрипты `scripts\*.ps1` команды сохранены с BOM правильно.
