@@ -6,8 +6,10 @@
 #   scripts/jury_check.sh gemini gemini-3.6-flash
 #   scripts/jury_check.sh claude_cli haiku
 #   scripts/jury_check.sh mock                    # без сети: проверка установки
+#   DOC=release/input/requirements.pdf scripts/jury_check.sh     # документ кейса в PDF (или любой свой файл)
 #
-# Отчёт: out/jury/requirements.<провайдер>.md (+ .json, .html, score.md). Код выхода 0 — все ворота пройдены.
+# Отчёт: out/jury/<документ>.<провайдер>.md (+ .json, .html, score.md). Код выхода 0 — все ворота пройдены.
+# Сверка с эталоном — только для документа кейса (release/input/requirements.md, .pdf, .docx).
 # Пределы: MAX_MINUTES (по умолчанию 6 для gemini, 15 для остальных), MAX_CALLS (12).
 set -uo pipefail
 
@@ -23,12 +25,20 @@ else
   MAX_MINUTES="${MAX_MINUTES:-15}"
 fi
 MAX_CALLS="${MAX_CALLS:-12}"
-DOC=release/input/requirements.md
+DOC="${DOC:-release/input/requirements.md}"
 OUTDIR=out/jury
-OUT="$OUTDIR/requirements.${PROVIDER}.md"
+stem="$(basename "${DOC%.*}")"
+ext="${DOC##*.}"
+[ "$ext" != "md" ] && [ "$ext" != "$DOC" ] && stem="${stem}_${ext}"
+OUT="$OUTDIR/${stem}.${PROVIDER}.md"
 JSON="${OUT%.md}.json"
 model_args=()
 [ -n "$MODEL" ] && model_args=(--model "$MODEL")
+
+if [ ! -f "$DOC" ]; then
+  echo "Файл не найден: $DOC (путь — от корня репозитория)" >&2
+  exit 2
+fi
 
 echo "== коммит агента: $(git rev-parse --short HEAD 2>/dev/null || echo 'нет .git')"
 
@@ -42,7 +52,7 @@ if [ "$PROVIDER" != "mock" ] && [ "$PROVIDER" != "offline" ]; then
 fi
 
 echo
-echo "== 2. прогон официального документа без кэша: $DOC -> $OUT"
+echo "== 2. прогон без кэша: $DOC -> $OUT"
 rm -f "$JSON"
 start=$(date +%s)
 "$PY" -m bcc_review "$DOC" "$OUT" --provider "$PROVIDER" ${model_args[@]+"${model_args[@]}"} --no-cache --export jira
@@ -61,13 +71,17 @@ echo "== 3. verify"
 verify=$?
 
 score_args=()
-if [ -d evaluation/v2 ]; then
+case "$DOC" in
+  release/input/requirements.md|release/input/requirements.pdf|release/input/requirements.docx) gold=1 ;;
+  *) gold=0 ;;
+esac
+if [ "$gold" = 1 ] && [ -d evaluation/v2 ]; then
   echo
   echo "== 4. сверка с эталоном (строгий счёт, без модели)"
-  if "$PY" -m evaluation.v2.score "$JSON" --report-md "$OUT" --out "$OUTDIR/score.${PROVIDER}.json" \
-       --md "$OUTDIR/score.${PROVIDER}.md" >/dev/null; then
-    score_args=(--score "$OUTDIR/score.${PROVIDER}.json")
-    echo "разбор: $OUTDIR/score.${PROVIDER}.md"
+  if "$PY" -m evaluation.v2.score "$JSON" --report-md "$OUT" --out "$OUTDIR/score.${stem}.${PROVIDER}.json" \
+       --md "$OUTDIR/score.${stem}.${PROVIDER}.md" >/dev/null; then
+    score_args=(--score "$OUTDIR/score.${stem}.${PROVIDER}.json")
+    echo "разбор: $OUTDIR/score.${stem}.${PROVIDER}.md"
   else
     echo "счётчик эталона не отработал — пропускаю" >&2
   fi

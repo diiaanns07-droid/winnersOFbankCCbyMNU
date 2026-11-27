@@ -5,9 +5,10 @@
 #   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 gemini gemini-3.6-flash
 #   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 claude_cli haiku
 #   powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1 mock            # без сети: проверка установки
+#   $env:DOC = "release\input\requirements.pdf"; powershell -ExecutionPolicy Bypass -File scripts\jury_check.ps1
 #
-# Отчёт: out\jury\requirements.<провайдер>.md (+ .json, .html, score.<провайдер>.md). Код выхода 0 — все ворота
-# пройдены. Пределы: $env:MAX_MINUTES (по умолчанию 6 для gemini, 15 для остальных), $env:MAX_CALLS (12).
+# Отчёт: out\jury\<документ>.<провайдер>.md (+ .json, .html, score.*.md). Код выхода 0 — все ворота
+# пройдены. Сверка с эталоном — только для документа кейса (release\input\requirements.md, .pdf, .docx). Пределы: $env:MAX_MINUTES (по умолчанию 6 для gemini, 15 для остальных), $env:MAX_CALLS (12).
 # Файл сохранён в UTF-8 с BOM (иначе Windows PowerShell 5.1 искажает русский текст).
 
 $Provider = if ($args.Count -ge 1) { [string]$args[0] } else { "gemini" }
@@ -17,10 +18,17 @@ $Model = if ($args.Count -ge 2) { [string]$args[1] } else { "" }
 
 $maxMinutes = if ($env:MAX_MINUTES) { $env:MAX_MINUTES } elseif ($Provider -eq "gemini") { "6" } else { "15" }
 $maxCalls = if ($env:MAX_CALLS) { $env:MAX_CALLS } else { "12" }
-$Doc = "release\input\requirements.md"
+$Doc = if ($env:DOC) { $env:DOC } else { "release\input\requirements.md" }
+if (-not (Test-Path -LiteralPath $Doc -PathType Leaf)) {
+    Write-Host "Файл не найден: $Doc (путь — от корня репозитория)" -ForegroundColor Red
+    exit 2
+}
+$stem = [IO.Path]::GetFileNameWithoutExtension($Doc)
+$ext = [IO.Path]::GetExtension($Doc).TrimStart(".").ToLower()
+if ($ext -and $ext -ne "md") { $stem = "$($stem)_$ext" }
 $outDir = "out\jury"
-$report = Join-Path $outDir "requirements.$Provider.md"
-$json = Join-Path $outDir "requirements.$Provider.json"
+$report = Join-Path $outDir "$stem.$Provider.md"
+$json = Join-Path $outDir "$stem.$Provider.json"
 $modelArgs = @()
 if ($Model) { $modelArgs = @("--model", $Model) }
 
@@ -42,7 +50,7 @@ if ($Provider -ne "mock" -and $Provider -ne "offline") {
 }
 
 Write-Host ""
-Write-Host "== 2. прогон официального документа без кэша: $Doc -> $report"
+Write-Host "== 2. прогон без кэша: $Doc -> $report"
 if (Test-Path $json) { Remove-Item $json }
 $sw = [Diagnostics.Stopwatch]::StartNew()
 & $Py -m bcc_review $Doc $report --provider $Provider @modelArgs --no-cache --export jira
@@ -61,11 +69,13 @@ Write-Host "== 3. verify"
 $verify = $LASTEXITCODE
 
 $scoreArgs = @()
-if (Test-Path "evaluation\v2") {
+$gold = @("requirements.md", "requirements.pdf", "requirements.docx") -contains [IO.Path]::GetFileName($Doc) -and
+    ((Split-Path -Parent $Doc) -replace "/", "\") -eq "release\input"
+if ($gold -and (Test-Path "evaluation\v2")) {
     Write-Host ""
     Write-Host "== 4. сверка с эталоном (строгий счёт, без модели)"
-    $scoreJson = Join-Path $outDir "score.$Provider.json"
-    $scoreMd = Join-Path $outDir "score.$Provider.md"
+    $scoreJson = Join-Path $outDir "score.$stem.$Provider.json"
+    $scoreMd = Join-Path $outDir "score.$stem.$Provider.md"
     & $Py -m evaluation.v2.score $json --report-md $report --out $scoreJson --md $scoreMd | Out-Null
     if ($LASTEXITCODE -eq 0) {
         $scoreArgs = @("--score", $scoreJson)

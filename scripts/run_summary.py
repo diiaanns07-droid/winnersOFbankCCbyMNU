@@ -74,8 +74,9 @@ def main(argv: list[str] | None = None) -> int:
             extra.append(f"{label} {calls[key]}")
     limit = f", предел {args.max_calls}" if args.max_calls else ""
     rows.append(("обращений к модели", f"{total}{' (' + ', '.join(extra) + ')' if extra else ''}{limit}", ok_calls))
-    rows.append(("токены вход / выход", f"{tokens.get('input', 0):,} / {tokens.get('output', 0):,}".replace(",", " "),
-                 None))
+    cost = float(run.get("cost_usd") or 0)
+    rows.append(("токены вход / выход", f"{tokens.get('input', 0):,} / {tokens.get('output', 0):,}".replace(",", " ")
+                 + (f"; стоимость ${cost:.2f}" if cost else ""), None))
     rows.append(("вердикт", f"разработка — {VERDICT.get(verdict.get('development'), '?')}, "
                             f"тестирование — {VERDICT.get(verdict.get('testing'), '?')}", None))
     rows.append(("требований / замечаний", f"{summary.get('requirements', 0)} / "
