@@ -689,6 +689,11 @@ def calibrate_coverage(cands: list[dict], checks: list[Mapping[str, Any]], reqs:
         if c["severity"] != COVERAGE_SEVERITY:
             c.setdefault("severity_hint", c["severity"])
             c["severity"] = COVERAGE_SEVERITY
+        # Место замечания — сама таблица критериев приёмки: первая её строка — первой цитатой (модель цитирует
+        # непокрытые правила, и замечание о таблице читалось как замечание о правиле возврата).
+        first_row = next((ch for ch in checks if ch.get("row_quote") and ch.get("row_line")), None)
+        if first_row and not any(e.get("line") == first_row["row_line"] for e in c["evidence"]):
+            c["evidence"] = [{"quote": first_row["row_quote"], "line": first_row["row_line"]}] + c["evidence"][:2]
         if not total:
             continue
         fact = f"Строки приёмки проверяют {done} из {total} функциональных требований."

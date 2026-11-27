@@ -242,7 +242,7 @@ def test_other_candidates_limited_conflicts_kept():
 def test_coverage_is_one_minor_remark_with_share_and_closing_tests():
     """Покрытие приёмкой — всегда minor (разбор №18: major на каждом ТЗ, и на чистом); в problem — доля
     проверенных функциональных требований, заголовок — факт, рекомендация — тест-кейсы, закрывающие пробел."""
-    cover = {"requirement_ids": ["R-03"], "evidence": [{"quote": "x", "line": 30}], "title": "Покрытие",
+    cover = {"requirement_ids": ["R-03"], "evidence": [{"quote": "x", "line": 12}], "title": "Покрытие",
              "problem": "Не покрыты границы.", "scenario": "s", "impact": "i", "recommendation": "Дополнить таблицу",
              "rewrite": "", "question": "", "blocks": "testing", "severity": "major", "kind": "missing_element",
              "criterion": "set_validatable"}
@@ -257,6 +257,8 @@ def test_coverage_is_one_minor_remark_with_share_and_closing_tests():
     assert c["title"] == "Критерии приёмки проверяют 1 из 2 функциональных требований"
     assert c["model_title"] == "Покрытие"
     assert c["recommendation"].startswith("Дополнить таблицу. Непокрытые ветки закрывают тест-кейсы T-02–T-04")
+    assert c["evidence"] == [{"quote": "Значение 10 | Добавить 5", "line": 30}, {"quote": "x", "line": 12}], \
+        "место — таблица приёмки, затем цитаты модели"
     none = lens_qa.postprocess({"acceptance_checks": [_check(verdict="match", rule_requirement_ids=[],
                                                             rule_evidence=[])],
                                 "candidates": [dict(cover)]}, REQS)
