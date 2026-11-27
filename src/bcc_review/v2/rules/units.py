@@ -433,13 +433,22 @@ def rule_time_units(doc: Doc, out: dict) -> None:
                     kind="unit_mismatch", criterion="set_consistent", severity="major", blocks="both",
                     evidence=[ev(prev[1], qa), ev(x, qb)],
                     problem=(f"{quoted(qa)} и {quoted(qb)}: одно и то же поле {name} задано в {prev[0]} и в {unit}."),
-                    scenario=f"{name} = 15: по одному месту это 15 {prev[0]}, по другому — 15 {unit}.",
+                    scenario=f"{name} = 15: по одному месту это 15 {_gen_pl(prev[0])}, по другому — 15 {_gen_pl(unit)}.",
                     impact="Срок или интервал отличается в десятки раз; поведение системы и тесты расходятся.",
                     recommendation=f"Указать одну единицу для {name} во всех разделах.",
                     question=f"В каких единицах задаётся {name}: {prev[0]} или {unit}?",
                     conflict=True,
                 ))
                 return
+
+
+GEN_PL = {"секунды": "секунд", "минуты": "минут", "часы": "часов", "сутки": "суток", "дни": "дней",
+          "миллисекунды": "миллисекунд", "недели": "недель", "месяцы": "месяцев", "годы": "лет"}
+
+
+def _gen_pl(unit: str) -> str:
+    """«15 минут», а не «15 минуты»: родительный падеж множественного числа после числа."""
+    return GEN_PL.get(unit, unit)
 
 
 def rule_day_kinds(doc: Doc, out: dict) -> None:

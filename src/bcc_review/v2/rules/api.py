@@ -537,6 +537,11 @@ def _same_case_decl(frag: str, decls: list[Status], code: int, method: "Method |
     return best
 
 
+def _short(text: str, limit: int = 110) -> str:
+    t = re.sub(r"^\s*\d+[.)]\s*", "", text.strip())
+    return t if len(t) <= limit else t[:limit].rsplit(" ", 1)[0] + "…"
+
+
 COND_MARK = re.compile(r"\b(?:если|при|в\s+случае|иначе|когда)\b", re.I)
 
 
@@ -586,8 +591,8 @@ def _rule_same_case_declared(doc: Doc, methods: list[Method], decls: list[Status
             evidence=[ev(line, frag), ev(other.line, other.text)],
             problem=(f"В логике сказано {quoted(frag)}, а в перечне статусов тот же случай описан кодом {other.code}: "
                      f"{quoted(other.text)}."),
-            scenario=(f"Наступает этот случай: сервер по логике метода отвечает {code}, клиент и автотест по перечню "
-                      f"статусов ждут {other.code}."),
+            scenario=(f"Наступает случай из логики метода — {quoted(_short(frag))}: сервер отвечает {code}, клиент "
+                      f"и автотест по перечню статусов ждут {other.code}."),
             impact="Клиент обработает ответ неверно; тест на этот случай нельзя написать однозначно.",
             recommendation=f"Оставить для случая один код ({code} или {other.code}) и описать его в логике и перечне одинаково.",
             question=f"Какой код возвращать в этом случае — {code} или {other.code}?",
