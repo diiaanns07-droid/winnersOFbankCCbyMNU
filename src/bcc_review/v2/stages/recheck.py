@@ -1408,6 +1408,13 @@ def next_round(clar: dict, questions: list[dict]) -> list[dict]:
         else:  # спорят общие решения: в разделе «## Решения» остаётся одно
             lines = list(dict.fromkeys(f"- {t}" for t in sides))
         if len(lines) >= 2:
+            # один вопрос с несколькими дефектами (D-03 и D-11 по одной паре реплик) — один блок выбора: иначе
+            # владелец оставит одну строку в первом блоке, а обе строки второго снова дадут конфликт
+            same = next((n for n in out if n["kind"] == "conflict" and n["lines"] == lines), None)
+            if same is not None:
+                if c["finding_id"] and c["finding_id"] not in same["finding_id"].split(", "):
+                    same["finding_id"] = ", ".join(x for x in (same["finding_id"], c["finding_id"]) if x)
+                continue
             out.append({"kind": "conflict", "finding_id": c["finding_id"], "question_id": qids[0] if qids else "",
                         "lines": lines})
     asked = {q.get("id"): _one_line(q.get("question")) for q in questions if isinstance(q, dict)}

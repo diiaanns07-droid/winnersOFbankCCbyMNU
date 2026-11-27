@@ -113,3 +113,14 @@ def test_next_round_from_run_modes_has_sha(tmp_path):
     path = tmp_path / "report.answers-next.md"
     assert out["clarification"]["next_answers_file"] == str(path)
     assert recheck.answers_sha(path.read_text(encoding="utf-8")) == SHA
+
+
+def test_interactive_header_of_22_is_read():
+    # шапка файла ответов из --interactive №22 (`__main__.write_answers_file`, adec09c6): 12 знаков и «…»
+    text = (f"> Документ: tz.md; SHA-256 {SHA[:12]}…; файл можно поправить и передать снова: --answers этот_файл.\n\n"
+            "Q-01 [Срок хранения]: B — 90 дней\n")
+    parsed = recheck.parse_answers_text(text)
+    assert parsed["document_sha256"] == SHA[:12]
+    assert recheck.check_document(parsed, {"sha256": SHA}, [])["match"] is True
+    w: list[str] = []
+    assert recheck.check_document(parsed, {"sha256": OTHER}, w)["match"] is False and w

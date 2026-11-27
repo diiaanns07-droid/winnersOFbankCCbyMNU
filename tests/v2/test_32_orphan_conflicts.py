@@ -136,3 +136,19 @@ def test_revise_warnings_reach_stats():
     res = revise.run(ctx, FINDINGS, clar)
     assert "возвращается 423" not in res["revised_markdown"]
     assert any("ответы адресатов расходятся" in w for w in res["stats"]["warnings"])
+
+
+def test_one_choice_block_per_question_with_two_findings():
+    # живой официальный прогон: Q-03 покрывает D-03 и D-11, обе остаются open с одной парой реплик
+    qs = [{"id": "Q-01", "topic": "Код ответа при блокировке счёта", "question": "Какой код вернуть?",
+           "options": ["423", "409"], "finding_ids": ["D-01", "D-03"]}]
+    rep = dict(_report(), questions=qs)
+    resp = _resp([{"finding_id": "D-01", "conflicting_answers": ["Q-01"], "reason": "ответы расходятся"},
+                  {"finding_id": "D-03", "conflicting_answers": ["Q-01"], "reason": "ответы расходятся"}])
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), rep, CLASH.replace("Q-07", "Q-01"))["clarification"]
+    assert len(clar["answer_conflicts"]) == 2  # по дефекту — в отчёте
+    nr = [n for n in clar["next_round"] if n["kind"] == "conflict"]
+    assert len(nr) == 1 and nr[0]["finding_id"] == "D-01, D-03" and len(nr[0]["lines"]) == 2
+    text = recheck.render_next_answers(clar, "tz.md", "report.md")
+    assert text.count("Q-01 [Код ответа при блокировке счёта]: Команда безопасности") == 1
+    assert "> Q-01 (D-01, D-03): ответы расходятся" in text
