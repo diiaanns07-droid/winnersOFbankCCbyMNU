@@ -407,3 +407,76 @@ def test_link_findings_maps_pairs_and_glossary_to_final_defects():
     C.link_findings(out["pair_checks"], out["glossary"], cands, findings)
     assert out["pair_checks"][0]["finding_ids"] == ["D-01"] and out["pair_checks"][1]["finding_ids"] == ["D-01"]
     assert out["glossary"][0]["finding_ids"] == ["D-02"]
+
+
+def test_pair_conflict_kind_is_always_specific():
+    out = C.postprocess(answer(pair_checks=[pair(kind="contradiction")]), VIEW, REQS)
+    assert out["pair_checks"][0]["kind"] == "event_conflict"
+    assert out["candidates"][0]["kind"] == "event_conflict"
+    assert "contradiction" not in C.PAIR_SCHEMA["properties"]["kind"]["enum"]
+
+
+def test_rule_against_acceptance_row_at_boundary_is_critical_conflict():
+    p = pair(a="R-05", b="R-07", subject="минимальная сумма пополнения, ровно 1 000",
+             quote_a="Минимальная сумма пополнения — 1 000.", line_a=6,
+             quote_b="| Сумма 10 000 | Пополнить на 1 000 | Сумма 11 000 |", line_b=8,
+             verdict="conflict", basis="value_mismatch", kind="boundary_conflict")
+    out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
+    c = out["candidates"][0]
+    assert c["severity"] == "critical" and c["kind"] == "boundary_conflict"
+    assert {e["line"] for e in c["evidence"]} == {6, 8}
+
+
+DOC_API = [
+    "# Лимит",                                                                      # 1
+    "Приложение читает лимит методом getLimit и меняет его методом setLimit.",      # 2
+    "Методы описаны в части B.",                                                    # 3
+    "Часть B",                                                                      # 4
+    "Метод getLimit",                                                               # 5
+    "REST type | GET",                                                              # 6
+    "Метод setLimit",                                                               # 7
+    "REST type | PUT",                                                              # 8
+    "Перевод сверх лимита отклоняется.",                                            # 9
+]
+HEADS = {1, 4, 5, 7}
+VIEW_API = {"lines": [{"n": i, "text": t, "page": None, "section": "", "heading": i in HEADS,
+                       "kind": "heading" if i in HEADS else ""} for i, t in enumerate(DOC_API, 1)]}
+
+
+def _missing(quotes):
+    return {"title": "Операция не описана", "kind": "missing_element", "criterion": "set_complete",
+            "severity": "critical", "requirement_ids": [], "problem": "п", "scenario": "с", "impact": "и",
+            "recommendation": "р", "rewrite": "", "question": "", "blocks": "development",
+            "evidence": [{"quote": q, "line": n} for q, n in quotes]}
+
+
+def test_promised_but_missing_stays_critical_when_named_method_has_no_section():
+    view = {"lines": [x for x in VIEW_API["lines"] if x["n"] not in (5, 6)]}  # раздела getLimit нет
+    out = C.postprocess(answer(candidates=[_missing([("читает лимит методом getLimit", 2), ("Метод setLimit", 7)])]),
+                        view, [])
+    assert out["candidates"][0]["severity"] == "critical"
+
+
+def test_promised_but_missing_is_major_when_every_named_method_is_described():
+    out = C.postprocess(answer(candidates=[_missing([("Перевод сверх лимита отклоняется.", 9),
+                                                     ("Методы описаны в части B.", 3), ("Метод setLimit", 7)])]),
+                        VIEW_API, [])
+    assert out["candidates"][0]["severity"] == "major"
+
+
+def test_promise_without_identifiers_keeps_model_severity():
+    out = C.postprocess(answer(candidates=[_missing([("Методы описаны в части B.", 3)])]),
+                        {"lines": [dict(x, text=x["text"].replace("getLimit", "чтение").replace("setLimit", "запись"))
+                                   for x in VIEW_API["lines"]]}, [])
+    assert out["candidates"][0]["severity"] == "critical"
+
+
+def test_link_trace_points_rows_to_findings_about_the_requirement():
+    trace = [{"requirement_id": "R-02", "verified_by": [], "implemented_by": [], "note": "нет критерия"},
+             {"requirement_id": "R-04", "verified_by": [], "implemented_by": [], "note": ""}]
+    findings = [{"id": "D-02", "severity": "major", "requirement_ids": ["R-02"]},
+                {"id": "D-01", "severity": "critical", "requirement_ids": ["R-02", "R-03"]},
+                {"id": "D-09", "severity": "minor", "requirement_ids": [f"R-0{i}" for i in range(1, 9)]}]
+    C.link_findings([], [], [], findings, trace)
+    assert trace[0]["finding_ids"] == ["D-01", "D-02"]  # критичный первым, дефект «обо всём» не ссылается
+    assert "finding_ids" not in trace[1]

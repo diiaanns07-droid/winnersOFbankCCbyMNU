@@ -50,7 +50,9 @@ SEVERITIES = ["critical", "major", "minor"]
 BLOCKS = ["development", "testing", "both", "none"]
 
 CONFLICT_KINDS = ("event_conflict", "status_conflict", "boundary_conflict", "unit_mismatch", "contradiction")
-PAIR_KINDS = list(CONFLICT_KINDS) + ["ambiguity", "incomplete"]
+# У пары вид конфликта всегда конкретный: общий «contradiction» счётчик засчитывает только уровнем родителя.
+PAIR_CONFLICT_KINDS = ("event_conflict", "status_conflict", "boundary_conflict", "unit_mismatch")
+PAIR_KINDS = list(PAIR_CONFLICT_KINDS) + ["ambiguity", "incomplete"]
 VERDICTS = ["conflict", "compatible", "undefined"]
 BASES = ["same_condition", "limit_removed", "value_mismatch", "none"]
 GLOSSARY_SEVERITIES = ["major", "minor", "none"]
@@ -261,7 +263,7 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
         "scenario": _s(p.get("scenario")), "outcome_a": _s(p.get("outcome_a")), "outcome_b": _s(p.get("outcome_b")),
         "verdict": p.get("verdict") if p.get("verdict") in VERDICTS else "undefined",
         "basis": p.get("basis") if p.get("basis") in BASES else "",
-        "kind": p.get("kind") if p.get("kind") in PAIR_KINDS else "contradiction",
+        "kind": p.get("kind") if p.get("kind") in PAIR_KINDS else "event_conflict",
         "title": _s(p.get("title")), "impact": _s(p.get("impact")),
         "recommendation": _s(p.get("recommendation")), "question": _s(p.get("question")),
     }
@@ -301,8 +303,8 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
     two_places = _found(ev_a) and _found(ev_b) and not _overlap(ev_a, ev_b)
     kind = pair["kind"]
     if pair["verdict"] == "conflict":
-        if kind not in CONFLICT_KINDS:
-            kind = "contradiction"
+        if kind not in PAIR_CONFLICT_KINDS:
+            kind = "event_conflict"
         soft = any((known or {}).get(x, {}).get("kind") in SOFT_KINDS for x in (pair["a"], pair["b"]))
         # Разные единицы одной величины обычно снимаются правилом пересчёта — major; судья может поднять.
         severity = "critical" if two_places and not soft and kind not in MAJOR_CONFLICT_KINDS else "major"
@@ -543,7 +545,32 @@ def normalize_candidate(c: dict, view: Any, known: dict[str, dict], requirements
         cand["severity"] = "major"
     if cand["severity"] == "critical" and cand["blocks"] == "none":
         cand["blocks"] = "both"
+    # «Обещано, но не описано»: если все названные в цитатах методы и поля описаны в заголовках документа,
+    # обещанное на месте — это не critical (модель приняла соседний процесс за обещанную операцию).
+    if cand["severity"] == "critical" and cand["kind"] == "missing_element" and _all_named_described(evidence, view):
+        cand["severity"] = "major"
     return cand
+
+
+_IDENT = re.compile(r"\b[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+\b|\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b")
+
+
+def _headings(view: Any) -> list[str]:
+    return [_s(x.get("text")) for x in _lines(view) if x.get("heading") or x.get("kind") == "heading"]
+
+
+def _all_named_described(evidence: list[dict], view: Any) -> bool:
+    """Все идентификаторы (camelCase, snake_case) из цитируемых строк встречаются в заголовках документа."""
+    by_n = {x.get("n"): _s(x.get("text")) for x in _lines(view)}
+    texts = []
+    for e in evidence:
+        texts.append(_s(e.get("quote")))
+        if _found(e):
+            a, b = _span(e)
+            texts.extend(by_n.get(n, "") for n in range(a, b + 1))
+    names = {m.group(0) for t in texts for m in _IDENT.finditer(t)}
+    heads = " ".join(_headings(view))
+    return bool(names) and bool(heads) and all(re.search(rf"\b{re.escape(n)}\b", heads) for n in names)
 
 
 def _duplicates_pair(cand: dict, pair_cands: list[dict]) -> bool:
@@ -652,11 +679,33 @@ def postprocess(data: dict, view: Any, requirements: list[dict]) -> dict:
 
 # ---------------------------------------------------------------- ссылки на итоговые дефекты
 
+MAX_TRACE_LINKS = 3
+# Дефект, который касается почти всех требований (нет приоритетов, нет ID), строку матрицы не объясняет.
+MAX_TRACE_SPREAD = 6
+_SEV_ORDER = {"critical": 0, "major": 1, "minor": 2}
+
+
+def link_trace(trace: list[dict], findings: list[dict]) -> None:
+    """``finding_ids`` строки матрицы покрытия: до трёх итоговых дефектов, которые называют это требование
+    (сначала критичные), кроме дефектов «обо всём наборе». Меняет список на месте."""
+    ranked = sorted((f for f in findings or [] if f.get("id")),
+                    key=lambda f: (_SEV_ORDER.get(f.get("severity"), 3), str(f.get("id"))))
+    for t in trace or []:
+        rid = t.get("requirement_id")
+        ids = [str(f["id"]) for f in ranked
+               if rid in (f.get("requirement_ids") or []) and len(f.get("requirement_ids") or []) <= MAX_TRACE_SPREAD]
+        if ids:
+            t["finding_ids"] = ids[:MAX_TRACE_LINKS]
+
+
 def link_findings(pair_checks: list[dict], glossary: list[dict], candidates: list[dict],
-                  findings: list[dict]) -> None:
+                  findings: list[dict], trace: list[dict] | None = None) -> None:
     """Проставить ``finding_ids`` парам (P-xx) и понятиям глоссария (G-xx) по цепочке
-    пара → кандидат этапа (``pair_ids`` / ``glossary_ids``) → итоговый дефект (``candidate_ids``).
+    пара → кандидат этапа (``pair_ids`` / ``glossary_ids``) → итоговый дефект (``candidate_ids``),
+    а если передана трассировка — и строкам матрицы покрытия (``link_trace``).
     Вызывается конвейером после судьи; меняет списки на месте."""
+    if trace is not None:
+        link_trace(trace, findings)
     by_cand: dict[str, list[str]] = {}
     for f in findings or []:
         for cid in f.get("candidate_ids") or []:
