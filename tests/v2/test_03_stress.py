@@ -356,3 +356,42 @@ def test_api_pdf_narrow_cells_and_latin_status_page():
     assert any("Страница 2: читатель счёл текстовый слой нечитаемым" in w for w in v["warnings"])
     assert not any("не прочитаны" in w.lower() or "не полностью" in w.lower() for w in v["warnings"])
     assert dv.line(v, t.index("410. Unsuccessful — Gone") + 1)["kind"] == "heading"
+
+
+# --------------------------------------------------------------------------- волна 3: каждый файл набора целиком
+# (ворота №15 «стресс-набор №03» гоняют этот файл — сюда же входят новые случаи волны 3: таблицы без линеек,
+# надписи Word, абзацы в ячейках, разделы и автонумерация DOCX)
+_ALL = sorted(p.name for p in S.iterdir() if p.suffix.lower() in (".pdf", ".docx", ".md", ".html", ".txt"))
+
+
+@pytest.mark.parametrize("name", _ALL)
+def test_every_stress_file_reads_and_binds(name):
+    """Каждый файл набора читается без падения; строки пронумерованы подряд; страницы у PDF; каждая непустая строка
+    находится сверкой цитат на своём месте (текст вида = то, что увидит модель и отчёт)."""
+    if name.endswith(".pdf") and not _has("pymupdf") or name.endswith(".docx") and not _has("docx"):
+        pytest.skip("нет читателя формата")
+    v = dv.load(S / name)
+    assert [ln["n"] for ln in v["lines"]] == list(range(1, len(v["lines"]) + 1))
+    if name.endswith(".pdf"):
+        assert all(ln["page"] for ln in v["lines"] if ln["text"].strip())
+    bad = []
+    for ln in dv.nonempty(v):
+        m = Q.verify_quote(v, ln["text"], ln["n"])
+        if not m or not m["line_start"] <= ln["n"] <= m["line_end"]:
+            bad.append(ln["n"])
+    assert not bad, f"{name}: строки не находятся на своём месте: {bad[:10]}"
+
+
+@pytest.mark.parametrize("name", [n for n in _ALL if n.split(".")[0] in
+                                  ("borderless", "textbox", "cell_paragraphs", "ru_styles", "numbered_headings")])
+def test_wave3_stress_files_full_offline_review(tmp_path, name):
+    """Новые файлы волны 3 проходят весь конвейер без модели: код 0, отчёт, verify OK."""
+    if name.endswith(".pdf") and not _has("pymupdf") or name.endswith(".docx") and not _has("docx"):
+        pytest.skip("нет читателя формата")
+    from bcc_review.v2 import pipeline, verify
+    out = tmp_path / f"{name}.md"
+    report, written = pipeline.review(S / name, out, {"provider": "offline", "runs_dir": str(tmp_path / "runs"),
+                                                      "html": False, "cache": False})
+    res = verify.verify_report(report, S / name)
+    assert res["ok"], res["errors"][:3]
+    assert out.is_file()
