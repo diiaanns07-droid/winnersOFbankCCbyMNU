@@ -42,11 +42,16 @@ def _kind(model: str | None, label: str | None = "") -> str:
 
 
 def _row(set_name: str, model: str, label: str, at: str, case: str, sev: dict, verdict: dict | None,
-         calls: int | None = None) -> dict:
-    """`calls` — вызовов модели в прогоне документа: 0 у модели — повтор ответов из кэша (не новая выборка)."""
+         calls: int | None = None, findings: list[dict] | None = None) -> dict:
+    """`calls` — вызовов модели в прогоне документа: 0 у модели — повтор ответов из кэша (не новая выборка).
+    `findings` — ложные замечания документа (critical и major: серьёзность, заголовок, источники, владельцы); None —
+    в сводке прогона их нет."""
+    keep = None if findings is None else [
+        {k: f.get(k) for k in ("severity", "title", "sources", "owners")} for f in findings
+        if isinstance(f, dict) and f.get("severity") in ("critical", "major")]
     return {"set": set_name, "model": _kind(model, label), "label": label, "at": at or "", "case": case,
             "critical": int(sev.get("critical") or 0), "major": int(sev.get("major") or 0),
-            "minor": int(sev.get("minor") or 0), "verdict": verdict or {}, "calls": calls}
+            "minor": int(sev.get("minor") or 0), "verdict": verdict or {}, "calls": calls, "findings": keep}
 
 
 def _corpus_rows() -> list[dict]:
@@ -102,7 +107,7 @@ def _newtz_rows() -> list[dict]:
             commits = [c for c in [r.get("commit"), *(d.get("commit") or [])] if c]
             out.append(_row(_set_of(r.get("doc"), commits, d.get("at", "")), d.get("model"),
                             d.get("label", p.parent.name), d.get("at", ""), r["case"], sev, r.get("verdict"),
-                            r.get("calls")))
+                            r.get("calls"), r.get("false_alarms") if isinstance(r.get("false_alarms"), list) else None))
     return out
 
 
@@ -275,6 +280,75 @@ def render_stability(rows: list[dict]) -> str:
     return "\n".join(L) + "\n"
 
 
+SAME_COMPLAINT = 0.2  # близость заголовков по словам — тот же порог, что «та же жалоба» в `corpus.background`
+
+
+def recurring(rows: list[dict], min_runs: int = 2) -> list[dict]:
+    """Повторяющиеся ложные замечания (critical и major) на чистом документе: одна и та же жалоба в ≥ `min_runs`
+    прогонах модели (выборка — как в `stability`). Жалобы склеиваются по заголовку (`corpus._title_sim` ≥
+    `SAME_COMPLAINT` хотя бы с одной из уже склеенных) — модель каждый раз формулирует её чуть иначе."""
+    from .corpus import _title_sim
+
+    out = []
+    for (set_name, model), docs in stability(rows).items():
+        for case, rs in docs.items():
+            rs = [r for r in rs if r.get("findings") is not None]
+            if len(rs) < min_runs:
+                continue
+            clusters: list[list[tuple[int, dict]]] = []
+            for i, r in enumerate(rs):
+                for f in r["findings"]:
+                    best, score = None, 0.0
+                    for c in clusters:
+                        sim = max(_title_sim(f.get("title") or "", g.get("title") or "") for _, g in c)
+                        if sim > score:
+                            best, score = c, sim
+                    if best is not None and score >= SAME_COMPLAINT:
+                        best.append((i, f))
+                    else:
+                        clusters.append([(i, f)])
+            for c in clusters:
+                runs = sorted({i for i, _ in c})
+                if len(runs) < min_runs:
+                    continue
+                sev = {i: ("critical" if any(f.get("severity") == "critical" for j, f in c if j == i) else "major")
+                       for i in runs}
+                src: dict[str, int] = {}
+                for i in runs:
+                    for x in sorted({x for j, f in c if j == i for x in (f.get("sources") or [])}):
+                        src[x] = src.get(x, 0) + 1
+                owners = sorted({o for _, f in c for o in (f.get("owners") or [])})
+                out.append({"set": set_name, "model": model, "case": case, "runs": len(runs), "of": len(rs),
+                            "severity": [sev[i] for i in runs], "at": [rs[i]["at"] for i in runs],
+                            "last": len(rs) - 1 in runs, "title": c[-1][1].get("title") or "",
+                            "sources": src, "owners": owners})
+    out.sort(key=lambda x: (ORDER.index(x["set"]) if x["set"] in ORDER else 9, x["model"],
+                            -("critical" in x["severity"]), -x["runs"], x["case"]))
+    return out
+
+
+def render_recurring(rows: list[dict]) -> str:
+    """Таблица «повторяющиеся ложные замечания»: что именно модель раз за разом находит на чистом документе."""
+    rec = recurring(rows)
+    if not rec:
+        return ""
+    sev = {"critical": "c", "major": "m"}
+    L = ["", "### Чистые ТЗ — повторяющиеся ложные замечания (critical и major в 2 и больше прогонах)", "",
+         "Одна жалоба (заголовки близки по словам) в нескольких прогонах модели на том же чистом документе: в каждом — "
+         "систематическая ошибка линзы или судьи, либо неясное место документа (тогда — автору набора). Серьёзность "
+         "по прогонам: c — critical, m — major.", "",
+         "| Документ | Набор | Модель | Прогонов | Серьёзность | Замечание (последняя формулировка) | В последнем прогоне | "
+         "Источники (прогонов) | Владельцы |",
+         "| :--- | :--- | :--- | ---: | :--- | :--- | :---: | :--- | :--- |"]
+    for x in rec:
+        src = ", ".join(f"{k.replace('lens:', '')} {v}" for k, v in sorted(x["sources"].items(), key=lambda kv: (-kv[1], kv[0])))
+        title = x["title"].replace("|", "/")
+        L.append(f"| {x['case']} | {x['set']} | {x['model']} | {x['runs']} из {x['of']} | "
+                 f"{' '.join(sev[v] for v in x['severity'])} | {title} | {'да' if x['last'] else 'нет'} | {src} | "
+                 f"{', '.join(x['owners'])} |")
+    return "\n".join(L) + "\n"
+
+
 def write_results(text: str) -> None:
     res = RESULTS.read_text(encoding="utf-8")
     block = f"{START}\n{text}{END}"
@@ -294,10 +368,10 @@ def main(argv: list[str] | None = None) -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     rows = _corpus_rows() + _newtz_rows() + _open2_rows() + _external_rows()
     groups = latest(rows)
-    text = render_verdicts(groups) + render(groups) + render_stability(rows)
+    text = render_verdicts(groups) + render(groups) + render_stability(rows) + render_recurring(rows)
     print(text)
     if a.write:
-        write_results(render(groups) + render_stability(rows))
+        write_results(render(groups) + render_stability(rows) + render_recurring(rows))
         put_results_block(RESULTS, "verdict", render_verdicts(groups, heading=False), "Вердикт на исправленных ТЗ")
     return 0
 

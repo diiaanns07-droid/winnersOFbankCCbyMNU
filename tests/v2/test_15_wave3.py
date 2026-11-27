@@ -809,6 +809,36 @@ def test_cleantable_stability_marks_systematic_and_noisy_documents():
     assert ("прогонов 3: 12:53, 15:41 (c6aa9b5), 19:03 (3e7133c); во всех без «нельзя» и critical: roundup." in text)
 
 
+def test_cleantable_recurring_complaints_glue_paraphrases_across_runs():
+    """Повторяющиеся ложные: та же жалоба другими словами в разных прогонах склеивается (заголовки близки), разная —
+    нет; счёт по прогонам, а не по замечаниям; повтор из кэша и прогон без списка замечаний не считаются."""
+    from evaluation.v2 import cleantable as ct
+
+    def f(sev, title, src):
+        return {"severity": sev, "title": title, "sources": [src], "owners": ["№07"]}
+
+    no = {"development": "no", "testing": "no"}
+    runs = (("2026-11-27 12:53", 9, [f("critical", "Повтор с тем же ключом после 422: «не проведено» против 200", "lens:qa"),
+                                     f("major", "Цель 50 % по каналу не имеет признака учёта", "consistency")]),
+            ("2026-11-27 15:41", 8, [f("critical", "Повтор после 422 даёт 200 вопреки отказу", "lens:architect"),
+                                     f("major", "Повтор после 422 даёт 200 и отказ", "lens:qa"),
+                                     f("minor", "Термины без глоссария", "consistency")]),
+            ("2026-11-27 16:29", 0, [f("critical", "Повтор после 422 даёт 200 вопреки отказу", "lens:architect")]),
+            ("2026-11-27 19:03", 9, [f("major", "Повтор после 422 при «проведена» — 200 или отказ", "lens:architect")]))
+    rows = [ct._row("чистые ТЗ №20", "haiku", f"прогон {at[11:16]}", at, "repay", {"critical": 1}, no, calls, fs)
+            for at, calls, fs in runs]
+    rows.append(ct._row("чистые ТЗ №20", "haiku", "без списка", "2026-11-27 19:30", "repay", {"critical": 1}, no, 9, None))
+    rec = ct.recurring(rows)
+    assert len(rec) == 1
+    x = rec[0]
+    assert (x["runs"], x["of"], x["severity"], x["last"]) == (3, 3, ["critical", "critical", "major"], True)
+    assert x["title"] == "Повтор после 422 при «проведена» — 200 или отказ"
+    assert x["sources"] == {"lens:qa": 2, "lens:architect": 2}  # источник — в скольких прогонах он дал эту жалобу
+    text = ct.render_recurring(rows)
+    assert "| repay | чистые ТЗ №20 | haiku | 3 из 3 | c c m | Повтор после 422 при «проведена» — 200 или отказ | да | " \
+           "architect 2, qa 2 | №07 |" in text
+
+
 def test_final_calls_offline_rules_are_not_cache_replay():
     """Прогон правил без модели (`--provider offline`) — «0 — без модели», а не «повтор из кэша»."""
     from evaluation.v2 import final
