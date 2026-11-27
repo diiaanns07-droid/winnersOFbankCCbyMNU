@@ -122,9 +122,11 @@ if (-not (Test-Path -LiteralPath $Py)) {
     Show-Status "BCC Review · первый запуск: создаю окружение ($($base -join ' '))"
     $exe = $base[0]
     $pre = @($base | Select-Object -Skip 1)
-    & $exe @pre -m venv (Join-Path $Root ".venv")
+    $venvOut = @(& $exe @pre -m venv (Join-Path $Root ".venv") 2>&1)  # вывод — только при ошибке, не поверх строки
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $Py)) {
         Remove-Item -LiteralPath (Join-Path $Root ".venv") -Recurse -Force -ErrorAction SilentlyContinue
+        Clear-Status
+        foreach ($l in $venvOut) { Write-Host ([string]$l) }
         Fail "Не удалось создать .venv — сообщение Python выше."
     }
 }

@@ -127,7 +127,7 @@ pre{{margin:0;padding:14px 18px 18px;color:{fg};font:15px/1.2 "DejaVu Sans Mono"
 NODE = r"""
 const { chromium } = require('playwright');
 (async () => {
-  const [page, png] = process.argv.slice(1);
+  const [page, png] = process.argv.slice(2);
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1200, height: 400 }, deviceScaleFactor: 2 });
   await p.goto('file://' + page);
@@ -153,9 +153,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--cwd", default=".")
     ap.add_argument("--title", default="BCC Review")
     ap.add_argument("--prompt", default="~/bcc-review$ ", help="как показать приглашение перед командой")
-    ap.add_argument("cmd", nargs=argparse.REMAINDER)
-    a = ap.parse_args(argv)
-    cmd = a.cmd[1:] if a.cmd[:1] == ["--"] else a.cmd
+    argv = list(sys.argv[1:] if argv is None else argv)
+    cmd = argv[argv.index("--") + 1:] if "--" in argv else []
+    a = ap.parse_args(argv[:argv.index("--")] if "--" in argv else argv)
     if not cmd or not shutil.which("tmux"):
         print("нужны tmux и команда после --", file=sys.stderr)
         return 2
