@@ -188,3 +188,19 @@ def test_rejected_thinking_level_is_remembered_per_level_not_per_model():
     p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, stage="judge")
     p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, stage="segment")
     assert seen == [{"thinking_level": "medium"}, {}, {}, {"thinking_level": "low"}]
+
+
+def test_timing_clarify_parallel_with_judge_by_timestamps(tmp_path):
+    rows = [
+        {"t": "2026-11-27T10:00:30+05:00", "stage": "segment", "model": "m", "seconds": 30, "usage": {}},
+        {"t": "2026-11-27T10:01:30+05:00", "stage": "consistency", "model": "m", "seconds": 60, "usage": {}},
+        {"t": "2026-11-27T10:02:10+05:00", "stage": "clarify", "model": "m", "seconds": 40, "usage": {}},
+        {"t": "2026-11-27T10:03:00+05:00", "stage": "judge", "model": "m", "seconds": 80, "usage": {}},
+        {"t": "2026-11-27T10:03:10+05:00", "stage": "judge", "model": "m", "seconds": 10, "usage": {}},
+    ]
+    (tmp_path / "trace.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+    s = timing.summary(timing.load(tmp_path))
+    assert s["clarify_parallel"] is True
+    assert s["critical_path_s"] == 30 + 60 + 90          # вопросы спрятаны за судьёй
+    assert s["model_wall_s"] == 190
+    assert "параллельно" in timing.render(tmp_path, s)
