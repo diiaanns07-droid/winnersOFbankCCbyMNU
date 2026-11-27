@@ -88,9 +88,9 @@ def test_out_of_scope_topics_dropped_without_hook():
     cands = [_cand("Нет требований соответствия PCI DSS"),
              _cand("Не описан аудит изменения настроек"),
              _cand("Нет схемы отката и feature flag"),
-             _cand("Не определён часовой пояс границы суток")]
+             _cand("Часовой пояс задан городом, а не смещением UTC")]
     kept, dropped = lens_risk.postprocess(cands, doc)
-    assert [c["title"] for c in kept] == ["Не определён часовой пояс границы суток"]
+    assert [c["title"] for c in kept] == ["Часовой пояс задан городом, а не смещением UTC"]
     assert len(dropped) == 3 and all(d["reject_reason"] for d in dropped)
 
 
@@ -438,3 +438,76 @@ def test_payout_to_closed_card_needs_destination_choice():
     defined = chosen + "\nЕсли на дату выплаты карта для выплаты закрыта, проценты капитализируются."
     kept, dropped = lens_risk.postprocess([_cand(title, kind="incomplete")], defined)
     assert not kept and "описан" in dropped[0]["reject_reason"]
+
+
+# ---- волна 3 (новый чат): ложные тревоги на чистых ТЗ, которые документ сам закрывает ----
+
+def test_deadline_without_timezone_is_not_a_finding():
+    doc = "Клиент может отказаться в течение 14 календарных дней с даты выдачи кредита."
+    t = "Срок отказа в 14 дней задан без часового пояса"
+    kept, dropped = lens_risk.postprocess([_cand(t, evidence=[{"quote": "в течение 14 календарных дней", "line": 1}])], doc)
+    assert _sev(t, kept, dropped) == "снято"
+    # пояс назван городом — minor с зацепкой; два разных пояса — противоречие; два периода — расхождение мест
+    city = "Часовой пояс задан городом Алматы без смещения UTC"
+    conflict = _cand("Время блокировки: UTC+5 в одном месте и UTC в другом", kind="contradiction")
+    periods = _cand("Период учёта и период ограничения уведомлений без пояса", requirement_ids=["R-01"])
+    kept, dropped = lens_risk.postprocess([_cand(city, "minor"), conflict, periods], "Месяц — по дате в Алматы.")
+    assert {c["title"] for c in kept} == {city, conflict["title"], periods["title"]}
+
+
+def test_end_of_day_balance_without_any_timezone_stays_major():
+    doc = "Проценты начисляются ежедневно на остаток счёта на конец дня."
+    c = _cand("Граница суток для начисления процентов без часового пояса",
+              evidence=[{"quote": "Проценты начисляются ежедневно на остаток счёта на конец дня", "line": 1}])
+    kept, _ = lens_risk.postprocess([c], doc)
+    assert kept and kept[0]["severity"] == "major"
+    # если пояс в документе назван, «конец дня» определён — замечания нет
+    kept, dropped = lens_risk.postprocess([c], doc + "\nВремя — по Астане (UTC+5).")
+    assert not kept and dropped
+
+
+def test_late_refund_already_decided_by_rule_is_dropped():
+    doc = ("Возврат покупки, отражённый до окончания периода, уменьшает сумму; возврат, отражённый позже, уменьшает "
+           "задолженность, но льготный период не восстанавливает.")
+    t = "Возврат после окончания периода: снимаются ли проценты по покупке"
+    c = _cand(t, evidence=[{"quote": "возврат, отражённый позже, уменьшает задолженность", "line": 1}])
+    kept, dropped = lens_risk.postprocess([c], doc)
+    assert _sev(t, kept, dropped) == "снято"
+    # правило возврата без позднего случая (официальный тип С10) — замечание остаётся
+    doc2 = "Возврат уменьшает расходы месяца исходной покупки. Не больше одного уведомления в месяц."
+    t2 = "Возврат меняет прошлый месяц, а уведомление уже отправлено"
+    c2 = _cand(t2, kind="incomplete", evidence=[{"quote": "Возврат уменьшает расходы месяца исходной покупки", "line": 1}])
+    kept, dropped = lens_risk.postprocess([c2], doc2)
+    assert _sev(t2, kept, dropped) == "major"
+
+
+def test_cancel_during_payment_is_not_a_refund_edge():
+    doc = ("Получатель может отменить неоплаченный QR-код.\n"
+           "Проверить срок: текущее время не позже времени создания + ttl.")
+    t = "Не описан исход начатой оплаты, если получатель отменил QR-код во время оплаты"
+    c = _cand(t, kind="incomplete", evidence=[{"quote": "Получатель может отменить неоплаченный QR-код", "line": 1},
+                                             {"quote": "текущее время не позже времени создания", "line": 2}])
+    kept, dropped = lens_risk.postprocess([c], doc)
+    assert _sev(t, kept, dropped) == "major"
+
+
+def test_failure_outcome_described_in_document():
+    doc = "Списание и зачисление выполняются вместе: при сбое не проводится ни одна из них, ответ 500."
+    t = "Не описано состояние QR-кода после сбоя 500 при проведении"
+    kept, dropped = lens_risk.postprocess([_cand(t, kind="incomplete")], doc)
+    assert _sev(t, kept, dropped) == "снято"
+    kept, _ = lens_risk.postprocess([_cand(t, kind="incomplete", criterion="risk")],
+                                    "Если перевод не прошёл из-за сбоя, клиент видит ошибку.")
+    assert kept
+
+
+def test_repeat_request_answered_by_special_rule():
+    doc = "Особые правила: 1. Повторная установка уже выбранного способа не считается ошибкой и возвращает 200."
+    t = "Повторная установка того же способа: 200 или 409"
+    kept, dropped = lens_risk.postprocess([_cand(t)], doc)
+    assert _sev(t, kept, dropped) == "снято"
+    # повтор события от внешней системы — не повтор запроса клиента
+    ev = "Повтор события процессинга: не назван признак распознавания"
+    kept, dropped = lens_risk.postprocess([_cand(ev, kind="ops_risk", criterion="risk")],
+                                          doc + "\nПовторное событие не учитывается повторно.")
+    assert _sev(ev, kept, dropped) == "major"
