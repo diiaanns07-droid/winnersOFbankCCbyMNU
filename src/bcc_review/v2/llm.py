@@ -14,6 +14,7 @@ import hashlib
 import json
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
 
@@ -28,7 +29,9 @@ except Exception:  # pragma: no cover - v1 всегда рядом, но v2 не
 
 TRANSIENT = {"rate_limit", "overloaded", "server", "timeout", "network"}
 NEXT_MODEL = {"not_found", "overloaded", "quota"}
-FATAL = {"auth", "not_configured", "quota"}  # после такой ошибки модель в этом прогоне больше не зовём  # после повторов — следующая модель цепочки
+# После такой ошибки модель в этом прогоне больше не зовём. Сеть — тоже: сюда она доходит только после всех
+# повторов (2+4+8+16+32 с), и иначе каждый следующий этап тратил бы бюджет вызовов на те же повторы.
+FATAL = {"auth", "not_configured", "quota", "network"}
 BACKOFF = (2, 4, 8, 16, 32)
 MAX_TIMEOUT_RETRIES = 1
 MAX_OUTPUT_CEILING = 32000  # выше лимит ответа не поднимаем: дальше — деление пакета  # таймаут claude -p — минуты; повторяем один раз
@@ -109,9 +112,13 @@ class LLMClient:
         self.trace = trace
         self.max_split_depth = max_split_depth  # не больше одного деления на этап: каскад делений съедает время
         self.stage_timeout_s = float(stage_timeout_s or 0)  # 0 — без лимита времени этапа
-        self.min_interval_s = 60.0 / float(rpm) if rpm and float(rpm) > 0 else 0.0  # темп запросов (RPM)
+        # Темп запросов (RPM) — скользящее окно: не больше ``rpm`` запросов за любые 60 с. Раньше запросы
+        # разносились на 60/rpm с, и при rpm=10 пять параллельных рецензентов стартовали с шагом 6 с (последний —
+        # через 24 с); окно даёт тот же лимит без пауз, пока за минуту меньше ``rpm`` запросов (9 за прогон).
+        self.rpm = int(float(rpm)) if rpm and float(rpm) >= 1 else 0
+        self.min_interval_s = 60.0 / float(rpm) if rpm and float(rpm) > 0 else 0.0
+        self._window: list[float] = []  # моменты старта запросов за последние 60 с
         self._stage_t0: dict[str, float] = {}
-        self._next_slot = 0.0
         self._sleep, self._clock = sleep, clock
         self._t0 = clock()
         self._lock = threading.Lock()
@@ -183,12 +190,24 @@ class LLMClient:
             wait = 0.0
             if self.min_interval_s:
                 now = self._clock()
-                slot = max(now, self._next_slot)
-                self._next_slot = slot + self.min_interval_s
-                wait = slot - now
+                if self.rpm:
+                    self._window = [x for x in self._window if x > now - 60.0]
+                    # слот: сейчас, если в окне меньше rpm запросов; иначе — когда из окна выйдет rpm-й с конца
+                    slot = now if len(self._window) < self.rpm else self._window[-self.rpm] + 60.0
+                    self._window.append(slot)
+                    self._window.sort()
+                else:  # меньше одного запроса в минуту — равные интервалы
+                    slot = max(now, self._window[-1] + self.min_interval_s) if self._window else now
+                    self._window = [slot]
+                wait = max(0.0, slot - now)
         if wait > 0:
             self._emit({"stage": stage, "event": "rpm_wait", "seconds": round(wait, 1)})
             self._sleep(wait)
+
+    def restart_stage_clock(self, stage: str) -> None:
+        """Лимит времени этапа заново: поздний вызов вопросов после раннего (его часы шли вместе с судьёй)."""
+        with self._lock:
+            self._stage_t0.pop(stage, None)
 
     def call_timeout(self, stage: str) -> float:
         """Таймаут одного вызова: не больше остатка лимита времени этапа (но не меньше минуты)."""
@@ -236,6 +255,9 @@ class LLMClient:
             with self._lock:
                 self.stats["cached"] += 1
                 self._stage_stats(stage)["cached"] += 1
+                m = cached.get("model")
+                if m and m not in self.stats["models_used"]:
+                    self.stats["models_used"].append(m)
             self._emit({"stage": stage, "cached": True, "model": cached.get("model"), "key": key[:16]})
             self._record(stage, cached["data"])
             return cached["data"]
@@ -297,6 +319,14 @@ class LLMClient:
                             "seconds": round(seconds, 1), "attempt": attempt})
                 if is_truncation(kind, str(msg)):
                     raise Truncated(stage, str(msg)) from None
+                if kind == "invalid_output" and not repaired and not handles_retries:
+                    # ответ пришёл, но не JSON / не по схеме на стороне провайдера (claude -p без structured_output):
+                    # одна попытка починки, как для ошибок схемы ниже; Gemini (handles_retries) повторяет сам
+                    repaired = True
+                    with self._lock:
+                        self.stats["repaired"] += 1
+                    cur_user = user + REPAIR_NOTE.format(errors=str(msg)[:300])
+                    continue
                 retry = (kind in TRANSIENT and not handles_retries and attempt < self.max_retries
                          and not (kind == "timeout" and timeouts >= MAX_TIMEOUT_RETRIES))
                 if retry:
@@ -361,11 +391,32 @@ class LLMClient:
             with self._lock:
                 self.stats["split"] += 1
                 self._stage_stats(stage)["split"] += 1
-            self._emit({"stage": stage, "event": "split", "items": len(items), "depth": _depth + 1})
+            # половинам — лимит, на котором споткнулся полный пакет (после расширения), иначе половина, которой мало
+            # 32 000, снова получает 16 000 и обрезается гарантированно; половины идут параллельно
+            limit = min(max_output_tokens * 2, MAX_OUTPUT_CEILING) if _depth == 0 else max_output_tokens
+            self._emit({"stage": stage, "event": "split", "items": len(items), "depth": _depth + 1,
+                        "max_output_tokens": limit})
             mid = len(items) // 2
-            parts = [self.ask_split(stage, build, part, schema, merge, max_output_tokens=max_output_tokens,
-                                    _depth=_depth + 1) for part in (items[:mid], items[mid:])]
-            return merge(parts)
+            halves = (items[:mid], items[mid:])
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                futs = [pool.submit(self.ask_split, stage, build, part, schema, merge, max_output_tokens=limit,
+                                    _depth=_depth + 1) for part in halves]
+                results: list[Any] = []
+                for fut in futs:
+                    try:
+                        results.append(fut.result())
+                    except LLMError as exc:  # Truncated, BudgetExceeded и прочие сбои одной половины
+                        results.append(exc)
+            ok = [r for r in results if not isinstance(r, LLMError)]
+            if not ok:
+                raise next(r for r in results if isinstance(r, LLMError))
+            if len(ok) < len(results):
+                # одна половина не удалась: этап получает ответ второй и помечается частичным (failed в статистике)
+                with self._lock:
+                    self.stats["failed"] += 1
+                    self._stage_stats(stage)["failed"] += 1
+                self._emit({"stage": stage, "event": "split_partial", "items": len(items), "depth": _depth + 1})
+            return merge(ok)
 
     def summary(self) -> dict:
         s = self.stats

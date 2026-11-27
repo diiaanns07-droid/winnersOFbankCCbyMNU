@@ -111,7 +111,7 @@ def models(pairs: list[str]) -> str:
                  f"{p['outside_real']}/{p['outside_false']} | {_pct(p['precision_useful'])} | "
                  f"{_pct(r['severity']['accuracy_ok'])} | {len(r['severity']['critical_false'])} | "
                  f"{r['quotes']['missing']}/{r['quotes']['total']} | {'—' if dur is None else f'{dur / 60:.1f}'} | "
-                 f"{calls.get('total', '—')} | {'—' if rep.get('cost_usd') is None else f'{rep['cost_usd']:.2f}'} |")
+                 f"{calls.get('total', '—')} | {'—' if rep.get('cost_usd') is None else format(rep['cost_usd'], '.2f')} |")
     return "\n".join(L) + "\n"
 
 

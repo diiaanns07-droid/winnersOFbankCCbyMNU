@@ -35,7 +35,9 @@ VOCAB: list[tuple[str, str, str]] = [
                    r"дешевле|эффективнее)\b|\b(?:улучшить|повысить|ускорить|увеличить|снизить|сократить|"
                    r"минимизировать|максимизировать|оптимизировать)\b",
      "сравнение без базы и числа"),
-    ("indefinite", r"\bнекотор\w+\b|\bнескольк\w+\b|\bмногие\b|\bбольшинств\w+\b|\bряд\s+\w+(?:ов|ей|ий)\b|"
+    # «несколько раз» — повторяемость («можно оплатить несколько раз», «если клиент несколько раз сменил»), а не
+    # неопределённое количество: на исправленных ТЗ это ложная подсказка
+    ("indefinite", r"\bнекотор\w+\b|\bнескольк\w+\b(?!\s+раз\b)|\bмногие\b|\bбольшинств\w+\b|\bряд\s+\w+(?:ов|ей|ий)\b|"
                    r"\bи/или\b|\bлибо\s+иные\b",
      "неопределённое количество или выбор"),
 ]
@@ -45,6 +47,11 @@ METADATA_KEYS = re.compile(r"^(наименование|продукт|бизн�
                            r"controller|framework|gitlab|swagger|url type|поле|parameter|параметр)\b", re.I)
 CHECKLIST = re.compile(r"\bДа\s*/\s*Нет\b", re.I)
 NUMBER = re.compile(r"\d")
+# «X считается Y в момент Z», «отказ считается оформленным в момент, когда …» — определение момента событием, а не
+# размытый срок; «узнать в момент покупки» (обещание реакции без допуска) остаётся сигналом
+DEFINES_MOMENT = re.compile(r"\b(?:счита\w+|признаё\w+|признае\w+|определя\w+|фиксиру\w+)\b", re.I)
+# раздел целей: «Снизить число обращений» — бизнес-цель, а не проверяемое требование
+GOAL_SECTION = re.compile(r"(?:^|›\s*)(?:\d+[.)]?\s*)?(?:цел[иья]\b|бизнес-цел|goals?\b|objectives?\b)", re.I)
 
 AUDIENCE = {"vague_time": ("analyst", "qa", "risk"), "vague_quality": ("analyst", "qa"),
             "loophole": ("analyst",), "open_list": ("analyst", "qa"), "comparison": ("analyst", "qa"),
@@ -93,7 +100,10 @@ NFR_ID = re.compile(r"^\s*(?:НФ|НФТ|NFR|NF)-?\d+", re.I)
 NFR_VAGUE = re.compile(
     r"\bбыстр(?:о|ый|ая|ое|ые|ого|ому)\b|\bмгновенн\w*|\bнемедленн\w*|\bсвоевременн\w*|\bоперативн\w*|"
     r"\bв\s+реальном\s+времени\b|\bудобн\w*|\bинтуитивн\w*|\bнадёжн\w*|\bнадежн\w*|\bвысок\w+\s+нагрузк\w*|"
-    r"\bвсегда\s+актуальн\w*|\bбез\s+задерж\w*|\bстабильн\w*|\bотзывчив\w*", re.I)
+    r"\bвсегда\s+актуальн\w*|\bбез\s+задерж\w*|\bстабильн\w*|\bотзывчив\w*|"
+    r"\bточн(?:о|ый|ая|ое|ые)\b|\bбез\s+(?:каких-либо\s+)?ошиб\w*|\bкруглосуточн\w*|\bбесперебойн\w*|"
+    r"\bбезотказн\w*|\bбез\s+сбо\w*|\b(?:всегда|постоянно)\s+доступ\w*|\bв\s+любое\s+время\b|\bмасштабируем\w*|"
+    r"\bотказоустойчив\w*|\bвысок\w+\s+(?:доступност|производительност|скорост)\w*", re.I)
 
 
 def _nfr_candidate(doc: Doc, out: dict) -> None:
@@ -138,8 +148,12 @@ def run(doc: Doc, out: dict, requirements: list[dict] | None = None, excluded: l
         for cat, rx, why in COMPILED:
             for m in rx.finditer(masked):
                 word = text[m.start():m.end()].strip()
-                if cat == "comparison" and NUMBER.search(text):
+                if cat == "comparison" and (NUMBER.search(text) or GOAL_SECTION.search(x.section or "")):
                     continue
+                if cat == "vague_time" and "момент" in m.group(0).lower():
+                    c0 = max(masked.rfind(";", 0, m.start()), masked.rfind(".", 0, m.start())) + 1
+                    if DEFINES_MOMENT.search(masked[c0:m.start()]):
+                        continue
                 if cat == "open_list":
                     before = masked[:m.start()]
                     enum = ENUM_BEFORE.search(before)

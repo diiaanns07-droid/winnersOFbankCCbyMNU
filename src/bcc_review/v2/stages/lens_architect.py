@@ -9,7 +9,9 @@
 * critical без сценария, последствий или с `blocks = none` понижается до major (CONTRACT, раздел 5);
 * точные дубли (тот же вид и тот же набор строк цитат) схлопываются;
 * порядок critical → major → minor, не больше MAX_CANDIDATES;
-* `requirement_ids`, которых нет в нарезке, убираются (модель иногда ставит ID из документа).
+* critical «нет операции» без цитаты явного обещания интерфейса (и без кода ответа) понижается до major;
+* `requirement_ids`, которых нет в нарезке, убираются (модель иногда ставит ID из документа);
+* метки нумерации «L052» в текстах заменяются на «стр. 52» (рубрика понятности: без внутренних кодов).
 """
 from __future__ import annotations
 
@@ -87,6 +89,39 @@ def unfulfilled_promises(inventory: dict) -> list[dict]:
     return [p for p in (inventory or {}).get("promises") or [] if not str(p.get("operation") or "").strip()]
 
 
+TEXT_FIELDS = ("title", "problem", "scenario", "impact", "recommendation", "rewrite", "question")
+LINE_MARK = re.compile(r"\bL(\d{3})\b")  # метка нумерации документа «L052» в тексте для читателя
+
+
+def plain_line_refs(text: str) -> str:
+    """«L052» → «стр. 52»: метки нумерации — внутренний формат запроса, читателю нужен номер строки."""
+    return LINE_MARK.sub(lambda m: f"стр. {int(m.group(1))}", text)
+
+
+HTTP_CODE = re.compile(r"(?<!\d)[1-5]\d\d(?!\d)")  # шаг сам называет код ответа — исход задан
+# Явное обещание интерфейса в цитате: «через дочерний документ», «методом …», строка Description, спецификация,
+# API/REST, вызов в последовательности «A → B: действие».
+PROMISE_MARK = re.compile(r"дочерн\w* документ|метод|description|спецификац|\bapi\b|\brest\b|интерфейс|"
+                          r"→[^:.]{1,60}:", re.I)
+
+
+# Шкала линзы (промпт, «Серьёзность»): critical — только обещанная, но не описанная операция или код ответа
+# (missing_element) и успех против ошибки для одного входа (status_conflict). Замер волны 3: critical других видов
+# (contradiction, unit_mismatch) из линзы — 7 из 16 на чистых ТЗ №18, остальные — конфликты правил зоны №09.
+CRITICAL_KINDS = {"missing_element", "status_conflict"}
+
+
+def unpromised_critical(c: dict) -> bool:
+    """critical «нет операции», ни одна цитата которого не содержит явного обещания интерфейса и кода ответа.
+
+    Такой critical держится только на экране или на обмене со смежной системой (замер №18: «номер полиса от
+    страховой компании» на чистом ТЗ). По шкале линзы critical — только явно обещанная операция (п. 1)."""
+    if c.get("severity") != "critical" or c.get("kind") != "missing_element":
+        return False
+    quotes = [str(e.get("quote") or "") for e in c.get("evidence") or []]
+    return not any(PROMISE_MARK.search(q) or HTTP_CODE.search(q) for q in quotes)
+
+
 def postprocess(data: dict, requirement_ids: set[str] | None = None,
                 max_candidates: int = MAX_CANDIDATES) -> dict:
     """Нормализует ответ модели. Не меняет вход; возвращает {"candidates": [...], "inventory": {...}}."""
@@ -106,8 +141,15 @@ def postprocess(data: dict, requirement_ids: set[str] | None = None,
                                             or not str(c.get("impact") or "").strip()
                                             or c.get("blocks") in (None, "", "none")):
             c["severity"] = "major"
+        if c["severity"] == "critical" and c.get("kind") not in CRITICAL_KINDS:
+            c["severity"] = "major"  # шкала линзы: противоречия правил и единицы — major (их critical — набор №09)
+        if unpromised_critical(c):
+            c["severity"] = "major"
         if requirement_ids is not None:
             c["requirement_ids"] = [r for r in c.get("requirement_ids") or [] if r in requirement_ids]
+        for k in TEXT_FIELDS:
+            if isinstance(c.get(k), str):
+                c[k] = plain_line_refs(c[k])
         key = _evidence_key(c)
         if key in seen:
             continue
@@ -128,6 +170,64 @@ API_KINDS = {"api", "integration", "data", "architecture"}
 # с 16 000 впустую падает через ~5 минут. Для локальных моделей (openai) остаётся общий лимит линз.
 WIDE_OUTPUT_PROVIDERS = {"claude_cli", "gemini", "anthropic", "mock"}
 WIDE_OUTPUT_TOKENS = 32000
+
+
+BRANCH_TITLE = "Ветка логики без ответа"
+# Условная ветка, которая сама велит что-то вернуть: «при отклонении … вернуть …», «если …, вернуть …».
+# Нужны оба признака: шаг основного пути («выполнить … и вернуть результат») описан ответом 200, а ветка,
+# которая задаёт исход словами («если …, возвращаются сведения …»), — с ответом (ложные на №18, волна 3).
+BRANCH_RETURN = re.compile(r"верн", re.I)
+BRANCH_CONDITION = re.compile(r"\bпри\b|\bесли\b|в случае|иначе|отклон|отказ", re.I)
+MAX_BRANCH_CANDIDATES = 2
+
+
+def _line_text(view: Any, n: int) -> str:
+    for ln in (view or {}).get("lines") or []:
+        if int(ln.get("n") or 0) == n:
+            return str(ln.get("text") or "").strip()
+    return ""
+
+
+def branch_candidates(inventory: dict, view: Any, candidates: list[dict]) -> list[dict]:
+    """Кандидаты на ветки логики без ответа, которые модель внесла в опись, но не оформила замечанием.
+
+    Слабая модель (haiku с effort=low) верно отмечает ветку без ответа в `inventory.branches`, но потом
+    сливает её с соседним замечанием. Код добавляет замечание, только если шаг — условная ветка, которая
+    велит что-то вернуть без кода («при отклонении … вернуть …»), и ни один кандидат не цитирует эту строку
+    как ветку логики
+    (заголовок со словом «ветка» — модель пишет и «Ветка «вернуть …» без поля …»).
+    Цитата — дословный текст строки документа, поэтому сверка цитат пройдёт.
+    """
+    covered = {int(e.get("line") or 0) for c in candidates
+               if "ветк" in str(c.get("title") or "").lower() for e in c.get("evidence") or []}
+    out: list[dict] = []
+    for b in undefined_branches(inventory):
+        try:
+            n = int(b.get("line") or 0)
+        except (TypeError, ValueError):
+            continue
+        text = _line_text(view, n)
+        if (not n or n in covered or not text or not BRANCH_RETURN.search(text)
+                or not BRANCH_CONDITION.search(text) or HTTP_CODE.search(text)):
+            continue
+        covered.add(n)
+        step = str(b.get("step") or "").strip().rstrip(".") or text
+        out.append({
+            "title": f"{BRANCH_TITLE}: {step}"[:120],
+            "kind": "api_contract", "criterion": "complete", "severity": "major", "requirement_ids": [],
+            "evidence": [{"quote": text[:200], "line": n}],
+            "problem": f"Шаг логики «{text[:160]}» требует ответа, но документ не задаёт для этой ветки код и "
+                       "состав тела: в перечне кодов и в примерах тел её нет.",
+            "scenario": "Запрос попадает в эту ветку логики: по документу неизвестно, какой код и какие поля "
+                        "вернёт метод.",
+            "impact": "Сервер и клиент реализуют ответ по-разному; тест этой ветки нельзя написать однозначно.",
+            "recommendation": "Описать для ветки код ответа и тело: какие поля и с какими значениями возвращаются.",
+            "rewrite": "<уточнить: код и тело ответа для этой ветки>", "question": "", "blocks": "both",
+            "source": SOURCE, "origin": "inventory",
+        })
+        if len(out) >= MAX_BRANCH_CANDIDATES:
+            break
+    return out
 
 
 def _is_output_limit(exc: BaseException) -> bool:
@@ -168,8 +268,38 @@ def _run_parts(ctx: Any) -> dict:
     return merge_lists(parts)
 
 
+EMPTY_RETRY = ("\n\nПредыдущий ответ на этот запрос пришёл пустым: ни одного элемента описи и ни одного кандидата. "
+               "Документ описывает интерфейс: заполни опись по тексту (операции, коды ответа, поля, шаги логики) "
+               "и выполни проверки шага 2.")
+# Признаки интерфейса в тексте документа: HTTP-метод, код ответа рядом со словом «код/статус/ответ», API.
+INTERFACE_HINT = re.compile(r"\b(GET|POST|PUT|PATCH|DELETE)\b|\bAPI\b|\bREST\b|endpoint|эндпоинт", re.I)
+
+
+def is_empty_answer(raw: Any) -> bool:
+    """Пустой ответ: ни кандидатов, ни одного элемента описи (схема пройдена, но модель ничего не проверила)."""
+    if not isinstance(raw, dict):
+        return True
+    if raw.get("candidates"):
+        return False
+    inv = raw.get("inventory") if isinstance(raw.get("inventory"), dict) else {}
+    return not any(inv.get(k) for k in ("operations", "promises", "codes", "fields", "branches"))
+
+
+def has_interface(ctx: Any) -> bool:
+    reqs = getattr(ctx, "requirements", None) or []
+    if any(isinstance(r, dict) and r.get("kind") in API_KINDS for r in reqs):
+        return True
+    lines = (getattr(ctx, "view", None) or {}).get("lines") or []
+    return any(INTERFACE_HINT.search(str(ln.get("text") or "")) for ln in lines)
+
+
 def _ask_whole(ctx: Any) -> dict:
-    """Один запрос на весь документ. При обрезке `LLMClient.ask` (№01) сам повторяет с удвоенным лимитом."""
+    """Один запрос на весь документ. При обрезке `LLMClient.ask` (№01) сам повторяет с удвоенным лимитом.
+
+    Пустой ответ (ни описи, ни кандидатов) на документе с интерфейсом — сбой модели, а не «дефектов нет»:
+    sonnet так ответил в 1 из 3 прогонов на официальном документе (13 с, 2 тыс. токенов). Тогда один повтор
+    с пометкой в запросе (другой ключ кэша, поэтому пустой ответ из кэша не вернётся).
+    """
     from . import lens  # каркас №01
 
     stage = f"lens_{NAME}"
@@ -177,7 +307,13 @@ def _ask_whole(ctx: Any) -> dict:
         ctx.warn(f"Линза «{NAME}»: нет промпта {stage}.md — этап пропущен")
         return {"candidates": []}
     system, user = ctx.prompt(stage)
-    return ctx.llm.ask(stage, system, user, lens.schema_for(NAME), max_output_tokens=output_limit(ctx))
+    schema = lens.schema_for(NAME)
+    raw = ctx.llm.ask(stage, system, user, schema, max_output_tokens=output_limit(ctx))
+    if is_empty_answer(raw) and has_interface(ctx):
+        if hasattr(ctx, "warn"):
+            ctx.warn("Линза «Архитектор»: модель вернула пустой ответ — один повтор")
+        raw = ctx.llm.ask(stage, system, user + EMPTY_RETRY, schema, max_output_tokens=output_limit(ctx))
+    return raw
 
 
 def output_limit(ctx: Any) -> int:
@@ -206,6 +342,10 @@ def run(ctx: Any) -> dict:
             ctx.warn("Линза «Архитектор»: ответ не уместился в лимит вывода — повтор двумя частями")
         raw = _run_parts(ctx)
     raw = dict(raw or {})
+    inv = raw.get("inventory") if isinstance(raw.get("inventory"), dict) else {}
+    extra = branch_candidates(inv, getattr(ctx, "view", None), list(raw.get("candidates") or []))
+    if extra:
+        raw["candidates"] = list(raw.get("candidates") or []) + extra
     reqs = {r.get("id") for r in getattr(ctx, "requirements", None) or [] if isinstance(r, dict)}
     result = postprocess(raw, requirement_ids=reqs or None)
     extras = {k: v for k, v in raw.items() if k not in ("candidates", "inventory")}

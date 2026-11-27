@@ -1,0 +1,243 @@
+{
+ "_note": "Ответ haiku (27.11, промпт до волны 3), прошедший кодовую часть волны 2; тест прогоняет его через текущий код.",
+ "requirements": [
+  {
+   "source_id": "",
+   "kind": "goal",
+   "summary": "Клиент временно блокирует карту в приложении при сомнении в её сохранности",
+   "line_start": 17,
+   "line_end": 17
+  },
+  {
+   "source_id": "Термины: Авторизация",
+   "kind": "other",
+   "summary": "Авторизация — запрос процессинга на одобрение операции по карте",
+   "line_start": 20,
+   "line_end": 20
+  },
+  {
+   "source_id": "Термины: Статусы карты",
+   "kind": "other",
+   "summary": "Статусы карты: ACTIVE и BLOCKED_BY_CLIENT с пояснениями",
+   "line_start": 21,
+   "line_end": 21
+  },
+  {
+   "source_id": "БК-1",
+   "kind": "functional",
+   "summary": "Блокировка из ACTIVE и разблокировка из BLOCKED_BY_CLIENT клиентом",
+   "line_start": 24,
+   "line_end": 24
+  },
+  {
+   "source_id": "БК-2",
+   "kind": "functional",
+   "summary": "Срок блокировки 1–30 суток или бессрочно; возврат в ACTIVE по сроку",
+   "line_start": 25,
+   "line_end": 25
+  },
+  {
+   "source_id": "БК-3",
+   "kind": "functional",
+   "summary": "Отклонение новых авторизации у заблокированной клиентом карты с причиной",
+   "line_start": 26,
+   "line_end": 26
+  },
+  {
+   "source_id": "БК-4",
+   "kind": "functional",
+   "summary": "Блокировка не отменяет авторизации, одобренные до неё",
+   "line_start": 27,
+   "line_end": 27
+  },
+  {
+   "source_id": "БК-5",
+   "kind": "functional",
+   "summary": "Вступление блокировки в силу не позднее 10 секунд после 200",
+   "line_start": 28,
+   "line_end": 28
+  },
+  {
+   "source_id": "БК-6",
+   "kind": "functional",
+   "summary": "Разблокировка доступна без ограничения числа раз",
+   "line_start": 29,
+   "line_end": 29
+  },
+  {
+   "source_id": "БК-7",
+   "kind": "functional",
+   "summary": "Push-уведомление о блокировке с последними четырьмя цифрами карты",
+   "line_start": 30,
+   "line_end": 30
+  },
+  {
+   "source_id": "",
+   "kind": "data",
+   "summary": "Хранимые данные карты, блокировки, срока, времени UTC+5 и инициатора",
+   "line_start": 33,
+   "line_end": 33
+  },
+  {
+   "source_id": "",
+   "kind": "integration",
+   "summary": "Приложение использует методы blockCard, unblockCard и getCardStatus",
+   "line_start": 36,
+   "line_end": 36
+  },
+  {
+   "source_id": "Критерии приёмки, строка 1",
+   "kind": "acceptance",
+   "summary": "Блокировка на 30 суток из ACTIVE: 200, авторизация через 10 секунд отклонена",
+   "line_start": 42,
+   "line_end": 42
+  },
+  {
+   "source_id": "Критерии приёмки, строка 2",
+   "kind": "acceptance",
+   "summary": "Авторизация на 1 000 ₸ при блокировке отклоняется с причиной",
+   "line_start": 43,
+   "line_end": 43
+  },
+  {
+   "source_id": "Критерии приёмки, строка 3",
+   "kind": "acceptance",
+   "summary": "Авторизация, одобренная до блокировки, остаётся одобренной",
+   "line_start": 44,
+   "line_end": 44
+  },
+  {
+   "source_id": "Метод blockCard",
+   "kind": "api",
+   "summary": "Метод blockCard: POST, адрес, авторизация клиента и Content-Type",
+   "line_start": 52,
+   "line_end": 55
+  },
+  {
+   "source_id": "Тело запроса blockCard: days",
+   "kind": "api",
+   "summary": "Параметр days: срок 1–30 суток, без поля — бессрочно",
+   "line_start": 61,
+   "line_end": 61
+  },
+  {
+   "source_id": "Метод unblockCard",
+   "kind": "api",
+   "summary": "Метод unblockCard: POST, адрес и авторизация клиента владельца",
+   "line_start": 67,
+   "line_end": 69
+  },
+  {
+   "source_id": "Метод getCardStatus",
+   "kind": "api",
+   "summary": "Метод getCardStatus: GET, адрес и авторизация клиента владельца",
+   "line_start": 75,
+   "line_end": 77
+  },
+  {
+   "source_id": "Метод getCardStatus: Статус 200",
+   "kind": "api",
+   "summary": "Ответ 200 getCardStatus: статус, время блокировки UTC+5, срок",
+   "line_start": 79,
+   "line_end": 79
+  },
+  {
+   "source_id": "Статус 200",
+   "kind": "api",
+   "summary": "Код 200: запрос выполнен, тело пустое для blockCard и unblockCard",
+   "line_start": 85,
+   "line_end": 85
+  },
+  {
+   "source_id": "Статус 400",
+   "kind": "api",
+   "summary": "Код 400: поле days вне диапазона 1–30, сообщение о сроке",
+   "line_start": 86,
+   "line_end": 86
+  },
+  {
+   "source_id": "Статус 401",
+   "kind": "api",
+   "summary": "Код 401: нет действующей сессии, сообщение о необходимости входа",
+   "line_start": 87,
+   "line_end": 87
+  },
+  {
+   "source_id": "Статус 404",
+   "kind": "api",
+   "summary": "Код 404: карта не найдена или не принадлежит клиенту",
+   "line_start": 88,
+   "line_end": 88
+  },
+  {
+   "source_id": "Статус 409",
+   "kind": "api",
+   "summary": "Код 409: статус карты не позволяет операцию, сообщение об ошибке",
+   "line_start": 89,
+   "line_end": 89
+  },
+  {
+   "source_id": "Статус 500",
+   "kind": "api",
+   "summary": "Код 500: внутренняя ошибка сервиса, сообщение об ошибке",
+   "line_start": 90,
+   "line_end": 90
+  }
+ ],
+ "excluded": [
+  {
+   "what": "Служебное пояснение о документе (открытый учебный документ, семейство)",
+   "line_start": 3,
+   "line_end": 3,
+   "reason": "Служебное пояснение о самом документе"
+  },
+  {
+   "what": "Шапка таблицы общих сведений",
+   "line_start": 9,
+   "line_end": 9,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Таблица общих сведений: наименование, продукт, Jira, версия",
+   "line_start": 11,
+   "line_end": 14,
+   "reason": "Метаданные (наименование, продукт, ссылка на задачу, версия); шаблон не заполнен не нарушен, версия указана 1.0 от 01.11.2026"
+  },
+  {
+   "what": "Шапка таблицы критериев приёмки",
+   "line_start": 40,
+   "line_end": 40,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Шапка таблицы параметров blockCard",
+   "line_start": 50,
+   "line_end": 50,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Шапка таблицы тела запроса blockCard",
+   "line_start": 59,
+   "line_end": 59,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Шапка таблицы unblockCard",
+   "line_start": 65,
+   "line_end": 65,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Шапка таблицы getCardStatus",
+   "line_start": 73,
+   "line_end": 73,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Шапка таблицы статусов",
+   "line_start": 83,
+   "line_end": 83,
+   "reason": "Строка-шапка таблицы"
+  }
+ ]
+}

@@ -52,19 +52,37 @@ DOCTOR_HINT = "Проверка настроек: python -m bcc_review doctor (�
 # --------------------------------------------------------------------------- окружение
 
 
+def read_env_text(path: str | Path) -> str:
+    """Текст .env в любой кодировке, в которой его пишет Windows.
+
+    Windows PowerShell 5.1 (``echo GEMINI_API_KEY=… > .env``, ``Out-File``) пишет UTF-16 с BOM — раньше такой
+    файл ронял doctor трейсбэком, а прогон молча уходил в режим без модели. Блокнот — UTF-8 с BOM; старые
+    редакторы — cp1251 (ключ — латиница, читается и так).
+    """
+    raw = Path(path).read_bytes()
+    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return raw.decode("utf-16")
+    if len(raw) >= 4 and raw[1:2] == b"\x00" and raw[3:4] == b"\x00":   # UTF-16 LE без BOM
+        return raw.decode("utf-16-le", "replace")
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return raw.decode("cp1251", "replace")
+
+
 def load_dotenv(path: str | Path = ".env", environ: dict[str, str] | None = None) -> bool:
     """Тот же минимальный загрузчик .env, что в v1: окружение важнее файла. True — файл найден."""
     env = os.environ if environ is None else environ
     p = Path(path)
     if not p.is_file():
         return False
-    for line in p.read_text(encoding="utf-8-sig").splitlines():
+    for line in read_env_text(p).splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
-        key = key.strip().removeprefix("export ").strip()
-        value = value.strip().strip('"').strip("'")
+        key = key.strip().lstrip("\ufeff").removeprefix("export ").strip()
+        value = value.strip().strip('"').strip("'").strip()
         if key and value and key not in env:
             env[key] = value
     return True
@@ -75,9 +93,10 @@ def _has(env: Mapping[str, str], *names: str) -> bool:
 
 
 def resolve_auto(env: Mapping[str, str] | None = None,
-                 which: Callable[[str], str | None] = shutil.which) -> tuple[str, str]:
+                 which: Callable[[str], str | None] | None = None) -> tuple[str, str]:
     """(имя провайдера, причина выбора) по правилу ``auto``."""
     env = os.environ if env is None else env
+    which = which or shutil.which  # в момент вызова, а не объявления: иначе подмена в тестах не действует
     if _has(env, "GEMINI_API_KEY", "GOOGLE_API_KEY"):
         return "gemini", "задан GEMINI_API_KEY" if _has(env, "GEMINI_API_KEY") else "задан GOOGLE_API_KEY"
     if _has(env, "ANTHROPIC_API_KEY"):
@@ -135,7 +154,7 @@ _ADVICE: dict[tuple[str, str], str] = {
     ("gemini", "quota"): ("Квота ключа исчерпана. Минутный лимит сбрасывается через минуту, дневной — в полночь по "
                           "тихоокеанскому времени. Можно задать другую модель (GEMINI_MODEL) или другой ключ."),
     ("gemini", "rate_limit"): ("Слишком много запросов в минуту для бесплатного ключа. Подождите минуту и повторите; "
-                               "можно уменьшить параллельность: GEMINI_CONCURRENCY=2."),
+                               "если у ключа меньше 10 запросов в минуту — задайте темп GEMINI_RPM=5 в .env."),
     ("gemini", "not_found"): ("Модель недоступна этому ключу. Список доступных моделей покажет "
                               "«python -m bcc_review doctor»; затем задайте GEMINI_MODEL=<модель>."),
     ("anthropic", "not_configured"): ANTHROPIC_KEY_HELP,
@@ -227,7 +246,7 @@ def headline(exc: BaseException, provider: str | None = None) -> str:
             wait = getattr(exc, "retry_after_s", None)
             when = f" через {int(wait) + 1} с" if isinstance(wait, (int, float)) and wait > 0 else " через минуту"
             return (f"Превышен лимит запросов в минуту бесплатного ключа Gemini (агент уже ждал и повторял). Повторите"
-                    f"{when}; можно уменьшить параллельность: GEMINI_CONCURRENCY=2 в .env.")
+                    f"{when}; если у ключа меньше 10 запросов в минуту — задайте темп GEMINI_RPM=5 в .env.")
         if kind == "not_found":
             return ("Модели Gemini из цепочки недоступны этому ключу. Список доступных моделей: python -m bcc_review "
                     "doctor; затем GEMINI_MODEL=<модель> в .env.")
@@ -301,12 +320,45 @@ def _cli_version(cmd: list[str]) -> str:
         return f"не запускается: {exc}"
 
 
+FREE_TIER_NOTE = ("Бесплатный ключ: 20 запросов в сутки на каждую модель Flash и 500 на Flash-Lite (квота на проект "
+                  "Google, не на ключ); прогон — 9–10 запросов, поэтому цепочка идёт по всем Flash, затем Flash-Lite.")
+
+
+def _attempt_lines(attempts: Sequence[Mapping[str, Any]]) -> list[str]:
+    """Неудачные попытки пробного вызова Gemini по-русски: почему ответила не основная модель."""
+    from bcc_review.v2.providers.gemini import daily_reset_local
+    lines: list[str] = []
+    seen: set[str] = set()
+    for a in attempts:
+        model, kind = str(a.get("model") or "?"), str(a.get("kind") or a.get("skipped") or "")
+        if not kind or model in seen:
+            continue
+        seen.add(model)
+        if kind == "quota" and a.get("subkind") == "limit_zero":
+            why = "на бесплатном тарифе квота модели нулевая"
+        elif kind == "quota":
+            limit = a.get("quota_limit")
+            why = ("исчерпана дневная квота" + (f" ({limit} запросов в сутки на модель)" if limit else "")
+                   + f"; восстановится около {daily_reset_local()}")
+        elif kind == "not_found":
+            why = "модель недоступна этому ключу (404)"
+        elif kind == "rate_limit":
+            why = "лимит запросов в минуту (429), агент подождал"
+        elif kind in ("overloaded", "server", "timeout"):
+            why = "модель перегружена (503) или не ответила вовремя"
+        else:
+            why = kind
+        lines.append(f"  {WARN} {model}: {why}")
+    return lines
+
+
 def run_doctor(*, live: bool = False, provider: str | None = None, model: str | None = None, timeout_s: float = 120.0,
                env: Mapping[str, str] | None = None, out: Callable[[str], None] = print,
-               which: Callable[[str], str | None] = shutil.which,
+               which: Callable[[str], str | None] | None = None,
                factory: Callable[..., Any] | None = None, list_models: bool = True) -> int:
     """Печатает диагностику. Код: 0 — можно запускать; 1 — нет рабочего провайдера; 2 — пробный вызов не прошёл."""
     env = os.environ if env is None else env
+    which = which or shutil.which
     factory = factory or make_provider
     problems: list[str] = []
     out("Диагностика bcc_review")
@@ -391,6 +443,7 @@ def run_doctor(*, live: bool = False, provider: str | None = None, model: str | 
                 flash = [i for i in ids if "flash" in i][:12]
                 if flash:
                     out(f"  Доступные модели Flash: {', '.join(flash)}")
+        out(f"  {WARN} {FREE_TIER_NOTE}")
 
     code = 0 if not problems else 1
     if live and instance is not None:
@@ -407,6 +460,8 @@ def run_doctor(*, live: bool = False, provider: str | None = None, model: str | 
             dt = time.monotonic() - started
             u = r.get("usage") or {}
             meta = r.get("meta") or {}
+            for line in _attempt_lines(meta.get("attempts") or []):
+                out(line)
             out(f"{OK} Модель ответила за {dt:.1f} с: {r.get('model')}"
                 + (" (запасная)" if meta.get("fallback_used") else "")
                 + f", токенов {u.get('input_tokens', '?')} -> {u.get('output_tokens', '?')}")

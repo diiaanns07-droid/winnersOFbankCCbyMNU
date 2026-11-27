@@ -110,6 +110,10 @@ EFFECT_TIME = re.compile(r"\b(?:с|со|начиная\s+с|начиная\s+с�
                          r"сегодняшн|текущ)\w*(?:\s+[а-яё]+){0,3})|\b(сразу|немедленно)\b", re.I)
 
 
+TTL_AFTER = re.compile(r"^\s*(?:в\s+течение\s+)?(?:\d+|од(?:ин|ну|ни)|дв[ае]|тр[иё]|четыр\w*|пят\w*|десят\w*|"
+                       r"пятнадцат\w*|тридцат\w*)\s+(?:секунд|минут|час|сут|дн|недел|месяц|год|лет)\w*", re.I)
+
+
 def rule_events(doc: Doc, out: dict) -> None:
     sents = sentences(doc)
     done: set[tuple[int, int]] = set()
@@ -129,7 +133,7 @@ def rule_events(doc: Doc, out: dict) -> None:
             if sa == sb and va == vb and na != nb and mark(a, b):
                 pos, neg = (a, b) if nb else (b, a)
                 _emit(out, "conflicts.event_negation", "event_conflict", pos, pos.text, neg, neg.text,
-                      title=f"Одно и то же правило с противоположным исходом: «{sa} {va}» и «{sa} не {va}»",
+                      title=f"Противоположные исходы одного правила: «{sa} {va}» и «не {va}»",
                       problem=(f"В одном месте {quoted(pos.body)}, в другом — {quoted(neg.body)}. Для одного и того же "
                                "случая документ даёт противоположные исходы."),
                       scenario=(f"Происходит событие «{sa}»: по одному месту документа «{va}» выполняется, по "
@@ -188,6 +192,8 @@ def rule_events(doc: Doc, out: dict) -> None:
         m = EFFECT.search(s.body)
         if not m:
             continue
+        if TTL_AFTER.match(m.group(2)):
+            continue  # «код действует 5 минут с момента отправки» — срок действия, а не момент вступления в силу
         tm = EFFECT_TIME.search(m.group(2))
         if not tm:
             continue
@@ -199,7 +205,9 @@ def rule_events(doc: Doc, out: dict) -> None:
         for b, sb, tb in effects[i + 1:]:
             if ta == tb or _stem(ta, 6) == _stem(tb, 6):
                 continue
-            if not (sa[0][:3] == sb[0][:3] or (set(x[:5] for x in sa) & set(x[:5] for x in sb))):
+            # общий предмет: первое слово или общее значимое слово (≥ 4 букв: «код» в «PIN-код» и «SMS-код» — разные)
+            if not (sa[0][:3] == sb[0][:3] or (set(x[:5] for x in sa if len(x) >= 4)
+                                                & set(x[:5] for x in sb if len(x) >= 4))):
                 continue
             if not mark(a, b):
                 continue
@@ -444,7 +452,7 @@ def rule_acceptance_bounds(doc: Doc, out: dict) -> None:
     for s, op, bound, subj, m in rules:
         bnum = _num(bound)
         for r, cells in rows:
-            pre, act, res = " ".join(cells[:-1]), cells[-2], cells[-1]
+            act, res = cells[-2], cells[-1]
             vals_all = _values(" ".join(cells[:-1]))
             vals_res = _values(res)
             subj_key = next((_stem(w) for w in reversed(subj) if _stem(w) in vals_all or _stem(w) in vals_res), None)
