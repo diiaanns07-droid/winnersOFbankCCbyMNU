@@ -32,7 +32,7 @@ TARGETS = {
     "Linux x64": [f"{m}_x86_64" for m in _MANYLINUX],
     "Linux arm64 (Docker на Mac M)": [f"{m}_aarch64" for m in _MANYLINUX],
 }
-PYTHONS = ["3.11", "3.12", "3.13", "3.14"]
+PYTHONS = ["3.11", "3.12", "3.13", "3.14", "3.15"]
 
 
 def pins(path: Path) -> list[tuple[str, str]]:
@@ -61,7 +61,7 @@ def supported(py: str, platforms: list[str]) -> set:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--constraints", default=str(ROOT / "constraints.txt"))
-    ap.add_argument("--python", action="append", help="версия Python (можно несколько); по умолчанию 3.11–3.14")
+    ap.add_argument("--python", action="append", help="версия Python (можно несколько); по умолчанию 3.11–3.15")
     a = ap.parse_args(argv)
     pyvers = a.python or PYTHONS
     req = pins(Path(a.constraints))
