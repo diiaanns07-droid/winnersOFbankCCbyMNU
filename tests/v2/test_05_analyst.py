@@ -267,3 +267,17 @@ def test_clean_base_answer_has_no_critical():
         if ".base." in fx.name:
             out = _load_stage().postprocess(_answer(fx)["candidates"])
             assert not [c for c in out if c["severity"] == "critical"], fx.name
+
+
+@pytest.mark.parametrize("ext", ["pdf", "docx"])
+def test_maturity_same_for_pdf_and_docx(ext):
+    from bcc_review.v2 import docview
+    m = _load_stage().maturity
+    try:
+        clean = m(docview.load(str(CASES / "cashback.base" / f"source.{ext}")))
+        raw = m(docview.load(str(ROOT / "release" / "input" / "requirements.pdf"))) if ext == "pdf" else None
+    except Exception as exc:  # нет читателя формата в окружении
+        pytest.skip(f"читатель {ext} недоступен: {exc}")
+    assert clean["mature"] and clean["score"] == 4
+    if raw is not None:
+        assert not raw["mature"] and raw["score"] == 0
