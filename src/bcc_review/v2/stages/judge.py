@@ -690,6 +690,14 @@ def _source_family(src: str) -> str:
 def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_sources: int = 0) -> None:
     """Защита шкалы серьёзности кодом (CONTRACT, раздел 5)."""
     if f["severity"] == "critical":
+        # критерий у противоречия и пропуска — по виду: модель иногда ставит «conforming» и т. п.
+        if f["kind"] in CONFLICT_KINDS and f["criterion"] in NEVER_CRITICAL_CRITERIA:
+            f["criterion"] = "set_consistent"
+        elif f["kind"] in MISSING_KINDS and f["criterion"] in NEVER_CRITICAL_CRITERIA:
+            f["criterion"] = "set_complete"
+        elif f["kind"] == "ambiguity" and f["criterion"] in NEVER_CRITICAL_CRITERIA:
+            f["criterion"] = "unambiguous"
+        f["standard_refs"] = list(STANDARD_REFS.get(f["criterion"], []))
         why = ""
         if f["kind"] in NEVER_CRITICAL_KINDS:
             why = f"вид {f['kind']} по шкале не бывает critical"
@@ -997,8 +1005,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
 
     findings = _merge_no_id(findings, ctx, warnings)
     findings = _consolidate(findings, lambda f: f["_wish"] and f["severity"] != "critical", _WISHES, ctx, warnings)
-    findings = _consolidate(findings, lambda f: f["kind"] == "placeholder" and f["severity"] != "critical",
-                            _PLACEHOLDERS, ctx, warnings)
+    findings = _consolidate(findings, lambda f: f["kind"] == "placeholder" and f["severity"] == "minor",
+                            _PLACEHOLDERS, ctx, warnings)  # major-заглушки (параметры спецификации) — отдельно
     for f in findings:  # после слияния — доказательства и источники заново
         if len(f["_members"]) > 1:
             f["evidence"] = _pick_evidence(f["_members"], f["_members"][0]) or f["evidence"]
