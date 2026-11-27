@@ -343,10 +343,10 @@ def test_final_code_note_flags_runs_on_other_code(monkeypatch):
     same = {"aaa1111": True, "bbb2222": True, "ccc3333": False, "ddd4444": None}
     monkeypatch.setattr(final, "same_code", lambda c, sha: same[c])
     ok = final.code_note("abc1234", [[{"commit": "aaa1111"}], [{"commit": ["aaa1111", "bbb2222"]}], []])
-    assert ok.startswith("Код прогонов сверен: 2 из 2") and "⚠" not in ok
+    assert ok.startswith("Код прогонов сверен по git (коммитов прогонов: 2, сверено 2)") and "⚠" not in ok
     bad = final.code_note("abc1234", [[{"commit": "aaa1111"}, {"commit": "ccc3333"}]])
     assert bad.startswith("⚠") and "`ccc3333`" in bad and "aaa1111" not in bad
-    assert "git не знает: ddd4444" in final.code_note("abc1234", [[{"commit": "ddd4444"}, {"commit": "aaa1111"}]])
+    assert "; git не знает: ddd4444" in final.code_note("abc1234", [[{"commit": "ddd4444"}, {"commit": "aaa1111"}]])
     assert final.code_note("abc1234", [[{"label": "без коммита"}]]) == ""
 
 
@@ -384,3 +384,20 @@ def test_final_code_diff_lists_changed_files(monkeypatch):
     assert final.code_diff("a", "b", limit=1).endswith("и ещё 2")
     monkeypatch.setattr(final, "_git", lambda *a: _sp.CompletedProcess(a, 128, stdout="", stderr="bad"))
     assert final.code_diff("a", "b") == ""
+
+
+def test_final_newer_code_section(monkeypatch):
+    """--newer: официальный документ на более новом коде отдельной таблицей и чем код отличается от кода релиза."""
+    from evaluation.v2 import final
+
+    rows = {"new1234": [{"label": "голова: new1234, sonnet", "model": "sonnet", "status": "complete", "K": 5,
+                         "K_as_critical": 5, "C": 17, "findings": 27, "duplicates": 0, "critical_false": 0,
+                         "duration_s": 150, "calls": 9, "cost_usd": 0.78, "clarity": {}, "commit": "abcdef1"}]}
+    monkeypatch.setattr(final, "resolve", lambda ref: (ref, ""))
+    monkeypatch.setattr(final, "official", lambda sha: rows.get(sha, []))
+    monkeypatch.setattr(final, "same_code", lambda a, b: a == b or (a, b) == ("abcdef1", "new1234"))
+    monkeypatch.setattr(final, "code_diff", lambda a, b: "`stages/recheck.py` (+533/−64)")
+    text = "\n".join(final.newer_lines("old1234", ["new1234", "none999"]))
+    assert "**Проверка на более новом коде `new1234`**" in text and "`stages/recheck.py` (+533/−64)" in text
+    assert "| sonnet | 1 | 1 | 5/5 | 5 | 17 | 27 | 0 | 0 | 2.5 | 9 |" in text
+    assert "Код прогонов сверен по git" in text and "На `none999` замеров официального документа нет." in text
