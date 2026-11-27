@@ -502,3 +502,24 @@ def test_docx_heading_autonumber_in_text_and_section():
     assert by["Кэшбэк начисляется за покупки в выбранных категориях."]["section"] == "1. Общие сведения"
     m = Q.verify_quote(view, "2. Требования")
     assert m and m["line_start"] == by["2. Требования"]["n"]
+
+
+def test_short_repeated_quote_stays_near_model_line():
+    """Короткая цитата «200» встречается 4 раза: далеко от строки модели — не угадываем (место не «уезжает»);
+    у строки модели или в строках требования — принимается; единственное вхождение — где угодно (просьба №14)."""
+    view = dv.load(OFFICIAL_MD)
+    assert Q.verify_quote(view, "200", 5) is None
+    assert Q.verify_quote(view, "200") is not None  # без подсказки — как раньше (ближайшее/первое вхождение)
+    assert Q.verify_quote(view, "200", 151)["line_start"] == 151
+    assert Q.verify_quote(view, "saveLimit", 30, [(101, 114)])["line_start"] in (108, 109)
+    assert Q.verify_quote(view, "OK / ERROR")["line_start"] == 155
+
+
+def test_document_warnings_in_summary_and_junk_file(tmp_path):
+    scan = dv.summary(dv.load(ROOT / "tests/v2/fixtures/03_stress/scan_page.pdf")) if _has("pymupdf") else None
+    if scan is not None:
+        assert any("Страница 2" in w and "скан" in w for w in scan["warnings"])
+    junk = tmp_path / "junk.md"
+    junk.write_bytes(bytes(range(256)) * 20)
+    assert any("двоичный или повреждённый" in w for w in dv.load(junk)["warnings"])
+    assert dv.load(OFFICIAL_MD)["warnings"] == []
