@@ -181,3 +181,18 @@ def test_views_env_switch(monkeypatch):
     monkeypatch.setenv(A.VIEWS_ENV, "1")
     A.run(_Ctx(view), lens_run=run)
     assert seen == [False]
+
+
+def test_merge_views_drops_second_only_minor():
+    """Одиночный minor второго просмотра не берётся; одиночный minor первого — остаётся."""
+    a = [_cand("первый, minor", "minor", [10])]
+    b = [_cand("второй, minor", "minor", [20]), _cand("второй, major", "major", [30])]
+    out = A.merge_views(a, b, [{10}], [{20}, {30}])
+    assert [(c["title"], c["severity"]) for c in out] == [("первый, minor", "minor"), ("второй, major", "minor")]
+
+
+def test_merge_views_agreed_takes_lower_severity():
+    a = [_cand("место", "critical", [37, 64], "event_conflict")]
+    b = [_cand("то же место", "major", [37], "ambiguity")]
+    out = A.merge_views(a, b, [{37, 64}], [{37}])
+    assert [(c["title"], c["severity"], c.get("severity_hint")) for c in out] == [("место", "major", "critical")]
