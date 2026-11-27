@@ -215,3 +215,11 @@ def test_injection_reported_as_risk_in_offline_report() -> None:
     assert len(inj) == 1
     assert inj[0]["criterion"] == "risk" and inj[0]["kind"] == "security"
     assert inj[0]["evidence"][0]["verified"] in ("exact", "normalized")
+
+
+def test_promised_operation_silent_when_methods_described_elsewhere(tmp_path: Path) -> None:
+    text = (STYLES / "wave3_defects.md").read_text(encoding="utf-8").replace(
+        "## 4. API\n", "## 4. API\n\nОстальные методы заявки описаны в документе «Заявки на доставку — REST API».\n")
+    p = tmp_path / "elsewhere.md"
+    p.write_text(text, encoding="utf-8")
+    assert not _by_rule(_run(p), "promises.promised_ops")

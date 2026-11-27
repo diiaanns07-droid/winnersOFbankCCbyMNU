@@ -95,11 +95,11 @@ def _finding(i: int, c: dict) -> dict:
 
 
 HOW_TO_FULL = [
-    "Получите бесплатный ключ Gemini: https://aistudio.google.com/apikey (войдите аккаунтом Google, "
-    "«Create API key»).",
+    "Получите бесплатный ключ модели: https://aistudio.google.com/apikey (войдите своим аккаунтом и создайте "
+    "ключ).",
     "Создайте в корне репозитория файл `.env` из шаблона `.env.example` и впишите ключ в строку "
     "`GEMINI_API_KEY=` (или задайте переменную окружения `GEMINI_API_KEY`).",
-    "Повторите ту же команду `python -m bcc_review <файл требований> <отчёт.md>` — агент сам выберет Gemini, "
+    "Повторите ту же команду `python -m bcc_review <файл требований> <отчёт.md>` — агент сам найдёт ключ, "
     "полная проверка занимает несколько минут.",
 ]
 
@@ -115,7 +115,7 @@ def verdict(findings: list[dict]) -> dict:
     blocking = dev or test
     tail = ("Смысл требований без модели не проверялся (противоречия правил, критерии приёмки, полнота основной "
             "функции), поэтому отсутствие других замечаний не означает, что их нет. Для полного ревью нужен ключ "
-            "модели: бесплатный ключ Gemini — https://aistudio.google.com/apikey, строка GEMINI_API_KEY в файле .env.")
+            "модели: бесплатный ключ — https://aistudio.google.com/apikey, строка GEMINI_API_KEY в файле .env.")
     if blocking:
         conf = [f["id"] for f in blocking if f.get("rule_conflict")][:5]
         crit = [f["id"] for f in blocking if f.get("severity") == "critical" and not f.get("rule_conflict")][:3]
