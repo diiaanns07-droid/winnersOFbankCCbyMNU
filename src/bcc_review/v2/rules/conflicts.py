@@ -444,7 +444,7 @@ def rule_acceptance_bounds(doc: Doc, out: dict) -> None:
     for s, op, bound, subj, m in rules:
         bnum = _num(bound)
         for r, cells in rows:
-            pre, act, res = " ".join(cells[:-1]), cells[-2], cells[-1]
+            act, res = cells[-2], cells[-1]
             vals_all = _values(" ".join(cells[:-1]))
             vals_res = _values(res)
             subj_key = next((_stem(w) for w in reversed(subj) if _stem(w) in vals_all or _stem(w) in vals_res), None)

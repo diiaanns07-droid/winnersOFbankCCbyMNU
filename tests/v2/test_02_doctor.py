@@ -177,7 +177,7 @@ def wrapped(kind, message, **kw):
      ["недоступны этому ключу", "python -m bcc_review doctor", "GEMINI_MODEL"]),
     ("network", "Нет соединения с generativelanguage.googleapis.com: ConnectError.",
      ["Нет соединения с Google Gemini", "HTTPS_PROXY"]),
-    ("rate_limit", "Превышен лимит запросов к модели gemini-3.8-flash (429).", ["лимит запросов в минуту", "GEMINI_CONCURRENCY"]),
+    ("rate_limit", "Превышен лимит запросов к модели gemini-3.8-flash (429).", ["лимит запросов в минуту", "GEMINI_RPM=5"]),
     ("overloaded", "Все модели Gemini из цепочки недоступны (… перегружена ×4).", ["Gemini перегружен"]),
 ])
 def test_headline_for_jury_scenarios(kind, message, expect):
