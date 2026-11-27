@@ -116,6 +116,10 @@ def load(path: str | Path) -> dict:
     if fmt in ("md", "txt"):
         text = _decode_text(data)
         lines = _text_lines(text, doc, tab_cells=fmt == "txt" and not _looks_markdown(text))
+        junk = _junk_share(text)
+        if junk > 0.10:
+            warnings.append(f"Файл похож на двоичный или повреждённый: {round(junk * 100)} % знаков не читаются как "
+                            "текст. Проверьте, что это текстовый документ, или сохраните его как DOCX, PDF, Markdown.")
     else:
         sizes = _page_sizes(p) if fmt == "pdf" else {}
         lines = _block_lines(doc or {}, sizes, warnings)
@@ -325,6 +329,14 @@ def _docx_revisions(data: bytes) -> list[str]:
         return []
     return [f"В документе есть непринятые исправления (вставок {ins}, удалений {dels}): проверена итоговая редакция "
             "— вставки учтены, удалённый текст не проверялся."]
+
+
+def _junk_share(text: str) -> float:
+    """Доля управляющих знаков (кроме переводов строки и табуляции) и «�» — признак двоичного файла."""
+    if not text:
+        return 0.0
+    bad = sum(1 for ch in text if ch == "\ufffd" or (ord(ch) < 32 and ch not in "\n\r\t\f") or 0x7f <= ord(ch) < 0xa0)
+    return bad / len(text)
 
 
 def _decode_text(data: bytes) -> str:
@@ -1497,9 +1509,12 @@ def _dedup(items: Iterable[str]) -> list[str]:
 
 
 def summary(view: dict) -> dict[str, Any]:
-    """Паспорт документа для report.json: {title, file, format, sha256, lines, pages}."""
+    """Паспорт документа для report.json: {title, file, format, sha256, lines, pages, warnings}. Предупреждения
+    чтения (скан без текста, нечитаемая страница, правки Word, таблица без линеек) нужны читателю отчёта: что не
+    проверялось или собрано кодом (просьба №14)."""
     return {"title": view.get("title", ""), "file": view.get("file", ""), "format": view.get("format", ""),
-            "sha256": view.get("sha256", ""), "lines": len(view.get("lines") or []), "pages": view.get("pages")}
+            "sha256": view.get("sha256", ""), "lines": len(view.get("lines") or []), "pages": view.get("pages"),
+            "warnings": [str(w) for w in view.get("warnings") or []]}
 
 
 def main(argv: list[str] | None = None) -> int:
