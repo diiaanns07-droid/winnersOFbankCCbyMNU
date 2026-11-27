@@ -784,3 +784,13 @@ def test_line_refs_readable():
     assert f("По Ф-4 (L040) push") == "По Ф-4 (строка 40) push"
     assert f("строки L061-L065") == "строки 61–65"
     assert f("L064 ожидает февраль") == "Строка 64 ожидает февраль"
+
+
+def test_rewrite_is_whole_row_when_row_quote_has_result():
+    """Цитата строки приёмки — вся строка с результатом: «стало» — та же строка с исправленной ячейкой."""
+    raw = _check(row_quote="Значение 10 | Добавить 5 | Итог 15", stated="Итог 15", fix="Итог 12")
+    c = lens_qa.postprocess({"acceptance_checks": [raw]}, REQS)["candidates"][0]
+    assert c["rewrite"] == "Значение 10 | Добавить 5 | Итог 12" and c["rewrite_line"] == 30
+    assert c["evidence"][-1]["quote"] == "Значение 10 | Добавить 5 | Итог 15"
+    only = lens_qa.postprocess({"acceptance_checks": [_check()]}, REQS)["candidates"][0]
+    assert only["rewrite"] == "Итог 12", "строка без результата в цитате — только новая ячейка"

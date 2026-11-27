@@ -466,6 +466,19 @@ def _takewhile_not_alt(parts: list[str]):
         yield p
 
 
+def _row_rewrite(c: Mapping[str, Any], new_result: str) -> str:
+    """«Было → стало» для строки приёмки: «было» — цитата всей строки таблицы (условия | действие | результат),
+    поэтому «стало» — та же строка с исправленной ячейкой результата, готовая к вставке. Если заявленный результат
+    не найден в цитате строки — только новая ячейка."""
+    row, stated = _s(c.get("row_quote")), _s(c.get("stated")).rstrip(".")
+    if not row or not stated or c.get("row_line") != c.get("stated_line"):
+        return new_result
+    i = row.find(stated)
+    if i < 0:
+        return new_result
+    return f"{row[:i]}{new_result.rstrip('.')}{row[i + len(stated):]}".strip()
+
+
 def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, Any]]) -> dict | None:
     """``conflict`` → critical с цитатами правила и строки; ``undefined`` → major; ``match`` → None.
 
@@ -493,6 +506,8 @@ def check_to_candidate(c: Mapping[str, Any], index: Mapping[str, Mapping[str, An
     rewrite, fix_is_rule = split_fix(humanize_ids(c["fix"], index))
     rule_line = next((e.get("line") for e in rule_ev if e.get("line")), None)
     rewrite_line = (rule_line if fix_is_rule else c["stated_line"]) if rewrite else None
+    if rewrite and not fix_is_rule:
+        rewrite = _row_rewrite(c, rewrite)
     row_cap = row_f["nom"][:1].upper() + row_f["nom"][1:]
 
     if verdict == "conflict":
