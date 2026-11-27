@@ -276,3 +276,37 @@ def test_agreed_replies_are_not_unsettled():
     clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), _report(), TWO)["clarification"]
     assert revise.unsettled_findings(clar) == set()
     assert revise._answers_block(clar)[1]["D-01"] == ["Q-01"]
+
+
+# --------------------------------------------------------------------------- форматы строки ответа
+@pytest.mark.parametrize("line,qid,topic,choice,text", [
+    ("Q-01 [Момент утраты льготного периода (LOST)]: B", "Q-01", "Момент утраты льготного периода (LOST)", 1, ""),
+    ("Q-02 [Срок [UTC+5] хранения]: 48 часов", "Q-02", "Срок [UTC+5] хранения", None, "48 часов"),
+    ("Q-07 (тема): свой ответ", "Q-07", "тема", None, "свой ответ"),
+    ("**Q-04.** B", "Q-04", "", 1, ""),
+    ("Q-05) A", "Q-05", "", 0, ""),
+    ("Вопрос 6: B", "Q-06", "", 1, ""),
+    ("| Q-03 | Срок хранения | 48 часов |", "Q-03", "Срок хранения", None, "48 часов"),
+])
+def test_answer_line_forms(line, qid, topic, choice, text):
+    a = recheck.parse_answers_text(line)["answers"]
+    assert [(x["id"], x["topic_hint"], x["choice"], x["text"]) for x in a] == [(qid, topic, choice, text)]
+
+
+def test_html_export_with_parenthesis_topic_binds():
+    # так строку выгружает кнопка «Скачать ответы» HTML-отчёта; раньше строка терялась без предупреждения
+    qs = [dict(QS[0], topic="Момент утраты льготного периода (LOST)")]
+    r = recheck.resolve_answers(qs, recheck.load_answers("Q-01 [Момент утраты льготного периода (LOST)]: B\n"))
+    assert r["answered"][0]["choice"] == "B"
+
+
+def test_table_header_and_empty_answer_are_skipped():
+    text = "| Вопрос | Тема | Ответ |\n| :--- | :--- | :--- |\n| Q-01 | Тема | |\n| Q-02 | Маршрут | Через шлюз |\n"
+    a = recheck.parse_answers_text(text)["answers"]
+    assert [(x["id"], x["text"]) for x in a] == [("Q-02", "Через шлюз")]
+
+
+def test_unparsed_question_line_is_warned():
+    w: list[str] = []
+    recheck.resolve_answers(QS, recheck.load_answers("Q-01 ответ без разделителя\n"), w)
+    assert any("не разобрана" in x for x in w)

@@ -85,9 +85,16 @@ SCHEMA: dict = {
 # --------------------------------------------------------------------------- разбор ответов
 _LETTER = {"A": 0, "B": 1, "C": 2, "D": 3, "А": 0, "В": 1, "С": 2, "Б": 1, "Г": 3,
            "1": 0, "2": 1, "3": 2, "4": 3}
+# «Q-01 [тема]: ответ». Тема в квадратных скобках может содержать круглые и одну вложенную пару квадратных
+# («[Момент утраты льготного периода (LOST)]» — так тему выгружает кнопка «Скачать ответы» HTML-отчёта);
+# разделитель — двоеточие, тире, «=», а также «.» или «)» перед пробелом («Q-04. B», «**Q-04.** B», «Q-05) A»).
+_QID = r"(?:Q|Вопрос)\s*-?\s*\d{1,3}"
 _QLINE = re.compile(
-    r"^\s*(?:[-*+]\s+)?(?:\*\*|__)?\s*(Q\s*-?\s*\d{1,3})\s*(?:\*\*|__)?\s*"
-    r"(?:[\[(]([^\])]{1,120})[\])])?\s*(?:\*\*|__)?\s*[:：=—–-]\s*(.*)$", re.I)
+    r"^\s*(?:[-*+]\s+)?(?:\*\*|__)?\s*(" + _QID + r")\s*(?:\*\*|__)?\s*"
+    r"(?:\[((?:[^\[\]\n]|\[[^\[\]\n]*\]){1,200})\]|\(([^()\n]{1,200})\))?\s*(?:\*\*|__)?\s*"
+    r"(?:[:：=—–-]|[.)](?=[\s*_]))\s*(?:\*\*|__)?\s*(.*)$", re.I)
+_QSTART = re.compile(r"^\s*(?:[-*+]\s+)?(?:\*\*|__)?\s*" + _QID + r"\b", re.I)
+_QCELL = re.compile(r"^(?:\*\*|__)?\s*(" + _QID + r")\s*(?:\*\*|__)?$", re.I)
 _CHOICE = re.compile(r"^\s*(?:\*\*)?([A-DА-ГABCDС1-4])(?:\*\*)?\s*(?:$|[).,;:—–-]\s*(.*)$|\s+[—–-]\s*(.*)$)", re.I)
 _NO_ANSWER = re.compile(r"^\s*(?:\?+|-+|—|нет ответа|не знаю|tbd|todo|позже|потом|обсудим\b.*)\s*$", re.I)
 _VAGUE = re.compile(r"\b(как обычно|по ситуации|на усмотрение|решим позже|обсудим позже|уточним позже)\b", re.I)
@@ -157,6 +164,7 @@ def parse_answers_text(text: str) -> dict:
     decisions: list[str] = []
     in_decisions = False
     current: dict | None = None
+    unparsed: list[str] = []
     for raw in str(text or "").splitlines():
         line = raw.rstrip()
         if not line.strip():
@@ -168,11 +176,27 @@ def parse_answers_text(text: str) -> dict:
             continue
         if line.lstrip().startswith(">") or line.lstrip().startswith("<!--"):
             continue
+        if line.lstrip().startswith("|"):  # строка таблицы «| Q-03 | тема | … | ответ |»
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            mc = _QCELL.match(cells[0]) if cells else None
+            current = None
+            if mc and len(cells) >= 2:
+                topic = cells[1] if len(cells) >= 3 else ""
+                if cells[-1]:
+                    answers.append({"id": _qid(mc.group(1)), "topic_hint": topic, **_parse_value(cells[-1])})
+                continue
+            if not in_decisions:
+                continue
         m = _QLINE.match(line)
         if m and _qid(m.group(1)):
-            entry = {"id": _qid(m.group(1)), "topic_hint": (m.group(2) or "").strip(), **_parse_value(m.group(3))}
+            entry = {"id": _qid(m.group(1)), "topic_hint": (m.group(2) or m.group(3) or "").strip(),
+                     **_parse_value(m.group(4))}
             answers.append(entry)
             current = entry if entry["choice"] is None and entry["text"] else None
+            continue
+        if _QSTART.match(line):  # строка с номером вопроса, которую не удалось разобрать, не теряется молча
+            unparsed.append(line.strip()[:120])
+            current = None
             continue
         stripped = re.sub(r"^\s*[-*+]\s+", "", line).strip()
         if in_decisions and stripped:
@@ -180,7 +204,10 @@ def parse_answers_text(text: str) -> dict:
             continue
         if current is not None and raw[:1].isspace():  # продолжение своего ответа с отступом
             current["text"] = (current["text"] + " " + stripped).strip()
-    return {"answers": answers, "decisions": decisions}
+    out = {"answers": answers, "decisions": decisions}
+    if unparsed:
+        out["unparsed"] = unparsed
+    return out
 
 
 def parse_answers_json(data: Any) -> dict:
@@ -277,6 +304,8 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     Мягкий отказ («не знаю», «решим позже») ответом не считается; отложенная часть частичного ответа — в ``deferred``.
     """
     warnings = warnings if warnings is not None else []
+    for line in parsed.get("unparsed") or []:
+        warnings.append(f"recheck: строка ответа не разобрана — «{line}» (формат: «Q-01: B» или «Q-01 [тема]: ответ»)")
     by_id = {q["id"]: q for q in questions}
     answered: dict[str, dict] = {}
     extra: list[str] = []
