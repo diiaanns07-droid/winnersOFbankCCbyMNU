@@ -161,8 +161,9 @@ def make_long_table(path: Path) -> None:
     keep = []
     for code, why, cost, cond in TARIFFS[::7] + [TARIFFS[-1]]:
         pg = next(i + 1 for i, p in enumerate(pdf) if f"условие {code[-2:]} " in " ".join(p.get_text().split()))
-        keep.append((f"{code} | {why} | {cost} |", "Тарифы перевыпуска", pg))
-        keep.append((cond, "Тарифы перевыпуска", pg))
+        # «Тарифы перевыпуска» — заголовок-название документа (как в свойствах PDF): из раздела вырезается
+        keep.append((f"{code} | {why} | {cost} |", "", pg))
+        keep.append((cond, "", pg))
     keep.append(("Стоимость списывается со счёта карты в день выпуска новой карты.", "Итоги", len(pdf)))
     pdf.close()
     _truth(path.name, keep=keep)
@@ -199,7 +200,7 @@ def make_typo(path: Path) -> None:
         t = text
         for a, b in plain.items():
             t = t.replace(a, b)
-        keep.append((t, "Профиль клиента", 1))
+        keep.append((t, "", 1))  # единственный заголовок наверху — название документа
     _truth(path.name, keep=keep, absent=["­", "ﬁ", "ﬂ", "ﬀ"])
 
 
