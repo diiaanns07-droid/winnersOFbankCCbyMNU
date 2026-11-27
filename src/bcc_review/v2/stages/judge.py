@@ -1005,8 +1005,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
 
     findings = _merge_no_id(findings, ctx, warnings)
     findings = _consolidate(findings, lambda f: f["_wish"] and f["severity"] != "critical", _WISHES, ctx, warnings)
-    findings = _consolidate(findings, lambda f: f["kind"] == "placeholder" and f["severity"] != "critical",
-                            _PLACEHOLDERS, ctx, warnings)
+    findings = _consolidate(findings, lambda f: f["kind"] == "placeholder" and f["severity"] == "minor",
+                            _PLACEHOLDERS, ctx, warnings)  # major-заглушки (параметры спецификации) — отдельно
     for f in findings:  # после слияния — доказательства и источники заново
         if len(f["_members"]) > 1:
             f["evidence"] = _pick_evidence(f["_members"], f["_members"][0]) or f["evidence"]

@@ -582,7 +582,7 @@ def test_wishes_and_placeholders_become_one_minor_each():
           dict(finding("F04", ["C-004", "C-003"], severity="critical", title="Ключевое событие не определено",
                        kind="ambiguity", criterion="unambiguous", scenario="s", impact="i"), wish=True),  # critical не сводится
           finding("F05", ["C-005"], severity="minor", kind="placeholder", title="Раздел тестирования — заглушка"),
-          finding("F06", ["C-006"], severity="major", kind="placeholder", title="Версия не указана"),
+          finding("F06", ["C-006"], severity="minor", kind="placeholder", title="Версия не указана"),
           finding("F07", ["C-007"], severity="minor", kind="placeholder", title="Блок согласующих пуст")]
     res = judge.run(Ctx(FakeLLM(response(fs))), cs)
     all_placed(res, [c["id"] for c in cs])
@@ -625,3 +625,15 @@ def test_conflict_critical_with_odd_criterion_keeps_level():
     d = res["findings"][0]
     assert d["severity"] == "critical" and d["criterion"] == "set_consistent"
     assert d["standard_refs"] == ["ISO/IEC/IEEE 29148:2018 п. 5.2.6", "IEEE 830-1998 п. 4.3.4"]
+
+
+def test_major_spec_placeholder_stays_separate():
+    cs = [cand("C-001", 68, "Документ (версия/дата)", kind="placeholder", source="rules:placeholder.version"),
+          cand("C-002", 89, "| | |", kind="placeholder", source="rules:placeholder.approvals"),
+          cand("C-003", 108, "Prod: —", kind="placeholder", source="lens:architect")]
+    fs = [finding("F01", ["C-001"], severity="minor", kind="placeholder", title="Версия не указана"),
+          finding("F02", ["C-002"], severity="minor", kind="placeholder", title="Согласующие не указаны"),
+          finding("F03", ["C-003"], severity="major", kind="placeholder", title="Адрес вызова в бою не указан")]
+    res = judge.run(Ctx(FakeLLM(response(fs))), cs)
+    titles = sorted(f["title"] for f in res["findings"])
+    assert titles == ["Адрес вызова в бою не указан", "Не заполнены поля и разделы шаблона документа"]
