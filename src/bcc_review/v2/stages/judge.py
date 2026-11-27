@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import re
 from collections import OrderedDict
+from pathlib import Path
 from typing import Any, Iterable
 
 STAGE = "judge"
@@ -843,19 +844,27 @@ def _source_family(src: str) -> str:
 
 
 def _confirmed(f: dict, members: list[dict], all_cands: list[dict] | None,
-               structured: frozenset[str] | set[str] = STRUCTURED_ORIGINS) -> bool:
+               structured: frozenset[str] | set[str] = STRUCTURED_ORIGINS, strict: bool = False,
+               skip_ids: set[str] | frozenset[str] = frozenset()) -> bool:
     """Critical подтверждён двумя ревьюерами: два источника среди кандидатов дефекта или кандидат другого
     источника, который цитирует те же места (≥ 2 общих строки), даже если судья положил его в соседний дефект.
-    Кандидат с происхождением из ``structured`` (исход выведен на конкретном входе) подтверждает сам."""
+    Кандидат с происхождением из ``structured`` (исход выведен на конкретном входе) подтверждает сам.
+    ``strict`` (для major): сосед — того же вида и с ≥ 2 общими строками; кандидаты из ``skip_ids`` (они сами
+    образуют другой major) не подтверждают: два major по одним строкам не держат друг друга; ревьюер, сам
+    предложивший minor, major не подтверждает."""
     fams = {_source_family(_s(m.get("source"))) for m in members}
-    if len(fams) >= 2 or any(_s(m.get("origin")) in structured for m in members):
+    voters = {_source_family(_s(m.get("source"))) for m in members
+              if not (strict and _s(m.get("severity")) == "minor")}
+    if len(voters) >= 2 or any(_s(m.get("origin")) in structured for m in members):
         return True
     lines = {e["line_start"] for e in f["evidence"]}
-    need = min(2, len(lines))
+    need = 2 if strict else min(2, len(lines))
     member_ids = {m["id"] for m in members}
     for c in all_cands or []:
-        if c["id"] in member_ids or _source_family(_s(c.get("source"))) in fams:
+        if c["id"] in member_ids or c["id"] in skip_ids or _source_family(_s(c.get("source"))) in fams:
             continue
+        if strict and (_s(c.get("kind")) != f["kind"] or _s(c.get("severity")) == "minor"):
+            continue  # соседний дефект другого вида или сам minor — не подтверждение
         if len(lines & set(_lines_of(c))) >= need:
             return True
     return False
@@ -936,8 +945,22 @@ def _req_maps(requirements: list[dict] | None) -> tuple[dict[int, str], dict[str
     return at, by_id
 
 
+def _critical_support(members: list[dict], run_has_critical: bool = True) -> bool:
+    """Итоговый critical допустим только с опорой: (а) хотя бы один ревьюер сам предложил critical, или
+    (б) кандидат исполнил строку критерия приёмки, или (в) дефект нашли не меньше трёх разных ревьюеров.
+    Страховка для слабых моделей: если во всём прогоне никто не предложил critical, хватает двух ревьюеров
+    (один — никогда). Ложные critical на чистых ТЗ были подъёмом major → critical от 1–2 ревьюеров."""
+    if any(_s(m.get("severity")) == "critical" for m in members):
+        return True
+    if any(_s(m.get("origin")) in MAJOR_STRUCTURED_ORIGINS for m in members):
+        return True
+    fams = len({_source_family(_s(m.get("source"))) for m in members if _s(m.get("source"))})
+    return fams >= 3 or (not run_has_critical and fams >= 2)
+
+
 def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_sources: int = 0,
-               all_cands: list[dict] | None = None, req_maps: tuple[dict, dict] | None = None) -> None:
+               all_cands: list[dict] | None = None, req_maps: tuple[dict, dict] | None = None,
+               run_has_critical: bool = True, critical_support: bool = False) -> None:
     """Защита шкалы серьёзности кодом (CONTRACT, раздел 5)."""
     if f["severity"] == "critical":
         # критерий у противоречия и пропуска — по виду: модель иногда ставит «conforming» и т. п.
@@ -961,6 +984,9 @@ def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_
             why = "противоречие подтверждено цитатой только одного места"
         elif run_sources >= MIN_SOURCES_FOR_CONSENSUS and not _confirmed(f, members, all_cands):
             why = "critical подтвердил только один ревьюер"
+        elif critical_support and not _critical_support(members, run_has_critical):
+            why = "подъём до critical без опоры: ни один ревьюер не предложил critical, нет строки приёмки, " \
+                  "ревьюеров меньше трёх"
         else:
             why = verify_critical(f, *(req_maps or ({}, {})))
         if why:
@@ -987,7 +1013,7 @@ _NO_IDS = {
     "lead": "Требования не пронумерованы или не ранжированы: ",
     "impact": "На пункты без ID нельзя сослаться из тестов и задач, без приоритета не видно, что делать первым.",
     "recommendation": "Присвоить каждому требованию уникальный ID и приоритет (обязательно, желательно, можно позже).",
-    "question": "",
+    "question": "Какие ID и приоритеты присвоить перечисленным требованиям?",
     "kind": "other", "criterion": "ranked", "warn": "нет ID и приоритетов",
 }
 _TERMS = {
@@ -1003,7 +1029,7 @@ _NONSINGULAR = {
     "lead": "Пункты объединяют несколько правил: ",
     "impact": "На каждое правило нельзя сослаться отдельно из теста и задачи; частичное выполнение пункта не видно.",
     "recommendation": "Разделить перечисленные пункты на отдельные требования, по одному правилу в каждом.",
-    "question": "",
+    "question": "Можно ли разделить перечисленные пункты на отдельные требования, по одному правилу в каждом?",
     "kind": "non_singular", "criterion": "singular", "warn": "неатомарные пункты",
 }
 _DUPLICATES = {
@@ -1011,7 +1037,7 @@ _DUPLICATES = {
     "lead": "Повторы правил: ",
     "impact": "При изменении одного места второе останется прежним, и документ начнёт противоречить сам себе.",
     "recommendation": "Оставить правило в одном месте, во втором — ссылку на него.",
-    "question": "",
+    "question": "В каком месте документа оставить каждое из повторённых правил?",
     "kind": "duplicate", "criterion": "modifiable", "warn": "повторы",
 }
 _PLACEHOLDERS = {
@@ -1019,7 +1045,7 @@ _PLACEHOLDERS = {
     "lead": "Оставлены незаполненными или заглушкой: ",
     "impact": "Документ нельзя считать согласованным и прослеживаемым: не видно версии, ответственных и источников.",
     "recommendation": "Заполнить перечисленные поля и разделы шаблона или явно указать «не применимо» с причиной.",
-    "question": "",
+    "question": "Кто и когда заполнит перечисленные поля шаблона, или какие из них не применимы к документу?",
     "kind": "placeholder", "criterion": "conforming", "warn": "незаполненные поля шаблона",
 }
 
@@ -1081,6 +1107,31 @@ def _cap_critical(findings: list[dict], ctx: Any, warnings: list[str]) -> None:
                          f"{len(crit) - MAX_CRITICAL} наименее приоритетных понижены до major")
 
 
+REVIEWER_STAGE_RE = re.compile(r"^(lens_\w+|consistency|rules)$")
+
+
+def reviewer_stages(ctx: Any) -> int:
+    """Число реально отработавших этапов-рецензентов по ``run_dir/stages/*.json``: линза, вернувшая ноль
+    кандидатов, тоже ревьюер (иначе на документах, где 3 из 5 линз ничего не нашли, правило не срабатывает)."""
+    run_dir = getattr(ctx, "run_dir", None)
+    if not run_dir:
+        return 0
+    n = 0
+    try:
+        for p in (Path(run_dir) / "stages").glob("*.json"):
+            if not REVIEWER_STAGE_RE.match(p.stem):
+                continue
+            try:
+                rec = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if isinstance(rec, dict) and rec.get("status") in ("ok", "partial"):
+                n += 1
+    except OSError:
+        return n
+    return n
+
+
 def _confirm_majors(findings: list[dict], candidates: list[dict], run_sources: int, ctx: Any,
                     warnings: list[str]) -> None:
     """В документе без критичных дефектов существенные дефекты решают вердикт («можно» или «с условиями»),
@@ -1091,8 +1142,10 @@ def _confirm_majors(findings: list[dict], candidates: list[dict], run_sources: i
     if run_sources < MIN_SOURCES_FOR_CONSENSUS or any(f["severity"] == "critical" for f in findings):
         return
     lowered = 0
+    own_major = {cid for g in findings if g["severity"] == "major" for cid in g["candidate_ids"]}
     for f in findings:
-        if f["severity"] != "major" or _confirmed(f, f["_members"], candidates, MAJOR_STRUCTURED_ORIGINS):
+        if f["severity"] != "major" or _confirmed(f, f["_members"], candidates, MAJOR_STRUCTURED_ORIGINS,
+                                                  strict=True, skip_ids=own_major):
             continue
         f["severity"], f["blocks"], f["priority"] = "minor", "none", 0
         lowered += 1
@@ -1162,6 +1215,15 @@ _TERMS_RU = [
     (re.compile(r"\bfeature[- ]flag\w*", re.I), "флаг включения функции"),
     (re.compile(r"\bevent[ _-]?id\b", re.I), "идентификатор события"),
     (re.compile(r"\bNFR\b"), "НФТ"),
+    (re.compile(r"\bMust\b"), "обязательно"),
+    (re.compile(r"\bShould\b"), "желательно"),
+    (re.compile(r"\bCould\b"), "возможно"),
+    (re.compile(r"\bWon[’']t\b"), "не будет"),
+    (re.compile(r"\brps\b", re.I), "запросов в секунду"),
+    # падеж не ломаем: только в начале фразы или после слова «диаграмма»
+    (re.compile(r"(?:(?<=^)|(?<=[.!?]\s))Sequence[- ]?[Dd]iagram\b"), "Диаграмма последовательности"),
+    (re.compile(r"\b([Дд]иаграмм[а-яё]*)\s+(?:Sequence(?:[- ]?[Dd]iagram)?|«Sequence(?:[- ]?[Dd]iagram)?»)(?![A-Za-z])"),
+     r"\1 последовательности"),
 ]
 
 
@@ -1194,6 +1256,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     cluster_of = {cid: gi for gi, g in enumerate(clusters) for cid in g}
     placed: dict[str, str] = {}  # C-id → ключ дефекта или "rejected"
     run_sources = len({_source_family(_s(c.get("source"))) for c in candidates if _s(c.get("source"))})
+    run_has_critical = any(_s(c.get("severity")) == "critical" for c in candidates)
     req_maps = _req_maps(requirements)
     view = _view_of(ctx)
 
@@ -1274,7 +1337,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         item = {
             "key": d["key"],
             "candidate_ids": sorted(d["ids"], key=_cid_num),
-            "title": _cut(_short_title(_s(f.get("title")) or _s(base.get("title")) or _fallback_title(f, base), members), 180),
+            "title": _cut(_short_title(_s(f.get("title")) or _s(base.get("title")) or _fallback_title(f, base),
+                                       members), 180),
             "kind": kind,
             "criterion": crit,
             "standard_refs": list(STANDARD_REFS.get(crit, [])),
@@ -1300,7 +1364,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
         }
         if _add_named_sides(item, view):
             _warn(ctx, warnings, f"судья: к {item['title'][:50]!r} добавлена цитата места, названного в тексте")
-        _calibrate(item, members, ctx, warnings, run_sources, candidates, req_maps)
+        _calibrate(item, members, ctx, warnings, run_sources, candidates, req_maps, run_has_critical,
+                   bool(_option(ctx, "judge_critical_support", False)))
         findings.append(item)
 
     findings = _consolidate(findings, lambda f: bool(_NO_ID_RE.search(f["title"])) and (
@@ -1321,7 +1386,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             f["_first_line"] = f["evidence"][0]["line_start"]
     _cap_critical(findings, ctx, warnings)
     if _option(ctx, "judge_confirm_majors", True):
-        _confirm_majors(findings, candidates, run_sources, ctx, warnings)
+        _confirm_majors(findings, candidates, max(run_sources, reviewer_stages(ctx)), ctx, warnings)
     _assign_priorities(findings)
 
     # 5. номера D-xx: серьёзность → приоритет → строка
