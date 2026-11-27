@@ -1148,22 +1148,48 @@ def _passport(c: _Ctx) -> list[str]:
     return [h2("s1", "1. Паспорт прогона"), ""] + table(["Поле", "Значение"], rows) + [""]
 
 
+def _seg_quote(text, limit: int = 160) -> str:
+    """Цитата для нарезки: короткая — целиком, длинная — начало и конец через «…», чтобы требование
+    можно было найти в документе по обоим краям."""
+    t = " ".join(str(text or "").split())
+    if len(t) > limit:
+        head_n, tail_n = int(limit * 0.6), int(limit * 0.4) - 3
+        head, tail = t[:head_n], t[-tail_n:]
+        sp = head.rfind(" ")
+        if sp > head_n * 0.6:
+            head = head[:sp]
+        sp = tail.find(" ")
+        if 0 <= sp < tail_n * 0.4:
+            tail = tail[sp + 1:]
+        t = head.rstrip(" ,.;:—-") + " … " + tail.lstrip(" ,.;:—-")
+    return quote_md(t, len(t) + 1, in_table=True)
+
+
+def _seg_place(q: dict) -> str:
+    """«Где» в нарезке: раздел, строка; для PDF — и страница («стр. 3, строка 38»)."""
+    sec = short_section(q.get("section", ""))
+    ln = lines_word(q.get("line_start"), q.get("line_end"))
+    bits = [b for b in (sec, f"стр. {q['page']}" if q.get("page") else "", ln) if b]
+    return ", ".join(bits) or "место не указано"
+
+
 def _segmentation(c: _Ctx) -> list[str]:
     reqs = c.reqs
     out = [h2("s2", "2. Нарезка: как агент нарезал требования"), "",
            f"Выделено {len(reqs)} {plural(len(reqs), 'требование', 'требования', 'требований')}. Идентификаторы "
            f"R-… присвоены агентом в порядке документа; «ID в документе» — номер или пункт документа, если он есть; "
-           f"для каждого требования сохранена цитата (полная — в `report.json`).", ""]
+           f"цитата приведена целиком, у длинной — начало и конец через «…» (полная — в `report.json`); «Где» — "
+           f"строки документа, для PDF ещё и страница.", ""]
     if not reqs:
         why = ("нарезка выполняется моделью, в режиме без модели её нет; замечания правил привязаны к строкам "
                "документа" if c.offline else "этап нарезки не дал результата (приложение Д)")
         return out[:2] + [f"Требования не выделены: {why}.", ""]
     rows = []
-    qlen = 70 if c.level < 3 else 45
+    qlen = 160 if c.level < 3 else 90
     for q in reqs:
         rows.append([f"<a id=\"{anchor(q.get('id'))}\"></a>{q.get('id')}", cell(q.get("source_id") or "—"),
                      REQ_KIND.get(q.get("kind"), cell(q.get("kind"))), cell(q.get("summary")),
-                     quote_md(q.get("quote"), qlen, in_table=True) if q.get("quote") else "—", cell(place(q))])
+                     _seg_quote(q.get("quote"), qlen) if q.get("quote") else "—", cell(_seg_place(q))])
     out += table(["ID в отчёте", "ID в документе", "Вид", "Краткая формулировка", "Цитата", "Где"], rows)
     exc = c.r.get("excluded") or []
     if exc and c.level >= 2:
@@ -1189,54 +1215,55 @@ def _per_requirement(c: _Ctx) -> list[str]:
         for r in ids:
             by_req.setdefault(r, []).append(f)
     used = [k for k in INDIVIDUAL if any(f.get("criterion") == k for f in c.findings)]
-    has_set = any(f.get("criterion") in SET_CRITERIA for f in c.findings)
-    has_risk = any(f.get("criterion") == "risk" for f in c.findings)
-    cols = [(k, CRITERIA[k][2]) for k in used] + ([("set", "Нб")] if has_set else []) + \
-           ([("risk", "Рс")] if has_risk else [])
     unused = [CRITERIA[k][0].lower() for k in INDIVIDUAL if k not in used]
-    legend = "; ".join(f"{lab} — {CRITERIA[k][0].lower()}" for k, lab in cols if k in CRITERIA and k != "risk")
-    if has_set:
-        legend += ("; " if legend else "") + "Нб — критерии набора (раздел 4)"
-    if has_risk:
-        legend += "; Рс — ИБ и операционные риски"
     out += ["### 3.1. Матрица: требование × нарушенный критерий", "",
-            f"Столбцы: {legend}. В клетке — самая серьёзная находка: 🔴 критичная, 🟠 существенная, "
-            f"🟡 незначительная; «·» — нарушений нет."
+            "Как читать: в строке названы только нарушенные критерии — словами, по группам серьёзности "
+            "(🔴 критичный, 🟠 существенный, 🟡 незначительный; критерий попадает в группу своей самой серьёзной "
+            "находки). Пометка «набор» — критерий всего набора, подробности в разделе 4. Требования без нарушений "
+            "перечислены под таблицей."
             + ((f" Без модели по остальным критериям ({', '.join(unused)}) документ не проверялся." if c.offline else
                 f" Критерии без нарушений во всём документе: {', '.join(unused)}.") if unused else ""), ""]
+
+    def crit_cell(fs: list[dict]) -> str:
+        worst_by: dict[str, str] = {}
+        for f in fs:
+            k = str(f.get("criterion") or "")
+            name = CRITERIA[k][0] if k in CRITERIA else (cell(k) or "критерий не указан")
+            name = name if name[:2].isupper() else name[:1].lower() + name[1:]
+            if k in SET_CRITERIA and "набор" not in name:
+                name += " (набор)"
+            sev = f.get("severity") if f.get("severity") in SEV_ORDER else "minor"
+            if name not in worst_by or SEV_ORDER[sev] < SEV_ORDER[worst_by[name]]:
+                worst_by[name] = sev
+        groups = []
+        for sev in ("critical", "major", "minor"):
+            names = [n for n, v in worst_by.items() if v == sev]
+            if names:
+                groups.append(f"{SEV_ICON[sev]} {SEV_NAME[sev]}: {', '.join(names)}")
+        return "; ".join(groups)
+
     rows, clean = [], []
     for q in c.reqs:
         fs = by_req.get(q.get("id"), [])
         if not fs:
             clean.append(q.get("id"))
             continue
-        row = [c.req_label(q.get("id")), SEV_ICON.get(_worst(fs), "")]
-        for k, _ in cols:
-            if k == "set":
-                hit = [f for f in fs if f.get("criterion") in SET_CRITERIA]
-            else:
-                hit = [f for f in fs if f.get("criterion") == k]
-            row.append(SEV_ICON.get(_worst(hit), "·") if hit else "·")
-        row.append(c.f_links(sorted({f["id"] for f in fs}, key=_id_num)))
-        rows.append(row)
+        rows.append([c.req_label(q.get("id")), crit_cell(fs),
+                     c.f_links(sorted({f["id"] for f in fs}, key=_id_num)), _worst(fs)])
     if doc_level:
-        row = ["документ в целом", SEV_ICON.get(_worst(doc_level), "")]
-        for k, _ in cols:
-            hit = [f for f in doc_level if (f.get("criterion") in SET_CRITERIA if k == "set" else f.get("criterion") == k)]
-            row.append(SEV_ICON.get(_worst(hit), "·") if hit else "·")
-        row.append(c.f_links([f["id"] for f in doc_level]))
-        rows.append(row)
+        rows.append(["документ в целом", crit_cell(doc_level), c.f_links([f["id"] for f in doc_level]),
+                     _worst(doc_level)])
     if rows and c.level >= 7:
         # очень большой документ: вместо матрицы — требования, сгруппированные по самой серьёзной находке
         for sev in ("critical", "major", "minor"):
-            grp = [r for r in rows if r[1] == SEV_ICON[sev]]
+            grp = [r for r in rows if r[3] == sev]
             if grp:
                 out.append(f"- {SEV_ICON[sev]} {SEV_PLURAL[sev][2].capitalize()} нарушения ({len(grp)}): "
-                           + "; ".join(f"{r[0]} — {r[-1]}" for r in grp))
+                           + "; ".join(f"{r[0]} — {r[2]}" for r in grp))
         out += ["", "Критерий каждого дефекта — в его карточке или строке таблицы ниже.", ""]
     elif rows:
-        out += table(["Требование", "Итог"] + [lab for _, lab in cols] + ["Дефекты"], rows,
-                     [":---", ":---:"] + [":---:"] * len(cols) + [":---"])
+        out += table(["Требование", "Нарушенные критерии (по серьёзности)", "Дефекты"], [r[:3] for r in rows],
+                     [":---", ":---", ":---"])
         out.append("")
     if clean:
         out += [f"✅ Без замечаний ({len(clean)}): " + ", ".join(c.req_label(r) for r in clean) + ".", ""]
@@ -1842,20 +1869,51 @@ def _appendix_how(c: _Ctx) -> list[str]:
         out += [f"Кандидатов в дефекты: {total}{extra}; " + "; ".join(bits) + "."
                 + (f" Ещё {n['self_dropped']} {plural(n['self_dropped'], 'кандидат отброшен', 'кандидата отброшены', 'кандидатов отброшены')} самой ролью при проверке." if n["self_dropped"] else "")
                 + " Кандидат без найденной в документе цитаты в отчёт не попадает.", ""]
+    # журнал: куда ушёл каждый кандидат — склеен в карточку или снят с причиной (только данные report.json)
+    to_card = {str(cid): str(f.get("id")) for f in list(c.findings) + list(c.resolved)
+               for cid in f.get("candidate_ids") or [] if cid and f.get("id")}
+    merged = sorted((f for f in list(c.findings) + list(c.resolved) if len(f.get("candidate_ids") or []) > 1),
+                    key=lambda f: _id_num(f.get("id")))
+    if merged or rej:
+        out += ["**Журнал снятых и склеенных кандидатов**", "",
+                "Каждый кандидат — со своим ID: «склеен → D-…» — повтор вошёл в эту итоговую карточку; "
+                "«снят: …» — причина, по которой кандидата нет в отчёте.", ""]
+    if merged:
+        out += [f"**Склеены** ({len(merged)} {plural(len(merged), 'карточка', 'карточки', 'карточек')}; остальные "
+                f"карточки — из одного кандидата): "
+                + "; ".join(f"{' + '.join(esc(x) for x in f.get('candidate_ids') or [])} → {c.f_link(str(f['id']))}"
+                            for f in merged) + ".", ""]
     if rej:
-        out += ["**Отклонённые кандидаты**", ""]
         rows = []
+        no_id = no_target = 0
         limit = MAX_REJECTED_ROWS if c.level < 1 else 10
-        for i, r in enumerate(rej[:limit], 1):
-            reason = cell(dejargon(str(r.get("reason") or "")))
-            if r.get("duplicate_of"):
-                reason += f" → {c.f_link(r['duplicate_of'])}"
+        for r in rej[:limit]:
+            cid = str(r.get("id") or r.get("candidate_id") or "").strip()
+            if not cid:
+                no_id += 1
+            reason = cell(dejargon(str(r.get("reason") or ""))) or "причина не указана"
+            target = str(r.get("duplicate_of") or "").strip()
+            target = to_card.get(target, target)
+            if target:
+                fate = f"склеен → {c.f_link(target)}: {reason}"
+            else:
+                fate = reason if re.match(r"снят", reason, re.I) else f"снят: {reason}"
+                if re.search(r"дубл|повтор", reason, re.I):
+                    no_target += 1
+                    fate += " (карточка, в которую ушёл повтор, в `report.json` не указана)"
             line = r.get("line") if isinstance(r.get("line"), int) and r.get("line") else None
-            rows.append([str(i), esc(source_name(r.get("source"))),
-                         cell(r.get("title")) + (f" (строка {line})" if line else ""), reason])
-        out += table(["№", "Кто предложил", "Что предлагалось", "Почему отклонён"], rows, [":---:", ":---", ":---", ":---"])
+            rows.append([esc(cid) if cid else "ID не передан", esc(source_name(r.get("source"))),
+                         cell(r.get("title")) + (f" (строка {line})" if line else ""), fate])
+        out += table(["Кандидат", "Кто предложил", "Что предлагалось", "Куда ушёл"], rows,
+                     [":---", ":---", ":---", ":---"])
         if len(rej) > limit:
             out += ["", f"Ещё {len(rej) - limit} — в `report.json`, поле `rejected`."]
+        if no_id or no_target:
+            gaps = ([f"у {no_id} {plural(no_id, 'кандидата', 'кандидатов', 'кандидатов')} этап не передал ID "
+                     f"(`candidate_id` пустой)"] if no_id else []) + \
+                   ([f"у {no_target} {plural(no_target, 'снятого повтора', 'снятых повторов', 'снятых повторов')} "
+                     f"не указана итоговая карточка (`duplicate_of`)"] if no_target else [])
+            out += ["", "Пробел в данных прогона: " + "; ".join(gaps) + ". Отчёт эти значения не додумывает."]
         out.append("")
     warns = run.get("warnings") or []
     if warns:
