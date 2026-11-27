@@ -8,6 +8,7 @@ import copy
 import json
 import os
 import random
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -17,7 +18,7 @@ sys.path.insert(0, str(ROOT / "tests" / "v2"))
 sys.path.insert(0, str(ROOT / "src"))
 
 from bcc_review.v2.stages import judge  # noqa: E402
-from test_10_judge import Ctx, FakeLLM, all_placed, cand, finding, response, simple_view  # noqa: E402
+from test_10_judge import Ctx, FakeLLM, Truncated, all_placed, cand, finding, response, simple_view  # noqa: E402
 
 FX = ROOT / "tests" / "v2" / "fixtures" / "10_judge"
 DOC = ROOT / "release" / "input" / "requirements.md"
@@ -143,3 +144,107 @@ def test_conform_keeps_valid_response_unchanged():
     _, resp, check, _ = _load("official.full")
     assert judge._conform(copy.deepcopy(resp), judge.response_schema()) == resp
     assert judge._conform(copy.deepcopy(check), judge.check_schema()) == check
+
+
+# --- ключи модели (F01…) не попадают в отчёт -------------------------------------------------------
+
+
+_KEY_RE = re.compile(r"(?<![\w-])(?:P\d)?[FR]\d{2}(?![\w-])")
+
+
+def _texts(res: dict) -> list[str]:
+    out = [res["verdict_summary"]] + [r.get("reason", "") for r in res["rejected"]]
+    out += [c["comment"] for c in res["checklist"]]
+    out += [f[k] for f in res["findings"] for k in ("title", "problem", "scenario", "impact", "recommendation",
+                                                    "question")]
+    return out
+
+
+def test_rejected_reason_key_becomes_finding_id():
+    """«Конфликт покрыт F01» в причине отклонения → номер дефекта из отчёта (D-xx), а не ключ модели."""
+    resp = response([finding("F01", ["C-001", "C-002"], kind="contradiction")],
+                    rejected=[{"candidate_id": "C-003", "reason_code": "resolved_elsewhere",
+                               "reason": "Конфликт уже покрыт F01.", "line": 0}],
+                    summary="Есть существенные замечания F01.")
+    res = judge.run(Ctx(FakeLLM(resp)), _three())
+    rej = next(r for r in res["rejected"] if r["candidate_id"] == "C-003")
+    d = next(f["id"] for f in res["findings"] if "C-001" in f["candidate_ids"])
+    assert rej["reason"] == f"Конфликт уже покрыт {d}."
+    assert not any(_KEY_RE.search(t) for t in _texts(res))
+
+
+def test_dangling_key_of_dropped_finding_removed():
+    """Дефект модели F02 отпал (ссылается на несуществующего кандидата): ссылки на F02 убираются, обоснование
+    вердикта со ссылкой на F02 собирает код."""
+    resp = response([finding("F01", ["C-001", "C-002"], kind="contradiction"), finding("F02", ["C-999"])],
+                    rejected=[{"candidate_id": "C-003", "reason_code": "resolved_elsewhere",
+                               "reason": "Вопрос учтён в F02.", "line": 0}],
+                    checklist=[{"n": 1, "answer": "Частично", "comment": "См. F02 и F01.", "finding_keys": ["F02"]}],
+                    summary="Разработку можно начинать с условиями: F01 и F02.")
+    res = judge.run(Ctx(FakeLLM(resp)), _three())
+    assert not any(_KEY_RE.search(t) for t in _texts(res)), _texts(res)
+    rej = next(r for r in res["rejected"] if r["candidate_id"] == "C-003")
+    assert rej["reason"] == "Вопрос учтён."
+
+
+def test_empty_register_summary_follows_code_verdict():
+    """Все дефекты модели отпали, реестр пуст, вердикт «можно» — текст модели «нельзя: F01» заменяет код."""
+    resp = response([], rejected=[{"candidate_id": c, "reason_code": "misread", "reason": "Неверно прочитано.",
+                                   "line": 0} for c in ("C-001", "C-002", "C-003")],
+                    summary="Разработку начинать нельзя: F01.")
+    res = judge.run(Ctx(FakeLLM(resp)), _three())
+    assert res["findings"] == []
+    v = judge.compute_verdict(res["findings"])
+    assert (v["development"], v["testing"]) == ("yes", "yes")
+    assert "нельзя" not in res["verdict_summary"] and "F01" not in res["verdict_summary"]
+    assert res["verdict_summary"].startswith("Разработку и тестирование можно начинать")
+
+
+def test_checklist_link_to_consolidated_finding_kept():
+    """Пункт чек-листа ссылался на мелочь, которую код свёл в одно замечание: ссылка ведёт к сводному, а не теряется."""
+    cs = [cand("C-001", 38, "Месяц определяется по дате совершения покупки", kind="terminology", severity="minor"),
+          cand("C-002", 64, "Февральский счётчик вырос", kind="terminology", severity="minor"),
+          cand("C-003", 90, "Удобный интерфейс", kind="ambiguity")]
+    resp = response([finding("F01", ["C-001"], kind="terminology", severity="minor"),
+                     finding("F02", ["C-002"], kind="terminology", severity="minor"),
+                     finding("F03", ["C-003"])],
+                    checklist=[{"n": 1, "answer": "Частично", "comment": "Термины: F02.", "finding_keys": ["F02"]}])
+    res = judge.run(Ctx(FakeLLM(resp)), cs)
+    merged = next(f for f in res["findings"] if {"C-001", "C-002"} <= set(f["candidate_ids"]))
+    assert res["checklist"][0]["finding_ids"] == [merged["id"]]
+    assert res["checklist"][0]["comment"] == f"Термины: {merged['id']}."
+
+
+def test_document_ids_like_model_keys_untouched():
+    """Если в самом документе есть ID вида F02, он не «висячий ключ» и остаётся в тексте."""
+    view = {"title": "t", "file": "t.md", "format": "md",
+            "lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(
+                ["Требования"] + ["Строка"] * 36 + ["F02. Месяц определяется по дате совершения покупки"]
+                + ["Строка"] * 25 + ["Февральский счётчик вырос"] + ["Строка"] * 30, 1)]}
+    resp = response([finding("F01", ["C-001", "C-002"], kind="contradiction")],
+                    rejected=[{"candidate_id": "C-003", "reason_code": "resolved_elsewhere",
+                               "reason": "Требование F02 уже задаёт это.", "line": 0}])
+    res = judge.run(Ctx(FakeLLM(resp), view=view, requirements=[]), _three())
+    rej = next(r for r in res["rejected"] if r["candidate_id"] == "C-003")
+    assert rej["reason"] == "Требование F02 уже задаёт это."
+
+
+def test_split_batch_keys_in_texts_follow_parts():
+    """Обрезанный ответ → две части; F01 второй части в её тексте и в причине отклонения — дефект второй части."""
+    cs = [cand(f"C-{i:03d}", ln, q, kind=k) for i, (ln, q, k) in enumerate([
+        (38, "Месяц определяется по дате совершения покупки", "contradiction"),
+        (64, "Февральский счётчик вырос", "ambiguity"),
+        (90, "Удобный интерфейс", "incomplete"),
+        (120, "Ответ при ошибке", "api_contract")], 1)]
+    part1 = response([finding("F01", ["C-001"], kind="contradiction")], checklist=[], summary="Часть 1.")
+    part2 = response([{**finding("F01", ["C-003"], kind="incomplete"), "problem": "Следствие F01: экран пуст."}],
+                     rejected=[{"candidate_id": "C-004", "reason_code": "resolved_elsewhere",
+                                "reason": "Уже покрыт F01.", "line": 0}], checklist=[], summary="Часть 2.")
+    first = {"findings": [finding("F01", ["C-001"])], "rejected": [], "checklist": [], "verdict_summary": ""}
+    llm = FakeLLM(Truncated("обрезан"), part1, part2, first)
+    res = judge.run(Ctx(llm), cs)
+    d2 = next(f for f in res["findings"] if "C-003" in f["candidate_ids"])
+    rej = next(r for r in res["rejected"] if r["candidate_id"] == "C-004")
+    assert rej["reason"] == f"Уже покрыт {d2['id']}."
+    assert d2["problem"].startswith(f"Следствие {d2['id']}") or "F01" not in d2["problem"]
+    assert not any(_KEY_RE.search(t) for t in _texts(res))
