@@ -41,7 +41,8 @@
       "major": 21,
       "minor": 12
     },
-    "duplicates": 7,
+    "duplicates": 4,
+    "parts": 3,
     "outside_gold": {
       "total": 1,
       "real": 1,
@@ -155,12 +156,13 @@
   },
   "precision": {
     "matched": 29,
-    "duplicates": 7,
+    "duplicates": 4,
+    "parts": 3,
     "outside_real": 1,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.811,
+    "precision_useful": 0.892,
     "precision_gold": 0.784
   },
   "severity": {
@@ -419,6 +421,115 @@
     "english": [],
     "english_report_md": [
       "event"
+    ]
+  },
+  "clarity": {
+    "n": 37,
+    "passed": 14,
+    "share": 0.378,
+    "by_check": {
+      "заголовок": 18,
+      "место": 0,
+      "проблема": 0,
+      "сценарий": 2,
+      "последствие": 0,
+      "исправление": 6,
+      "язык": 0
+    },
+    "worst": [
+      {
+        "id": "D-05",
+        "title": "Чужая карта: по статусам 403, по разделу 404 с телом «Карта не найдена»",
+        "severity": "major",
+        "source": "consistency, lens:qa, lens:architect, rules:api.status_404",
+        "fails": [
+          "заголовок",
+          "исправление"
+        ]
+      },
+      {
+        "id": "D-07",
+        "title": "Сумма покупки в тиынах, порог в тенге: правило пересчёта и сравнения не описано",
+        "severity": "major",
+        "source": "consistency, lens:analyst, lens:architect, rules:units.currency_mix",
+        "fails": [
+          "заголовок",
+          "исправление"
+        ]
+      },
+      {
+        "id": "D-10",
+        "title": "Путь сервиса расходов к настройкам не отражён ни в архитектуре, ни в схеме API",
+        "severity": "major",
+        "source": "lens:architect, consistency",
+        "fails": [
+          "заголовок",
+          "сценарий"
+        ]
+      },
+      {
+        "id": "D-01",
+        "title": "Месяц покупки: Ф-2 относит по дате совершения, критерий приёмки и BPMN — по проведению",
+        "severity": "critical",
+        "source": "lens:analyst, lens:qa, lens:risk",
+        "fails": [
+          "заголовок"
+        ]
+      },
+      {
+        "id": "D-02",
+        "title": "Операция чтения настроек и суммы за месяц не описана; единственный метод только сохраняет",
+        "severity": "critical",
+        "source": "lens:architect, consistency, rules:promises.read_operation, lens:qa",
+        "fails": [
+          "заголовок"
+        ]
+      },
+      {
+        "id": "D-03",
+        "title": "Ф-3 (один push в месяц) и Ф-4 (push при достижении после смены порога) дают разное число push",
+        "severity": "critical",
+        "source": "consistency, lens:qa, lens:risk, lens:analyst",
+        "fails": [
+          "заголовок"
+        ]
+      },
+      {
+        "id": "D-04",
+        "title": "Сумма вне диапазона: по статусам 400, по логике и примеру — 200 с result ERROR",
+        "severity": "critical",
+        "source": "lens:qa, lens:architect, consistency, rules:api.success_with_error",
+        "fails": [
+          "заголовок"
+        ]
+      },
+      {
+        "id": "D-06",
+        "title": "Метод, изменяющий порог, объявлен как GET; параметры в адресе; Content-Type при пустом теле",
+        "severity": "major",
+        "source": "rules:api.get_mutation.saveLimit, lens:architect, lens:risk, rules:api.content_type_without_body",
+        "fails": [
+          "заголовок"
+        ]
+      },
+      {
+        "id": "D-09",
+        "title": "Цель «в момент покупки» не подкреплена сроком доставки клиенту; НФТ ограничивает только передачу",
+        "severity": "major",
+        "source": "consistency",
+        "fails": [
+          "заголовок"
+        ]
+      },
+      {
+        "id": "D-11",
+        "title": "Компоненты названы по-разному: сервис настроек, настройки, хранилище; учёт и сервис расходов",
+        "severity": "major",
+        "source": "consistency",
+        "fails": [
+          "исправление"
+        ]
+      }
     ]
   },
   "report_sections": {
@@ -761,28 +872,9 @@
   ],
   "duplicates": [
     {
-      "finding": "D-05",
-      "gold": "С2",
-      "title": "Чужая карта: по статусам 403, по разделу 404 с телом «Карта не найдена»",
-      "sources": [
-        "consistency",
-        "lens:qa",
-        "lens:architect",
-        "rules:api.status_404"
-      ]
-    },
-    {
       "finding": "D-09",
       "gold": "К5",
       "title": "Цель «в момент покупки» не подкреплена сроком доставки клиенту; НФТ ограничивает только передачу",
-      "sources": [
-        "consistency"
-      ]
-    },
-    {
-      "finding": "D-11",
-      "gold": "С16",
-      "title": "Компоненты названы по-разному: сервис настроек, настройки, хранилище; учёт и сервис расходов",
       "sources": [
         "consistency"
       ]
@@ -806,19 +898,52 @@
       ]
     },
     {
-      "finding": "D-18",
-      "gold": "С12",
-      "title": "Сумма в push не определена: покупка или накопленный итог",
-      "sources": [
-        "lens:analyst"
-      ]
-    },
-    {
       "finding": "D-33",
       "gold": "С13",
       "title": "Срок push «в течение минуты» без доли событий и места измерения",
       "sources": [
         "lens:risk"
+      ]
+    }
+  ],
+  "parts": [
+    {
+      "finding": "D-05",
+      "gold": "С2",
+      "parts": [
+        "403 ↔ 404, чужая карта"
+      ],
+      "credited": "D-24",
+      "title": "Чужая карта: по статусам 403, по разделу 404 с телом «Карта не найдена»",
+      "sources": [
+        "consistency",
+        "lens:qa",
+        "lens:architect",
+        "rules:api.status_404"
+      ]
+    },
+    {
+      "finding": "D-11",
+      "gold": "С16",
+      "parts": [
+        "компоненты названы по-разному"
+      ],
+      "credited": "D-10",
+      "title": "Компоненты названы по-разному: сервис настроек, настройки, хранилище; учёт и сервис расходов",
+      "sources": [
+        "consistency"
+      ]
+    },
+    {
+      "finding": "D-18",
+      "gold": "С12",
+      "parts": [
+        "какая сумма в push"
+      ],
+      "credited": "D-19",
+      "title": "Сумма в push не определена: покупка или накопленный итог",
+      "sources": [
+        "lens:analyst"
       ]
     }
   ],
@@ -872,8 +997,10 @@
       "gold": "С17",
       "level": "major",
       "title": "UI описан неполно",
-      "where": "найден кандидатом (consistency, rules:promises.read_operation), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "analyst",
+        "qa",
         "judge"
       ],
       "near": [
@@ -896,26 +1023,7 @@
           "arbiter": "no_match"
         }
       ],
-      "seen_in": [
-        {
-          "source": "consistency",
-          "id": "consistency#3",
-          "title": "Шаги логики метода проверяют только принадлежность карты, а Ф-1 требует активную карту KZT; для неактивной карты исход н",
-          "reason": ""
-        },
-        {
-          "source": "consistency",
-          "id": "consistency#11",
-          "title": "Чтение настроек обещано в документе, но метод чтения не описан",
-          "reason": ""
-        },
-        {
-          "source": "rules:promises.read_operation",
-          "id": "rules#1",
-          "title": "Обещано чтение данных, но в спецификации API нет ни одной операции чтения",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М1",
@@ -932,8 +1040,10 @@
       "gold": "М2д",
       "level": "minor",
       "title": "Нет задачи в Jira — источник требований не прослеживается",
-      "where": "найден кандидатом (consistency), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "rules",
+        "consistency",
         "judge"
       ],
       "near": [
@@ -944,21 +1054,15 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "consistency",
-          "id": "consistency#15",
-          "title": "Версия документа и задача в трекере не указаны, большинство пунктов без идентификаторов",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М3",
       "level": "minor",
       "title": "Нет ID у НФТ, данных, интеграции; нет приоритетов",
-      "where": "найден кандидатом (consistency), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "rules",
         "judge"
       ],
       "near": [
@@ -969,14 +1073,7 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "consistency",
-          "id": "consistency#15",
-          "title": "Версия документа и задача в трекере не указаны, большинство пунктов без идентификаторов",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М4б",
@@ -993,8 +1090,9 @@
       "gold": "М6",
       "level": "minor",
       "title": "Description метода бессвязен",
-      "where": "найден кандидатом (consistency), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "architect",
         "judge"
       ],
       "near": [
@@ -1005,14 +1103,7 @@
           "arbiter": "no_match"
         }
       ],
-      "seen_in": [
-        {
-          "source": "consistency",
-          "id": "consistency#11",
-          "title": "Чтение настроек обещано в документе, но метод чтения не описан",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М7",
@@ -1029,8 +1120,10 @@
       "gold": "М8",
       "level": "minor",
       "title": "«В Алматы» вместо явного часового пояса",
-      "where": "найден кандидатом (lens:analyst), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "analyst",
+        "rules",
         "judge"
       ],
       "near": [
@@ -1047,147 +1140,10 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "lens:analyst",
-          "id": "lens:analyst#1",
-          "title": "Не согласовано, по какой дате покупка относится к месяцу: совершения или проведения",
-          "reason": ""
-        },
-        {
-          "source": "lens:analyst",
-          "id": "lens:analyst#11",
-          "title": "Часовой пояс задан названием города, а не смещением UTC",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     }
   ],
-  "stage_recall": {
-    "consistency": {
-      "candidates": 15,
-      "K": [
-        "К2",
-        "К3",
-        "К4",
-        "К5"
-      ],
-      "C": [
-        "С2",
-        "С4",
-        "С5",
-        "С6",
-        "С7",
-        "С8",
-        "С13",
-        "С16",
-        "С17"
-      ],
-      "only_here": []
-    },
-    "lens:analyst": {
-      "candidates": 12,
-      "K": [
-        "К1",
-        "К2",
-        "К4",
-        "К5"
-      ],
-      "C": [
-        "С4",
-        "С5",
-        "С6",
-        "С7",
-        "С8",
-        "С9",
-        "С11",
-        "С12",
-        "С13",
-        "С14",
-        "С16",
-        "С18"
-      ],
-      "only_here": [
-        "С9",
-        "С14"
-      ]
-    },
-    "lens:architect": {
-      "candidates": 12,
-      "K": [
-        "К3",
-        "К4",
-        "К5"
-      ],
-      "C": [
-        "С1",
-        "С2",
-        "С3",
-        "С4",
-        "С7",
-        "С12",
-        "С15",
-        "С16",
-        "С19"
-      ],
-      "only_here": [
-        "С15"
-      ]
-    },
-    "lens:qa": {
-      "candidates": 7,
-      "K": [
-        "К1",
-        "К2",
-        "К3",
-        "К4"
-      ],
-      "C": [
-        "С2",
-        "С18",
-        "С20"
-      ],
-      "only_here": []
-    },
-    "lens:risk": {
-      "candidates": 11,
-      "K": [
-        "К1",
-        "К2",
-        "К5"
-      ],
-      "C": [
-        "С1",
-        "С2",
-        "С5",
-        "С6",
-        "С7",
-        "С8",
-        "С11",
-        "С12",
-        "С13"
-      ],
-      "only_here": []
-    },
-    "rules": {
-      "candidates": 15,
-      "K": [
-        "К3",
-        "К4"
-      ],
-      "C": [
-        "С1",
-        "С2",
-        "С3",
-        "С4",
-        "С7",
-        "С17",
-        "С19",
-        "С20"
-      ],
-      "only_here": []
-    }
-  },
+  "stage_recall": {},
   "gates": [
     {
       "metric": "К1–К5 найдены",
@@ -1235,6 +1191,11 @@
       "ok": true
     },
     {
+      "metric": "рубрика понятности",
+      "value": "14/37",
+      "ok": false
+    },
+    {
       "metric": "английские слова",
       "value": "1",
       "ok": false
@@ -1256,13 +1217,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 2,
-    "seconds": 20.5,
-    "cost_usd": 0.0735353,
-    "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
+    "pending": 3,
+    "model": ""
   },
-  "seconds": 21.18,
-  "run_dir": "runs/20261127-045946-fea8"
+  "seconds": 0.19,
+  "run_dir": "runs/20261127-045946-fea8",
+  "rescored_at": "2026-11-27 17:15"
 }

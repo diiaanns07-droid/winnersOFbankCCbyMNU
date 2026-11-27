@@ -42,6 +42,7 @@
       "minor": 10
     },
     "duplicates": 0,
+    "parts": 0,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -155,6 +156,7 @@
   "precision": {
     "matched": 27,
     "duplicates": 0,
+    "parts": 0,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
@@ -763,6 +765,7 @@
     }
   ],
   "duplicates": [],
+  "parts": [],
   "outside": [],
   "misses": [
     {
@@ -1226,13 +1229,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 2,
-    "seconds": 27.4,
-    "cost_usd": 0.1937264,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 27.92,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_golova_16_50/runs/20261127-170251-d28a"
+  "seconds": 0.4,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_golova_16_50/runs/20261127-170251-d28a",
+  "rescored_at": "2026-11-27 17:15"
 }

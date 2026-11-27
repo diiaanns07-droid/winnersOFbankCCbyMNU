@@ -41,7 +41,8 @@
       "major": 15,
       "minor": 12
     },
-    "duplicates": 6,
+    "duplicates": 2,
+    "parts": 4,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -152,12 +153,13 @@
   },
   "precision": {
     "matched": 26,
-    "duplicates": 6,
+    "duplicates": 2,
+    "parts": 4,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.812,
+    "precision_useful": 0.938,
     "precision_gold": 0.812
   },
   "severity": {
@@ -741,14 +743,6 @@
   ],
   "duplicates": [
     {
-      "finding": "D-11",
-      "gold": "С12",
-      "title": "Push: не указано, накопленная сумма или сумма покупки передаётся",
-      "sources": [
-        "lens:analyst"
-      ]
-    },
-    {
       "finding": "D-14",
       "gold": "С7",
       "title": "Ключ повтора события процессинга не назван, итог при повторе не определён",
@@ -758,8 +752,34 @@
       ]
     },
     {
+      "finding": "D-31",
+      "gold": "С1",
+      "title": "Content-Type указан у метода, у которого тела запроса нет",
+      "sources": [
+        "rules:api.content_type_without_body"
+      ]
+    }
+  ],
+  "parts": [
+    {
+      "finding": "D-11",
+      "gold": "С12",
+      "parts": [
+        "какая сумма в push"
+      ],
+      "credited": "D-12",
+      "title": "Push: не указано, накопленная сумма или сумма покупки передаётся",
+      "sources": [
+        "lens:analyst"
+      ]
+    },
+    {
       "finding": "D-18",
       "gold": "С2",
+      "parts": [
+        "201 не описан"
+      ],
+      "credited": "D-20",
       "title": "Код успеха: 200 или 201, в перечне статусов описан только 200",
       "sources": [
         "consistency",
@@ -769,6 +789,10 @@
     {
       "finding": "D-22",
       "gold": "С16",
+      "parts": [
+        "компоненты названы по-разному"
+      ],
+      "credited": "D-08",
       "title": "Одни и те же понятия названы разными терминами",
       "sources": [
         "lens:architect",
@@ -776,16 +800,12 @@
       ]
     },
     {
-      "finding": "D-31",
-      "gold": "С1",
-      "title": "Content-Type указан у метода, у которого тела запроса нет",
-      "sources": [
-        "rules:api.content_type_without_body"
-      ]
-    },
-    {
       "finding": "D-32",
       "gold": "С2",
+      "parts": [
+        "открытый перечень «400, 401 и далее»"
+      ],
+      "credited": "D-20",
       "title": "Перечень кодов ответа открыт словами «и далее»",
       "sources": [
         "rules:language.open_list"
@@ -1226,7 +1246,7 @@
     "pending": 0,
     "model": ""
   },
-  "seconds": 0.52,
+  "seconds": 0.47,
   "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_zamorozka/runs/20261127-161150-4b69",
-  "rescored_at": "2026-11-27 16:25"
+  "rescored_at": "2026-11-27 17:15"
 }

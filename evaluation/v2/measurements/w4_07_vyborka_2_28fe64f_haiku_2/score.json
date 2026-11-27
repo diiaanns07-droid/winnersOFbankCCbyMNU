@@ -41,7 +41,8 @@
       "major": 18,
       "minor": 12
     },
-    "duplicates": 5,
+    "duplicates": 2,
+    "parts": 3,
     "outside_gold": {
       "total": 2,
       "real": 0,
@@ -157,12 +158,13 @@
   },
   "precision": {
     "matched": 28,
-    "duplicates": 5,
+    "duplicates": 2,
+    "parts": 3,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 2,
-    "precision_useful": 0.857,
+    "precision_useful": 0.943,
     "precision_gold": 0.8
   },
   "severity": {
@@ -778,14 +780,6 @@
   ],
   "duplicates": [
     {
-      "finding": "D-06",
-      "gold": "С16",
-      "title": "Архитектура не содержит связи расходов с настройками",
-      "sources": [
-        "lens:architect"
-      ]
-    },
-    {
       "finding": "D-09",
       "gold": "К4",
       "title": "Сумма за месяц на экране не возвращается ни одним методом",
@@ -795,8 +789,34 @@
       ]
     },
     {
+      "finding": "D-34",
+      "gold": "С15",
+      "title": "«Прежнее состояние» при отказе не определено",
+      "sources": [
+        "lens:analyst"
+      ]
+    }
+  ],
+  "parts": [
+    {
+      "finding": "D-06",
+      "gold": "С16",
+      "parts": [
+        "нет связи расходы → настройки в архитектуре"
+      ],
+      "credited": "D-08",
+      "title": "Архитектура не содержит связи расходов с настройками",
+      "sources": [
+        "lens:architect"
+      ]
+    },
+    {
       "finding": "D-21",
-      "gold": "К3",
+      "gold": "С2",
+      "parts": [
+        "открытый перечень «400, 401 и далее»"
+      ],
+      "credited": "D-23",
       "title": "Перечень кодов ответа неполон и противоречив",
       "sources": [
         "rules:api.status_201",
@@ -804,16 +824,12 @@
       ]
     },
     {
-      "finding": "D-34",
-      "gold": "С15",
-      "title": "«Прежнее состояние» при отказе не определено",
-      "sources": [
-        "lens:analyst"
-      ]
-    },
-    {
       "finding": "D-35",
       "gold": "С1",
+      "parts": [
+        "Content-Type без тела"
+      ],
+      "credited": "D-07",
       "title": "Content-Type указан при отсутствии тела запроса",
       "sources": [
         "rules:api.content_type_without_body"
@@ -1253,13 +1269,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 3,
-    "seconds": 41.699999999999996,
-    "cost_usd": 0.2777716,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 42.12,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_vyborka_2/runs/20261127-163448-d7ab"
+  "seconds": 0.46,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_vyborka_2/runs/20261127-163448-d7ab",
+  "rescored_at": "2026-11-27 17:15"
 }

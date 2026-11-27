@@ -41,7 +41,8 @@
       "major": 17,
       "minor": 11
     },
-    "duplicates": 5,
+    "duplicates": 3,
+    "parts": 2,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -153,12 +154,13 @@
   },
   "precision": {
     "matched": 27,
-    "duplicates": 5,
+    "duplicates": 3,
+    "parts": 2,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.844,
+    "precision_useful": 0.906,
     "precision_gold": 0.844
   },
   "severity": {
@@ -400,6 +402,116 @@
     "generic": [],
     "english": [],
     "english_report_md": []
+  },
+  "clarity": {
+    "n": 32,
+    "passed": 19,
+    "share": 0.594,
+    "by_check": {
+      "заголовок": 0,
+      "место": 0,
+      "проблема": 4,
+      "сценарий": 3,
+      "последствие": 0,
+      "исправление": 9,
+      "язык": 1
+    },
+    "worst": [
+      {
+        "id": "D-01",
+        "title": "Дата покупки для месяца: по совершению (Ф-2) или по проведению (приёмка)",
+        "severity": "critical",
+        "source": "lens:qa, lens:analyst, consistency",
+        "fails": [
+          "проблема",
+          "язык"
+        ]
+      },
+      {
+        "id": "D-06",
+        "title": "Чужая карта: код 403 в статусе и код 404 в описании",
+        "severity": "major",
+        "source": "consistency, lens:qa, lens:architect, rules:api.status_404",
+        "fails": [
+          "проблема",
+          "исправление"
+        ]
+      },
+      {
+        "id": "D-10",
+        "title": "Архитектура и последовательность расходятся по составу компонентов",
+        "severity": "major",
+        "source": "consistency, lens:architect",
+        "fails": [
+          "сценарий",
+          "исправление"
+        ]
+      },
+      {
+        "id": "D-29",
+        "title": "Документ не рассматривает ряд случаев",
+        "severity": "minor",
+        "source": "lens:qa, lens:risk",
+        "fails": [
+          "сценарий",
+          "исправление"
+        ]
+      },
+      {
+        "id": "D-03",
+        "title": "Недопустимый порог: код 400 или код 200 с ERROR",
+        "severity": "critical",
+        "source": "lens:architect, lens:qa, consistency, rules:api.success_with_error",
+        "fails": [
+          "проблема"
+        ]
+      },
+      {
+        "id": "D-09",
+        "title": "Держатель, владелец и клиент карты названы по-разному",
+        "severity": "major",
+        "source": "consistency",
+        "fails": [
+          "исправление"
+        ]
+      },
+      {
+        "id": "D-22",
+        "title": "Нет приоритетов и ID у пунктов; Jira-задача не указана",
+        "severity": "minor",
+        "source": "consistency",
+        "fails": [
+          "исправление"
+        ]
+      },
+      {
+        "id": "D-23",
+        "title": "Компоненты названы по-разному: сервис настроек, настройки, хранилище",
+        "severity": "minor",
+        "source": "consistency",
+        "fails": [
+          "исправление"
+        ]
+      },
+      {
+        "id": "D-24",
+        "title": "Накопленная сумма за месяц не выведена в модели данных",
+        "severity": "minor",
+        "source": "lens:architect",
+        "fails": [
+          "сценарий"
+        ]
+      },
+      {
+        "id": "D-25",
+        "title": "Накопленная сумма за месяц названа тремя терминами",
+        "severity": "minor",
+        "source": "consistency",
+        "fails": [
+          "исправление"
+        ]
+      }
+    ]
   },
   "report_sections": {
     "паспорт прогона": true,
@@ -735,8 +847,22 @@
       ]
     },
     {
+      "finding": "D-31",
+      "gold": "С14",
+      "title": "Термин «исходный итог» при повторной доставке не раскрыт",
+      "sources": [
+        "lens:analyst"
+      ]
+    }
+  ],
+  "parts": [
+    {
       "finding": "D-20",
-      "gold": "К3",
+      "gold": "С2",
+      "parts": [
+        "открытый перечень «400, 401 и далее»"
+      ],
+      "credited": "D-06",
       "title": "Перечень кодов ответа противоречив и неполон",
       "sources": [
         "lens:architect",
@@ -747,17 +873,13 @@
     {
       "finding": "D-23",
       "gold": "С16",
+      "parts": [
+        "компоненты названы по-разному"
+      ],
+      "credited": "D-10",
       "title": "Компоненты названы по-разному: сервис настроек, настройки, хранилище",
       "sources": [
         "consistency"
-      ]
-    },
-    {
-      "finding": "D-31",
-      "gold": "С14",
-      "title": "Термин «исходный итог» при повторной доставке не раскрыт",
-      "sources": [
-        "lens:analyst"
       ]
     }
   ],
@@ -799,26 +921,20 @@
       "gold": "С15",
       "level": "major",
       "title": "Логика метода, п. 5, и обязательность полей",
-      "where": "найден кандидатом (lens:architect), судья не взял",
+      "where": "не найден ни одним этапом",
       "owners": [
-        "judge"
+        "architect"
       ],
       "near": [],
-      "seen_in": [
-        {
-          "source": "lens:architect",
-          "id": "lens:architect#2",
-          "title": "Чтение настроек не описано: saveLimit требует сохранения",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "С18",
       "level": "major",
       "title": "Критерии приёмки неполны",
-      "where": "найден кандидатом (lens:qa), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "qa",
         "judge"
       ],
       "near": [
@@ -841,27 +957,15 @@
           "arbiter": "no_match"
         }
       ],
-      "seen_in": [
-        {
-          "source": "lens:qa",
-          "id": "lens:qa#1",
-          "title": "Ожидаемый результат критерия приёмки R-14 (Критерии приемки, строка 2) противоречит R-06 (Ф-2)",
-          "reason": ""
-        },
-        {
-          "source": "lens:qa",
-          "id": "lens:qa#5",
-          "title": "Приёмка покрывает три строки и не проверяет ветки правил",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М2б",
       "level": "minor",
       "title": "Версия и дата документа не заполнены",
-      "where": "найден кандидатом (consistency, rules:placeholder.version), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "rules",
         "judge"
       ],
       "near": [
@@ -878,27 +982,15 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "consistency",
-          "id": "consistency#15",
-          "title": "Нет версии документа и задачи в Jira",
-          "reason": ""
-        },
-        {
-          "source": "rules:placeholder.version",
-          "id": "rules#12",
-          "title": "Не указана версия документа и дата",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М2в",
       "level": "minor",
       "title": "Чек-лист ревью без отметок",
-      "where": "найден кандидатом (lens:risk, rules:placeholder.checklist), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "rules",
         "judge"
       ],
       "near": [
@@ -909,27 +1001,15 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#5",
-          "title": "Нет схемы отката функции, хотя пункт чек-листа её требует",
-          "reason": ""
-        },
-        {
-          "source": "rules:placeholder.checklist",
-          "id": "rules#11",
-          "title": "Чек-лист ревью не заполнен: в 14 пунктах не выбрано «Да» или «Нет»",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М2г",
       "level": "minor",
       "title": "Блок согласующих пуст",
-      "where": "найден кандидатом (rules:placeholder.approvals), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "rules",
         "judge"
       ],
       "near": [
@@ -940,14 +1020,7 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "rules:placeholder.approvals",
-          "id": "rules#13",
-          "title": "Блок согласующих пуст: нет ни одного согласующего",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М3",
@@ -975,8 +1048,9 @@
       "gold": "М6",
       "level": "minor",
       "title": "Description метода бессвязен",
-      "where": "найден кандидатом (consistency), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "architect",
         "judge"
       ],
       "near": [
@@ -987,21 +1061,15 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "consistency",
-          "id": "consistency#9",
-          "title": "Чтение порога обещано, но не описано в API",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М7",
       "level": "minor",
       "title": "Схема отката не описана",
-      "where": "найден кандидатом (lens:risk), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "risk",
         "judge"
       ],
       "near": [
@@ -1012,21 +1080,16 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#5",
-          "title": "Нет схемы отката функции, хотя пункт чек-листа её требует",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М8",
       "level": "minor",
       "title": "«В Алматы» вместо явного часового пояса",
-      "where": "найден кандидатом (consistency, lens:analyst, lens:risk), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "analyst",
+        "rules",
         "judge"
       ],
       "near": [
@@ -1037,142 +1100,37 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "consistency",
-          "id": "consistency#2",
-          "title": "Ф-2 относит покупку к дате совершения, приёмка — к дате проведения",
-          "reason": ""
-        },
-        {
-          "source": "lens:analyst",
-          "id": "lens:analyst#8",
-          "title": "Три правила о порогах, учёте и срабатывании смешаны в одном пункте",
-          "reason": ""
-        },
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#6",
-          "title": "Пояс «в Алматы» назван городом, а не смещением UTC",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     }
   ],
   "stage_recall": {
-    "consistency": {
-      "candidates": 15,
-      "K": [
-        "К1",
-        "К2",
-        "К3",
-        "К4",
-        "К5"
-      ],
-      "C": [
-        "С2",
-        "С5",
-        "С6",
-        "С8",
-        "С16",
-        "С17"
-      ],
-      "only_here": []
-    },
-    "lens:analyst": {
-      "candidates": 9,
-      "K": [
-        "К1",
-        "К5"
-      ],
-      "C": [
-        "С4",
-        "С6",
-        "С7",
-        "С9",
-        "С11",
-        "С13",
-        "С14",
-        "С17"
-      ],
-      "only_here": [
-        "С13"
-      ]
-    },
-    "lens:architect": {
-      "candidates": 12,
-      "K": [
-        "К3",
-        "К4"
-      ],
-      "C": [
-        "С1",
-        "С2",
-        "С3",
-        "С4",
-        "С7",
-        "С12",
-        "С14",
-        "С15",
-        "С16",
-        "С19"
-      ],
-      "only_here": [
-        "С12",
-        "С15"
-      ]
-    },
     "lens:qa": {
-      "candidates": 6,
+      "candidates": 1,
       "K": [
-        "К1",
-        "К2",
-        "К3",
         "К4"
       ],
       "C": [
         "С1",
-        "С2",
-        "С8",
-        "С18",
         "С20"
       ],
       "only_here": [
-        "С18"
+        "К4",
+        "С1",
+        "С20"
       ]
     },
     "lens:risk": {
-      "candidates": 8,
+      "candidates": 2,
       "K": [
-        "К1",
-        "К5"
+        "К1"
       ],
       "C": [
-        "С1",
-        "С5",
-        "С9",
-        "С11",
         "С14"
       ],
-      "only_here": []
-    },
-    "rules": {
-      "candidates": 15,
-      "K": [
-        "К3",
-        "К4"
-      ],
-      "C": [
-        "С1",
-        "С2",
-        "С3",
-        "С4",
-        "С7",
-        "С17",
-        "С19",
-        "С20"
-      ],
-      "only_here": []
+      "only_here": [
+        "К1",
+        "С14"
+      ]
     }
   },
   "gates": [
@@ -1222,6 +1180,11 @@
       "ok": true
     },
     {
+      "metric": "рубрика понятности",
+      "value": "19/32",
+      "ok": false
+    },
+    {
       "metric": "английские слова",
       "value": "0",
       "ok": true
@@ -1243,13 +1206,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 3,
-    "seconds": 29.4,
-    "cost_usd": 0.25184470000000003,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 29.81,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_08_30/runs/20261127-082327-d983"
+  "seconds": 0.13,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_08_30/runs/20261127-082327-d983",
+  "rescored_at": "2026-11-27 17:15"
 }

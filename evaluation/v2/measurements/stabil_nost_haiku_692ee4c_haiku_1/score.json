@@ -41,7 +41,8 @@
       "major": 20,
       "minor": 8
     },
-    "duplicates": 5,
+    "duplicates": 3,
+    "parts": 2,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -157,12 +158,13 @@
   },
   "precision": {
     "matched": 28,
-    "duplicates": 5,
+    "duplicates": 3,
+    "parts": 2,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.848,
+    "precision_useful": 0.909,
     "precision_gold": 0.848
   },
   "severity": {
@@ -312,7 +314,7 @@
       {
         "gold": "С14",
         "level": "major",
-        "finding": "D-19",
+        "finding": "D-18",
         "severity": "major",
         "ok": true,
         "exact": true
@@ -699,11 +701,11 @@
     },
     {
       "gold": "С14",
-      "finding": "D-19",
-      "title": "«Исходный итог» при повторной доставке не определён",
+      "finding": "D-18",
+      "title": "Признак повторной доставки события не определён",
       "severity": "major",
       "sources": [
-        "consistency"
+        "lens:architect"
       ],
       "how": "детерминированно"
     },
@@ -824,20 +826,11 @@
       ]
     },
     {
-      "finding": "D-09",
-      "gold": "С16",
-      "title": "Связь сервиса расходов с настройками есть в последовательности, нет в архитектуре",
+      "finding": "D-19",
+      "gold": "С14",
+      "title": "«Исходный итог» при повторной доставке не определён",
       "sources": [
-        "lens:architect",
         "consistency"
-      ]
-    },
-    {
-      "finding": "D-18",
-      "gold": "К4",
-      "title": "Признак повторной доставки события не определён",
-      "sources": [
-        "lens:architect"
       ]
     },
     {
@@ -849,10 +842,29 @@
         "lens:architect",
         "consistency"
       ]
+    }
+  ],
+  "parts": [
+    {
+      "finding": "D-09",
+      "gold": "С16",
+      "parts": [
+        "нет связи расходы → настройки в архитектуре"
+      ],
+      "credited": "D-10",
+      "title": "Связь сервиса расходов с настройками есть в последовательности, нет в архитектуре",
+      "sources": [
+        "lens:architect",
+        "consistency"
+      ]
     },
     {
       "finding": "D-33",
       "gold": "С1",
+      "parts": [
+        "Content-Type без тела"
+      ],
+      "credited": "D-06",
       "title": "Заголовок Content-Type указан у метода без тела запроса",
       "sources": [
         "rules:api.content_type_without_body"
@@ -933,7 +945,7 @@
       "gold": "М2в",
       "level": "minor",
       "title": "Чек-лист ревью без отметок",
-      "where": "найден кандидатом (lens:risk, rules:placeholder.checklist), судья не взял",
+      "where": "найден кандидатом (rules:placeholder.checklist), судья не взял",
       "owners": [
         "judge"
       ],
@@ -946,12 +958,6 @@
         }
       ],
       "seen_in": [
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#7",
-          "title": "В документе нет схемы отката функции",
-          "reason": ""
-        },
         {
           "source": "rules:placeholder.checklist",
           "id": "rules#11",
@@ -989,19 +995,13 @@
       "gold": "М2д",
       "level": "minor",
       "title": "Нет задачи в Jira — источник требований не прослеживается",
-      "where": "найден кандидатом (consistency), судья не взял",
+      "where": "не найден ни одним этапом",
       "owners": [
-        "judge"
+        "rules",
+        "consistency"
       ],
       "near": [],
-      "seen_in": [
-        {
-          "source": "consistency",
-          "id": "consistency#12",
-          "title": "Версия документа и номер задачи не заполнены",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М4б",
@@ -1029,26 +1029,21 @@
       "gold": "М6",
       "level": "minor",
       "title": "Description метода бессвязен",
-      "where": "найден кандидатом (consistency), судья не взял",
+      "where": "не найден ни одним этапом",
       "owners": [
-        "judge"
+        "architect"
       ],
       "near": [],
-      "seen_in": [
-        {
-          "source": "consistency",
-          "id": "consistency#6",
-          "title": "Чтение настроек обещано, но описано только сохранение",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М8",
       "level": "minor",
       "title": "«В Алматы» вместо явного часового пояса",
-      "where": "найден кандидатом (lens:risk), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "analyst",
+        "rules",
         "judge"
       ],
       "near": [
@@ -1059,14 +1054,7 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#6",
-          "title": "Часовой пояс Алматы назван без смещения UTC",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     }
   ],
   "stage_recall": {
@@ -1102,9 +1090,7 @@
         "С17",
         "С18"
       ],
-      "only_here": [
-        "С12"
-      ]
+      "only_here": []
     },
     "lens:architect": {
       "candidates": 12,
@@ -1120,6 +1106,7 @@
         "С4",
         "С7",
         "С11",
+        "С12",
         "С14",
         "С15",
         "С16",
@@ -1256,13 +1243,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 3,
-    "seconds": 23.2,
-    "cost_usd": 0.2124356,
-    "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
+    "pending": 2,
+    "model": ""
   },
-  "seconds": 23.54,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/stabil_nost_haiku/runs/20261127-143807-926c"
+  "seconds": 0.61,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/stabil_nost_haiku/runs/20261127-143807-926c",
+  "rescored_at": "2026-11-27 17:15"
 }

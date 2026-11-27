@@ -41,7 +41,8 @@
       "major": 19,
       "minor": 14
     },
-    "duplicates": 8,
+    "duplicates": 4,
+    "parts": 4,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -154,12 +155,13 @@
   },
   "precision": {
     "matched": 28,
-    "duplicates": 8,
+    "duplicates": 4,
+    "parts": 4,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.778,
+    "precision_useful": 0.889,
     "precision_gold": 0.778
   },
   "severity": {
@@ -807,25 +809,6 @@
       ]
     },
     {
-      "finding": "D-13",
-      "gold": "С12",
-      "title": "Сумма в push не определена: покупки или накопленная за месяц",
-      "sources": [
-        "lens:analyst"
-      ]
-    },
-    {
-      "finding": "D-22",
-      "gold": "С2",
-      "title": "Чужая карта: код 403 в перечне статусов против 404 в ответе",
-      "sources": [
-        "lens:architect",
-        "lens:qa",
-        "consistency",
-        "rules:api.status_404"
-      ]
-    },
-    {
       "finding": "D-24",
       "gold": "С13",
       "title": "Цель «в момент покупки» расходится с минутной задержкой push",
@@ -849,10 +832,43 @@
       "sources": [
         "consistency"
       ]
+    }
+  ],
+  "parts": [
+    {
+      "finding": "D-13",
+      "gold": "С12",
+      "parts": [
+        "какая сумма в push"
+      ],
+      "credited": "D-14",
+      "title": "Сумма в push не определена: покупки или накопленная за месяц",
+      "sources": [
+        "lens:analyst"
+      ]
+    },
+    {
+      "finding": "D-22",
+      "gold": "С2",
+      "parts": [
+        "403 ↔ 404, чужая карта"
+      ],
+      "credited": "D-20",
+      "title": "Чужая карта: код 403 в перечне статусов против 404 в ответе",
+      "sources": [
+        "lens:architect",
+        "lens:qa",
+        "consistency",
+        "rules:api.status_404"
+      ]
     },
     {
       "finding": "D-35",
       "gold": "С1",
+      "parts": [
+        "Content-Type без тела"
+      ],
+      "credited": "D-16",
       "title": "Content-Type application/json указан для запроса без тела",
       "sources": [
         "rules:api.content_type_without_body",
@@ -862,6 +878,10 @@
     {
       "finding": "D-36",
       "gold": "С2",
+      "parts": [
+        "открытый перечень «400, 401 и далее»"
+      ],
+      "credited": "D-20",
       "title": "Перечень неуспешных кодов открыт словами «и далее»",
       "sources": [
         "rules:language.open_list"
@@ -874,7 +894,7 @@
       "gold": "С7",
       "level": "major",
       "title": "Требования к данным неполны",
-      "where": "найден кандидатом (lens:architect, rules:api.field_types.saveLimit, rules:units.currency_mix), судья не взял",
+      "where": "найден кандидатом (rules:api.field_types.saveLimit), судья не взял",
       "owners": [
         "judge"
       ],
@@ -899,18 +919,6 @@
         }
       ],
       "seen_in": [
-        {
-          "source": "lens:architect",
-          "id": "lens:architect#4",
-          "title": "Порог в тенге, покупки в тиынах: правила пересчёта нет",
-          "reason": ""
-        },
-        {
-          "source": "rules:units.currency_mix",
-          "id": "rules#2",
-          "title": "Суммы в тиынах и в тенге без правила пересчёта",
-          "reason": ""
-        },
         {
           "source": "rules:api.field_types.saveLimit",
           "id": "rules#4",
@@ -942,7 +950,7 @@
       "gold": "М2в",
       "level": "minor",
       "title": "Чек-лист ревью без отметок",
-      "where": "найден кандидатом (lens:risk, rules:placeholder.checklist), судья не взял",
+      "where": "найден кандидатом (rules:placeholder.checklist), судья не взял",
       "owners": [
         "judge"
       ],
@@ -961,12 +969,6 @@
         }
       ],
       "seen_in": [
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#6",
-          "title": "Нет схемы отката функции, пункт шаблона отмечен пустым",
-          "reason": ""
-        },
         {
           "source": "rules:placeholder.checklist",
           "id": "rules#11",
@@ -1076,8 +1078,10 @@
       "gold": "М8",
       "level": "minor",
       "title": "«В Алматы» вместо явного часового пояса",
-      "where": "найден кандидатом (lens:risk), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "analyst",
+        "rules",
         "judge"
       ],
       "near": [
@@ -1088,14 +1092,7 @@
           "arbiter": ""
         }
       ],
-      "seen_in": [
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#5",
-          "title": "Часовой пояс суток и месяца задан городом, а не смещением UTC",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     }
   ],
   "stage_recall": {
@@ -1284,13 +1281,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 2,
-    "seconds": 43.1,
-    "cost_usd": 0.24092039999999998,
-    "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
+    "pending": 1,
+    "model": ""
   },
-  "seconds": 43.62,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_20/runs/20261127-152134-0c4c"
+  "seconds": 0.56,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_20/runs/20261127-152134-0c4c",
+  "rescored_at": "2026-11-27 17:15"
 }

@@ -41,7 +41,8 @@
       "major": 16,
       "minor": 13
     },
-    "duplicates": 6,
+    "duplicates": 2,
+    "parts": 4,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -156,12 +157,13 @@
   },
   "precision": {
     "matched": 28,
-    "duplicates": 6,
+    "duplicates": 2,
+    "parts": 4,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.824,
+    "precision_useful": 0.941,
     "precision_gold": 0.824
   },
   "severity": {
@@ -785,23 +787,6 @@
   ],
   "duplicates": [
     {
-      "finding": "D-09",
-      "gold": "С16",
-      "title": "Вызов порога учётом расходов есть только в последовательности",
-      "sources": [
-        "lens:architect",
-        "consistency"
-      ]
-    },
-    {
-      "finding": "D-15",
-      "gold": "С12",
-      "title": "Последние четыре цифры карты для push не передаются и не хранятся",
-      "sources": [
-        "lens:architect"
-      ]
-    },
-    {
       "finding": "D-23",
       "gold": "К5",
       "title": "Цель «в момент покупки» не совпадает с минутой по НФТ",
@@ -811,17 +796,48 @@
       ]
     },
     {
-      "finding": "D-24",
-      "gold": "С17",
-      "title": "Тексты ошибок ввода порога на экране не заданы",
-      "sources": [
-        "lens:analyst"
-      ]
-    },
-    {
       "finding": "D-33",
       "gold": "С15",
       "title": "Понятие «прежнее состояние» при отклонении не определено",
+      "sources": [
+        "lens:analyst"
+      ]
+    }
+  ],
+  "parts": [
+    {
+      "finding": "D-09",
+      "gold": "С16",
+      "parts": [
+        "нет связи расходы → настройки в архитектуре"
+      ],
+      "credited": "D-08",
+      "title": "Вызов порога учётом расходов есть только в последовательности",
+      "sources": [
+        "lens:architect",
+        "consistency"
+      ]
+    },
+    {
+      "finding": "D-15",
+      "gold": "С12",
+      "parts": [
+        "откуда 4 цифры карты"
+      ],
+      "credited": "D-14",
+      "title": "Последние четыре цифры карты для push не передаются и не хранятся",
+      "sources": [
+        "lens:architect"
+      ]
+    },
+    {
+      "finding": "D-24",
+      "gold": "С17",
+      "parts": [
+        "тексты ошибок ввода"
+      ],
+      "credited": "D-10",
+      "title": "Тексты ошибок ввода порога на экране не заданы",
       "sources": [
         "lens:analyst"
       ]
@@ -829,6 +845,10 @@
     {
       "finding": "D-34",
       "gold": "С1",
+      "parts": [
+        "Content-Type без тела"
+      ],
+      "credited": "D-16",
       "title": "Заголовок Content-Type указан при запросе без тела",
       "sources": [
         "rules:api.content_type_without_body"
@@ -1213,13 +1233,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 2,
-    "seconds": 34.4,
-    "cost_usd": 0.2512164,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 35.2,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_vyborka_2/runs/20261127-163447-97fe"
+  "seconds": 0.49,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_vyborka_2/runs/20261127-163447-97fe",
+  "rescored_at": "2026-11-27 17:15"
 }

@@ -41,7 +41,8 @@
       "major": 16,
       "minor": 10
     },
-    "duplicates": 5,
+    "duplicates": 1,
+    "parts": 4,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -153,12 +154,13 @@
   },
   "precision": {
     "matched": 26,
-    "duplicates": 5,
+    "duplicates": 1,
+    "parts": 4,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.839,
+    "precision_useful": 0.968,
     "precision_gold": 0.839
   },
   "severity": {
@@ -727,8 +729,22 @@
   ],
   "duplicates": [
     {
+      "finding": "D-14",
+      "gold": "К4",
+      "title": "Повтор события: ключ дедупликации и исходный итог не определены",
+      "sources": [
+        "lens:risk"
+      ]
+    }
+  ],
+  "parts": [
+    {
       "finding": "D-08",
       "gold": "С16",
+      "parts": [
+        "нет связи расходы → настройки в архитектуре"
+      ],
+      "credited": "D-09",
       "title": "Вызов получения порога есть в последовательности, но не в архитектуре",
       "sources": [
         "lens:architect",
@@ -738,22 +754,22 @@
     {
       "finding": "D-12",
       "gold": "С12",
+      "parts": [
+        "какая сумма в push"
+      ],
+      "credited": "D-13",
       "title": "Push: неясно, сумма покупки или накопленный расход",
       "sources": [
         "lens:analyst"
       ]
     },
     {
-      "finding": "D-14",
-      "gold": "К4",
-      "title": "Повтор события: ключ дедупликации и исходный итог не определены",
-      "sources": [
-        "lens:risk"
-      ]
-    },
-    {
       "finding": "D-21",
       "gold": "С2",
+      "parts": [
+        "403 ↔ 404, чужая карта"
+      ],
+      "credited": "D-19",
       "title": "Чужая карта: код 403 и код 404 в разных разделах",
       "sources": [
         "lens:qa",
@@ -765,6 +781,10 @@
     {
       "finding": "D-31",
       "gold": "С1",
+      "parts": [
+        "Content-Type без тела"
+      ],
+      "credited": "D-06",
       "title": "Content-Type указан при отсутствии тела запроса",
       "sources": [
         "rules:api.content_type_without_body"
@@ -1217,13 +1237,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 3,
-    "seconds": 25.799999999999997,
-    "cost_usd": 0.2242096,
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
     "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "model": ""
   },
-  "seconds": 26.37,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_golova_16_50/runs/20261127-170251-2bb7"
+  "seconds": 0.48,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_golova_16_50/runs/20261127-170251-2bb7",
+  "rescored_at": "2026-11-27 17:15"
 }

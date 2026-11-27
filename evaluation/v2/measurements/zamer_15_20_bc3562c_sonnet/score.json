@@ -41,7 +41,8 @@
       "major": 12,
       "minor": 11
     },
-    "duplicates": 1,
+    "duplicates": 0,
+    "parts": 1,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -154,12 +155,13 @@
   },
   "precision": {
     "matched": 27,
-    "duplicates": 1,
+    "duplicates": 0,
+    "parts": 1,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
     "outside_partial": 0,
-    "precision_useful": 0.964,
+    "precision_useful": 1.0,
     "precision_gold": 0.964
   },
   "severity": {
@@ -770,10 +772,15 @@
       "how": "детерминированно"
     }
   ],
-  "duplicates": [
+  "duplicates": [],
+  "parts": [
     {
       "finding": "D-12",
       "gold": "С12",
+      "parts": [
+        "какая сумма в push"
+      ],
+      "credited": "D-13",
       "title": "Не определено, какая сумма передаётся в push",
       "sources": [
         "lens:analyst"
@@ -786,7 +793,7 @@
       "gold": "С9",
       "level": "major",
       "title": "Какой месяц у лимита push и в каком поясе",
-      "where": "найден кандидатом (lens:analyst, lens:risk), судья не взял",
+      "where": "найден кандидатом (lens:risk), судья не взял",
       "owners": [
         "judge"
       ],
@@ -816,12 +823,6 @@
           "id": "rejected#2",
           "title": "Часовой пояс месяца задан городом без смещения от UTC",
           "reason": "L038: «Месяц определяется по дате совершения покупки в Алматы» — часовой пояс задан однозначно."
-        },
-        {
-          "source": "lens:analyst",
-          "id": "lens:analyst#3",
-          "title": "Ограничение «один push в месяц» расходится с правилом после смены порога",
-          "reason": ""
         },
         {
           "source": "lens:risk",
@@ -872,8 +873,10 @@
       "gold": "С17",
       "level": "major",
       "title": "UI описан неполно",
-      "where": "найден кандидатом (rules:promises.read_operation), судья не взял",
+      "where": "есть близкое замечание, но не та проблема или не те строки",
       "owners": [
+        "analyst",
+        "qa",
         "judge"
       ],
       "near": [
@@ -884,14 +887,7 @@
           "arbiter": "gold"
         }
       ],
-      "seen_in": [
-        {
-          "source": "rules:promises.read_operation",
-          "id": "rules#1",
-          "title": "Обещано чтение данных, но в спецификации API нет ни одной операции чтения",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     },
     {
       "gold": "М1",
@@ -959,7 +955,7 @@
       "gold": "М2в",
       "level": "minor",
       "title": "Чек-лист ревью без отметок",
-      "where": "найден кандидатом (lens:risk, rules:placeholder.checklist), судья не взял",
+      "where": "найден кандидатом (rules:placeholder.checklist), судья не взял",
       "owners": [
         "judge"
       ],
@@ -978,12 +974,6 @@
         }
       ],
       "seen_in": [
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#8",
-          "title": "Схема отката и выключения функции не описана",
-          "reason": ""
-        },
         {
           "source": "rules:placeholder.checklist",
           "id": "rules#11",
@@ -1062,25 +1052,13 @@
       "gold": "М8",
       "level": "minor",
       "title": "«В Алматы» вместо явного часового пояса",
-      "where": "найден кандидатом (lens:risk), судья не взял",
+      "where": "не найден ни одним этапом",
       "owners": [
-        "judge"
+        "analyst",
+        "rules"
       ],
       "near": [],
-      "seen_in": [
-        {
-          "source": "lens:risk",
-          "id": "rejected#2",
-          "title": "Часовой пояс месяца задан городом без смещения от UTC",
-          "reason": "L038: «Месяц определяется по дате совершения покупки в Алматы» — часовой пояс задан однозначно."
-        },
-        {
-          "source": "lens:risk",
-          "id": "lens:risk#7",
-          "title": "Часовой пояс месяца задан городом без смещения от UTC",
-          "reason": ""
-        }
-      ]
+      "seen_in": []
     }
   ],
   "stage_recall": {
@@ -1119,7 +1097,6 @@
     "lens:architect": {
       "candidates": 11,
       "K": [
-        "К3",
         "К4",
         "К5"
       ],
@@ -1268,13 +1245,14 @@
     }
   ],
   "arbiter": {
-    "mode": "sonnet",
-    "calls": 2,
-    "seconds": 39.0,
-    "cost_usd": 0.2332404,
-    "pending": 0,
-    "model": "claude-sonnet-5-5"
+    "mode": "off",
+    "calls": 0,
+    "seconds": 0.0,
+    "cost_usd": 0.0,
+    "pending": 1,
+    "model": ""
   },
-  "seconds": 39.41,
-  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_20/runs/20261127-152134-dc5f"
+  "seconds": 0.46,
+  "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/zamer_15_20/runs/20261127-152134-dc5f",
+  "rescored_at": "2026-11-27 17:15"
 }

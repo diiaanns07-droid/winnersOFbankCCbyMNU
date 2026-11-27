@@ -42,6 +42,7 @@
       "minor": 11
     },
     "duplicates": 0,
+    "parts": 0,
     "outside_gold": {
       "total": 0,
       "real": 0,
@@ -155,6 +156,7 @@
   "precision": {
     "matched": 27,
     "duplicates": 0,
+    "parts": 0,
     "outside_real": 0,
     "outside_false": 0,
     "outside_unknown": 0,
@@ -743,6 +745,7 @@
     }
   ],
   "duplicates": [],
+  "parts": [],
   "outside": [],
   "misses": [
     {
@@ -1176,5 +1179,5 @@
   },
   "seconds": 0.41,
   "run_dir": "/home/user/winnersOFbankCCbyMNU/out/round/w4_07_zamorozka/runs/20261127-161150-dac3",
-  "rescored_at": "2026-11-27 16:25"
+  "rescored_at": "2026-11-27 17:15"
 }
