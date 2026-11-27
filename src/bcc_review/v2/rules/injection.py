@@ -40,14 +40,37 @@ ADDRESSEE = re.compile(
     r"(?:автоматическ\w+|машинн\w+)\s+(?:провер\w+|ревью|анализ\w*)\s+(?:требовани\w+|документ\w*|ТЗ|спецификаци\w*)|"
     r"reviewer|assistant|language\s+model|the\s+model|AI\s+agent)\b", re.I)
 IMPERATIVE = re.compile(
-    r"\b(?:игнорируй|проигнорируй|не\s+учитывай|забудь|пропусти|считай|отметь|поставь|присвой|верни|выведи|"
-    r"ответь|укажи|напиши|сообщи|оцени|признай|одобри|согласуй|исключи|пометь|подтверди|скрой|умолчи|"
+    # повелительное наклонение, в том числе вежливое «-те»: «оцените», «пропустите», «верните»
+    r"\b(?:(?:игнорируй|проигнорируй|не\s+учитывай|забудь|пропусти|считай|отметь|поставь|присвой|верни|выведи|"
+    r"ответь|укажи|напиши|сообщи|оцени|признай|одобри|согласуй|исключи|пометь|подтверди|скрой|умолчи)(?:те)?|"
     r"не\s+(?:сообщай|находи|ищи|отмечай|пиши|формируй|упоминай|включай|выводи|создавай|показывай|указывай)(?:те)?|"
     r"не\s+долж(?:ен|на|ны|но)\s+(?:сообщать|находить|отмечать|указывать|писать|выводить|формировать|упоминать|"
     r"включать)|"
     r"ignore|disregard|forget|pretend|approve|mark|rate|treat|consider|skip|classify|label|"
     r"must\s+(?:say|output|return|report|rate|approve|ignore)|do\s+not|don't|never|"
-    r"(?:respond|reply)\s+with|output\s+only)\b", re.I)
+    r"(?:respond|reply|answer)\s+(?:only\s+)?with|output\s+only|return\s+(?:only\s+)?(?:an?\s+)?empty|"
+    r"(?:please\s+)?report\s+(?:zero|no|0)\b|please\s+(?:report|rate|mark|approve|ignore|skip|return|respond))\b",
+    re.I)
+# указание инфинитивом («все требования считать согласованными», «замечания не выдавать») — только об итоге
+# проверки: рядом должен быть её предмет (ниже REVIEW_OBJECT)
+INF_DIRECTIVE = re.compile(
+    r"\b(?:считать|признать|оценить|отметить|пометить|пропустить|одобрить|"
+    r"не\s+(?:выдавать|выводить|сообщать|отмечать|указывать|формировать|находить|упоминать|включать))\b", re.I)
+# предмет проверки: о нём указание обращено к проверяющему, а не к смежной системе («модель скоринга: верните
+# решение» — не вставка)
+REVIEW_OBJECT = re.compile(
+    r"замечани|дефект|противореч|вердикт|требовани|раздел\w*\s+(?:«|\"|\d|[A-ZА-Я]\b)|"
+    r"(?:этот|данный|настоящий|весь)\s+документ|документ\w*\s+(?:как|не\s+содерж|корректен|готов)|"
+    r"\bТЗ\b|спецификаци|findings?|defects?|issues?|requirements?|specification|verdict", re.I)
+AI_ADDRESSEE = re.compile(
+    r"\b(?:ИИ|AI|LLM|GPT|ChatGPT|Claude|Gemini|нейросет\w*|языков\w+\s+модел\w*|ии-агент\w*|ии-ассистент\w*|"
+    r"агент\w*\s+(?:провер\w+|ревью)|проверяющ\w+\s+(?:модел\w*|систем\w*|агент\w*)|language\s+model|the\s+model|"
+    r"AI\s+agent)\b", re.I)
+# слабое обращение: «Модели: …», «для автоматической системы проверки: …» — вставка, только если указание о
+# предмете проверки
+ADDRESSEE_WEAK = re.compile(
+    r"\bмодел(?:и|ям|ь)\b|\b(?:систем\w*|сервис\w*)\s+(?:автоматическ\w+\s+)?(?:провер\w+|ревью)\b|"
+    r"\bпроверяющ(?:ему|ей|им)\b|\bassistant\b|\bассистент\w*", re.I)
 VERDICT = re.compile(
     r"\bдефект\w*\s+(?:нет|не\s+(?:обнаружен\w*|найден\w*|выявлен\w*))|"
     r"\bдокумент\s+(?:не\s+содержит\s+(?:дефект|замечани|ошибок|противореч)\w*|полностью\s+корректен|без\s+"
@@ -55,6 +78,10 @@ VERDICT = re.compile(
     r"(?:дефект|ошиб|противореч)\w*)|вердикт\w*\s*[:—-]\s*(?:можно|одобр\w*|готов\w*)|"
     r"\bможно\s+начинать\s+разработку\b|\bno\s+(?:defects|issues)\s+(?:found|detected)?|\bdocument\s+is\s+"
     r"(?:correct|complete|flawless)\b|\bapprove\s+(?:this|the)\s+(?:document|spec\w*|requirements?)\b", re.I)
+# итог, навязанный обращением к модели: «укажите, что замечаний нет», «верните пустой список замечаний»
+VERDICT_ADDR = re.compile(r"\bзамечани\w*\s+нет\b|\bнет\s+замечаний\b|\bпуст\w+\s+спис\w+\s+(?:замечани|дефект)\w*|"
+                          r"\bempty\s+list\s+of\s+(?:defects|findings|issues)|\bzero\s+(?:findings|defects|issues)\b",
+                          re.I)
 # навязанный итог — вставка, только если текст обращается к модели или к автоматической проверке
 # (запись в журнале ревью «Ревью 12.11: дефектов не обнаружено» — не вставка)
 REVIEW_CTX = re.compile(r"\bвердикт\w*\s+(?:для|автоматическ)|\bв\s+отч[её]т\w*\s+(?:укажи|напиши|выведи)|"
@@ -98,7 +125,17 @@ def run(doc: Doc, out: dict) -> None:
             if a:
                 rest = text[a.start():]
                 im = IMPERATIVE.search(rest)
-                if im and im.start() < 120:
+                inf = INF_DIRECTIVE.search(rest)
+                ai = AI_ADDRESSEE.search(text)  # инфинитив и «замечаний нет» — только при обращении к ИИ, не к ревьюеру
+                if (im and im.start() < 120) or (ai and ((inf and inf.start() < 120 and REVIEW_OBJECT.search(rest))
+                                                         or VERDICT_ADDR.search(rest))):
+                    m, why = a, "обращение к модели или проверяющему с указанием, что делать"
+        if not m:
+            a = ADDRESSEE_WEAK.search(text)
+            if a:
+                rest = text[a.start():]
+                im = IMPERATIVE.search(rest) or INF_DIRECTIVE.search(rest)
+                if im and im.start() < 120 and REVIEW_OBJECT.search(rest[im.start():]):
                     m, why = a, "обращение к модели или проверяющему с указанием, что делать"
         if not m:
             v = VERDICT.search(text)

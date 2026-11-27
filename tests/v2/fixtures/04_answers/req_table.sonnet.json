@@ -1,0 +1,107 @@
+{
+ "_note": "sonnet 27.11 12:40 (волна 3, сессия 2, №04): таблица REQ-001, пункты 3.1, лист согласования",
+ "requirements": [
+  {
+   "source_id": "",
+   "kind": "goal",
+   "summary": "Формирование выписки по счёту в PDF и 1С",
+   "line_start": 11,
+   "line_end": 11
+  },
+  {
+   "source_id": "REQ-001",
+   "kind": "functional",
+   "summary": "Выбор счёта и периода до 366 дней",
+   "line_start": 17,
+   "line_end": 17
+  },
+  {
+   "source_id": "REQ-002",
+   "kind": "functional",
+   "summary": "Состав содержимого выписки",
+   "line_start": 18,
+   "line_end": 18
+  },
+  {
+   "source_id": "REQ-003",
+   "kind": "functional",
+   "summary": "Формат 1С по стандарту 1.03",
+   "line_start": 19,
+   "line_end": 19
+  },
+  {
+   "source_id": "REQ-004",
+   "kind": "functional",
+   "summary": "Асинхронное формирование выписки за период свыше 90 дней",
+   "line_start": 20,
+   "line_end": 20
+  },
+  {
+   "source_id": "REQ-005",
+   "kind": "functional",
+   "summary": "Электронная подпись банка в подписанной выписке",
+   "line_start": 21,
+   "line_end": 21
+  },
+  {
+   "source_id": "3.1",
+   "kind": "data",
+   "summary": "Источник операций и пометка текущего дня",
+   "line_start": 25,
+   "line_end": 25
+  },
+  {
+   "source_id": "3.2",
+   "kind": "data",
+   "summary": "Формат отображения сумм",
+   "line_start": 27,
+   "line_end": 27
+  },
+  {
+   "source_id": "4.1",
+   "kind": "nonfunctional",
+   "summary": "Лимит запросов выписки на пользователя",
+   "line_start": 31,
+   "line_end": 31
+  },
+  {
+   "source_id": "4.2",
+   "kind": "constraint",
+   "summary": "Срок хранения файла выписки",
+   "line_start": 33,
+   "line_end": 33
+  }
+ ],
+ "excluded": [
+  {
+   "what": "Название документа",
+   "line_start": 1,
+   "line_end": 1,
+   "reason": "Название документа"
+  },
+  {
+   "what": "Таблица общих сведений (система, заказчик, статус)",
+   "line_start": 3,
+   "line_end": 7,
+   "reason": "Метаданные документа"
+  },
+  {
+   "what": "Шапка таблицы функциональных требований",
+   "line_start": 15,
+   "line_end": 15,
+   "reason": "Строка-шапка таблицы"
+  },
+  {
+   "what": "Пример строки выписки",
+   "line_start": 38,
+   "line_end": 38,
+   "reason": "Пример данных к выписке (REQ-002), единственным описанием не является"
+  },
+  {
+   "what": "Лист согласования",
+   "line_start": 43,
+   "line_end": 46,
+   "reason": "Блок согласующих, не заполнен: ФИО и подписи пустые"
+  }
+ ]
+}

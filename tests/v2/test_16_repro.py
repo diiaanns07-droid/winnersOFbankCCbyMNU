@@ -63,8 +63,6 @@ def _run_mock(out: Path, runs: Path, monkeypatch, delays: dict[str, float] | Non
     return json.loads(out.with_suffix(".json").read_text(encoding="utf-8"))
 
 
-@pytest.mark.xfail(strict=False, reason="просьба №01 (статус №16, «Волна 3»): pipeline записывает этапы в порядке "
-                                        "завершения потоков; нужен канонический порядок в run.stages/stage_stats")
 def test_stage_order_does_not_depend_on_which_lens_finishes_first(tmp_path, monkeypatch):
     """Линзы идут параллельно; порядок их завершения не должен менять ни JSON, ни Markdown."""
     a = _run_mock(tmp_path / "a" / "r.md", tmp_path / "runs", monkeypatch)
@@ -86,13 +84,13 @@ def test_two_mock_runs_give_same_report_except_time(tmp_path, monkeypatch):
     a = _run_mock(tmp_path / "a" / "r.md", tmp_path / "runs", monkeypatch)
     b = _run_mock(tmp_path / "b" / "r.md", tmp_path / "runs", monkeypatch)
     ja, jb = _mask_json(a), _mask_json(b)
-    # порядок этапов проверяет тест выше (xfail до правки №01) — здесь сравниваем содержимое
-    for j in (ja, jb):
-        j["run"]["stages"] = dict(sorted(j["run"]["stages"].items()))
-        j["run"]["stage_stats"] = dict(sorted(j["run"]["stage_stats"].items()))
+    # порядок ключей тоже сравнивается: этапы идут в порядке конвейера (правка №01)
     assert json.dumps(ja, ensure_ascii=False, sort_keys=False) == json.dumps(jb, ensure_ascii=False, sort_keys=False)
     for key in ("findings", "requirements", "questions", "verdict", "rejected"):
         assert a.get(key) == b.get(key), key
+    md_a = _mask_md((tmp_path / "a" / "r.md").read_text(encoding="utf-8"))
+    md_b = _mask_md((tmp_path / "b" / "r.md").read_text(encoding="utf-8"))
+    assert md_a == md_b
 
 
 class _FakeProvider:
@@ -120,8 +118,6 @@ def test_cache_returns_same_answer_without_calling_model(tmp_path):
     assert (p1.calls, p2.calls) == (1, 0)
 
 
-@pytest.mark.xfail(strict=False, reason="просьба №01 (статус №16, «Волна 3»): при ответе из кэша llm.py не добавляет "
-                                        "модель в models_used → отчёт пишет «режим без модели»")
 def test_cached_answers_keep_model_in_passport(tmp_path):
     """Прогон целиком из кэша — это всё ещё ответы модели: паспорт называет модель, а не «без модели»."""
     from bcc_review.v2.llm import LLMClient
@@ -135,8 +131,6 @@ def test_cached_answers_keep_model_in_passport(tmp_path):
     assert cached.summary()["models_used"] == live.summary()["models_used"] == ["fake-model-1"]
 
 
-@pytest.mark.xfail(strict=False, reason="просьба №13 (статус №16, «Волна 3»): отчёт считает прогон «без модели», "
-                                        "если models_used пуст, даже когда все этапы модели выполнены из кэша")
 def test_report_from_cache_is_not_called_offline(tmp_path, monkeypatch):
     """Паспорт прогона из кэша (models_used пуст, все вызовы — кэш) не должен рендериться как режим без модели."""
     from bcc_review.v2.render import markdown
