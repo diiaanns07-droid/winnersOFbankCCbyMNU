@@ -33,9 +33,13 @@ def test_every_profile_has_output_limit_and_gemini_rate():
 
 def test_gemini_thinking_by_generation_and_explicit_env_wins():
     assert thinking_for("gemini-3.8-flash", None, None) == {"thinking_level": "medium"}
+    assert thinking_for("gemini-3.8-flash", None, None, "judge") == {"thinking_level": "medium"}
+    assert thinking_for("gemini-3.8-flash", None, None, "segment") == {"thinking_level": "low"}
+    assert thinking_for("gemini-3.8-flash", None, None, "clarify") == {"thinking_level": "low"}
     assert thinking_for("gemini-2.5-flash", None, None) == {"thinking_budget": 4096}
+    assert thinking_for("gemini-2.5-flash", None, None, "segment") == {"thinking_budget": 1024}
     assert thinking_for("gemini-1.5-flash", None, None) == {}
-    assert thinking_for("gemini-3.8-flash", "high", None, "segment") == {"thinking_level": "high"}
+    assert thinking_for("gemini-3.8-flash", "high", None, "segment") == {"thinking_level": "high"}   # env важнее
     assert thinking_for("gemini-3.8-flash", None, "2048") == {"thinking_budget": 2048}
     assert thinking_for("gemini-3.8-flash", "off", None) == {}
 
@@ -151,3 +155,15 @@ def test_timing_summary_and_render(tmp_path):
     assert "consistency split" in text
     assert timing.main([str(run)]) == 0
     assert timing.latest_run(tmp_path / "runs") == run
+
+
+def test_measured_stage_profile_sonnet_and_gemini():
+    """Принятые замером отступления: нарезка и вопросы — low; линзы, набор, судья — по умолчанию."""
+    for fam in ("sonnet", "gemini-flash"):
+        assert profiles.STAGE_EFFORT[fam] == {"segment": "low", "clarify": "low"}, fam
+    p = ClaudeCLIProvider(model="sonnet", env={}, binary="claude")
+    for stage, effort in (("segment", "low"), ("clarify", "low"), ("judge", None), ("consistency", None),
+                          ("lens_qa", None)):
+        cmd = p.build_command("sonnet", SCHEMA, None, stage)
+        assert (cmd[cmd.index("--effort") + 1] if "--effort" in cmd else None) == effort, stage
+    assert "opus" not in profiles.STAGE_EFFORT        # opus — контрольные прогоны, без непроверенных отступлений

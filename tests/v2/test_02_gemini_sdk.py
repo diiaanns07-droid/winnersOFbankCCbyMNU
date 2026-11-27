@@ -78,7 +78,7 @@ def test_sdk_503_then_404_then_success_on_third_model():
     assert len(fakes["gemini-3.8-flash"].calls) == 4 and len(fakes["gemini-3.6-flash"].calls) == 1
     assert sleeps == [2.0, 5.0, 10.0]
     cfg = fakes["gemini-3.8-flash"].calls[0][1]
-    assert cfg.max_output_tokens == 32000 and cfg.response_json_schema["required"] == ["answer"]
+    assert cfg.max_output_tokens == 65536 and cfg.response_json_schema["required"] == ["answer"]
     assert str(cfg.thinking_config.thinking_level).upper().endswith("MEDIUM")
 
 

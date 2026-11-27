@@ -16,7 +16,8 @@
 * неверный ключ, плохой запрос, отказ фильтром, обрезанный ответ — сразу наверх: повтор не поможет,
   а обрезку (``truncated``) ``LLMClient`` лечит делением пакета.
 
-``max_output_tokens`` — 32 000 (``GEMINI_MAX_OUTPUT_TOKENS``). Рассуждения — умеренные: для Gemini 3
+``max_output_tokens`` — потолок модели из профиля (2.5 и 3.x — 65 536; ``GEMINI_MAX_OUTPUT_TOKENS``),
+если API отверг лимит — 32 768, затем 8 192. Рассуждения — умеренные: для Gemini 3
 ``thinking_level=medium``, для 2.x ``thinking_budget=4096`` (``GEMINI_THINKING_LEVEL`` /
 ``GEMINI_THINKING_BUDGET``, ``off`` — не передавать). Если модель отвергла настройку рассуждений (400),
 запрос повторяется без неё. Фактическая модель (``model_version`` ответа) возвращается в ``model`` и
@@ -115,8 +116,7 @@ def settings(env: Mapping[str, str] | None = None) -> dict[str, Any]:
         "api_key": (env.get("GEMINI_API_KEY") or env.get("GOOGLE_API_KEY") or "").strip() or None,
         "model": (env.get("GEMINI_MODEL") or "").strip().removeprefix("models/") or DEFAULT_MODEL,
         "fallback_models": fallbacks,
-        "max_output_tokens": int(_num(env, "GEMINI_MAX_OUTPUT_TOKENS", DEFAULT_MAX_OUTPUT_TOKENS) or 0)
-        or DEFAULT_MAX_OUTPUT_TOKENS,
+        "max_output_tokens": int(_num(env, "GEMINI_MAX_OUTPUT_TOKENS", 0) or 0) or None,   # None — по профилю модели
         "thinking_level": (env.get("GEMINI_THINKING_LEVEL") or "").strip().lower() or None,
         "thinking_budget": (env.get("GEMINI_THINKING_BUDGET") or "").strip().lower() or None,
         "temperature": _num(env, "GEMINI_TEMPERATURE", None),
@@ -194,6 +194,11 @@ def daily_reset_local(now_utc: "datetime.datetime | None" = None) -> str:
     return f"{local:%H:%M} {day} по местному времени (полночь по тихоокеанскому времени США)"
 
 
+def _is_output_limit_error(low: str) -> bool:
+    """400 из-за слишком большого max_output_tokens (модель старше 2.5)."""
+    return any(m in low for m in ("max_output_tokens", "maxoutputtokens", "max output tokens", "output token"))
+
+
 def _attempt_note(a: Mapping[str, Any]) -> str:
     """Короткая запись попытки для трассы: «gemini-3.8-flash 503», «gemini-3.8-flash ждал окно 12 с»."""
     if "rpm_wait_s" in a:
@@ -256,7 +261,9 @@ class GeminiProvider:
         self.rpm = rpm if rpm is not None else cfg["rpm"]   # None — по профилю каждой модели
         self._window: dict[str, deque] = {}
         self._window_lock = threading.Lock()
-        self.max_output_tokens = int(max_output_tokens or cfg["max_output_tokens"])
+        explicit = max_output_tokens or cfg["max_output_tokens"]
+        self.max_output_tokens = int(explicit) if explicit else None   # None — потолок модели из профиля
+        self._out_cap: dict[str, int] = {}                             # модели, отвергшие большой лимит ответа
         self.thinking_level = cfg["thinking_level"]
         self.thinking_budget = cfg["thinking_budget"]
         self.temperature = cfg["temperature"]
@@ -319,6 +326,18 @@ class GeminiProvider:
             self._dead.clear()
             self._no_thinking.clear()
 
+    def output_limit(self, model: str, stage_limit: int = 0) -> int:
+        """Лимит ответа запроса: не ниже лимита этапа и потолка модели — рассуждения Gemini расходуют тот же лимит.
+
+        Потолок — ``GEMINI_MAX_OUTPUT_TOKENS`` или профиль (Gemini 2.5 и 3.x — 65 536). Обрезка на 32 000 у
+        набора (у haiku 34,5 тыс. токенов с рассуждением) раньше означала провал этапа: повтор «с удвоенным
+        лимитом» упирался в тот же потолок, а набор пакет не делит.
+        """
+        ceiling = int(self.max_output_tokens or profiles.gemini_max_output(model))
+        limit = max(int(stage_limit or 0), ceiling)
+        cap = self._out_cap.get(model)
+        return min(limit, cap) if cap else limit
+
     def rpm_for(self, model: str) -> float:
         """Сколько запросов в минуту слать модели: ``GEMINI_RPM`` или профиль (бесплатный тариф)."""
         if self.rpm is not None:
@@ -361,8 +380,7 @@ class GeminiProvider:
         deadline = self._clock() + total
         attempts: list[dict[str, Any]] = []
         last: ProviderError | None = None
-        # лимит этапа — не ниже лимита провайдера: у Gemini рассуждения расходуют тот же лимит
-        max_tokens = max(int(max_output_tokens or 0), self.max_output_tokens)
+        stage_limit = int(max_output_tokens or 0)
         clean = [{"role": m.get("role"), "content": m.get("content")} for m in messages]
 
         for current in chain:
@@ -382,6 +400,7 @@ class GeminiProvider:
                 except ProviderError as exc:
                     raise self._final(exc, chain, attempts) from None
                 sent = _with_schema_text(clean, schema) if mode == "text" else clean
+                max_tokens = self.output_limit(current, stage_limit)
                 started = self._clock()
                 try:
                     with self._gate:
@@ -429,6 +448,9 @@ class GeminiProvider:
                             continue
                         raise self._final(exc, chain, attempts) from None
                     low = (exc.message or "").lower()
+                    if kind == "bad_request" and _is_output_limit_error(low) and max_tokens > 8192:
+                        self._out_cap[current] = 32768 if max_tokens > 32768 else 8192
+                        continue
                     if kind == "bad_request" and thinking and "think" in low:
                         self._no_thinking.add(current)
                         continue

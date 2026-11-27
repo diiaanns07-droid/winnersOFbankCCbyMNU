@@ -28,7 +28,8 @@ from bcc_review.v2.llm import LLMClient  # noqa: E402
 from bcc_review.v2.providers import gemini as gem  # noqa: E402
 
 SCALE = 250.0
-PARALLEL = ("lens_analyst", "lens_qa", "lens_architect", "lens_risk", "consistency")
+# порядок запуска как в pipeline._parallel_reviewers (№01, a055425): самый долгий — первым
+PARALLEL = ("consistency", "lens_architect", "lens_analyst", "lens_risk", "lens_qa")
 # секунды на вызов: haiku (effort=low), официальный документ, прогон 27.11 08:58 (runs/20261127-085847-77dc)
 HAIKU_S = {"segment": 59.2, "lens_analyst": 35.8, "lens_architect": 63.3, "lens_qa": 82.2, "lens_risk": 87.3,
            "consistency": 135.5, "judge": 119.9, "judge_check": 17.0, "clarify": 38.4}
@@ -151,18 +152,23 @@ def test_provider_window_runs_all_parallel_stages_at_once_without_429():
     assert r["seconds"] <= CRITICAL_S + 15, (r["seconds"], CRITICAL_S)
 
 
-def test_pipeline_rpm_step_still_completes_without_429():
-    """С фиксированным шагом --rpm 10 у LLMClient (как сейчас в pipeline) — тоже без 429, но дольше на шаг×4."""
+def test_pipeline_rpm_window_and_provider_window_together_add_nothing():
+    """Как у жюри: окно --rpm 10 у LLMClient (№01) и окно по модели у провайдера — без пауз и без 429."""
     r = run_graph(client_rpm=10)
     assert r["outcomes"] == ["200"] * 9, r["outcomes"]
-    assert r["seconds"] <= CRITICAL_S + 4 * 6 + 15, (r["seconds"], CRITICAL_S)
+    assert r["seconds"] <= CRITICAL_S + 15, (r["seconds"], CRITICAL_S)
 
 
 def test_concurrency_four_was_slower():
-    """Замер решения: при параллельности 4 пятый этап ждал свободного места."""
-    four = run_graph(client_rpm=0, concurrency=4)
-    five = run_graph(client_rpm=0)
-    assert four["max_in_flight"] == 4 and five["seconds"] < four["seconds"] - 20, (four["seconds"], five["seconds"])
+    """Замер решения: при параллельности 4 пятый рецензент ждёт свободного места — фаза удлиняется на длину этапа.
+
+    Насколько — зависит от того, кто ждёт (набор первым — обычно ждёт короткая линза, ~0–35 с на замере haiku);
+    здесь все пять равны 100 с, чтобы эффект был детерминированным."""
+    equal = {**HAIKU_S, **{s: 100.0 for s in PARALLEL}}
+    four = run_graph(client_rpm=0, concurrency=4, latency=equal)
+    five = run_graph(client_rpm=0, latency=equal)
+    assert four["max_in_flight"] == 4 and five["max_in_flight"] == 5
+    assert five["seconds"] < four["seconds"] - 80, (four["seconds"], five["seconds"])
 
 
 def test_low_free_tier_rpm_waits_instead_of_failing():
@@ -181,9 +187,9 @@ def test_503_wave_falls_back_and_completes():
 
 
 def _table() -> None:  # pragma: no cover - ручной запуск
-    rows = [("было: параллельность 4, шаг --rpm 10", {"concurrency": 4, "client_rpm": 10}),
-            ("параллельность 5, шаг --rpm 10", {"client_rpm": 10}),
-            ("параллельность 5, окно провайдера", {"client_rpm": 0}),
+    rows = [("параллельность 4 (было), окно --rpm 10", {"concurrency": 4, "client_rpm": 10}),
+            ("параллельность 5 (сейчас), окно --rpm 10", {"client_rpm": 10}),
+            ("параллельность 5, только окно провайдера", {"client_rpm": 0}),
             ("сервер 5 RPM, GEMINI_RPM=5", {"server_rpm": 5, "client_rpm": 0, "env": {"GEMINI_RPM": "5"}}),
             ("сервер 5 RPM, окно 10 (не знаем лимит)", {"server_rpm": 5, "client_rpm": 0}),
             ("вызовы ×1,5", {"factor": 1.5, "client_rpm": 0}), ("волна 503 ×6", {"fail_503": 6, "client_rpm": 0})]
