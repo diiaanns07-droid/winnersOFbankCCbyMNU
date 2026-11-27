@@ -3,11 +3,29 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import shlex
+import subprocess
 import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def shell_quote(arg: object) -> str:
+    """Аргумент для строки команды с `shell=True`: на Windows её разбирает cmd.exe (двойные кавычки,
+    `subprocess.list2cmdline`), иначе POSIX sh (`shlex.quote`). Одинарные кавычки shlex cmd.exe не понимает —
+    путь с пробелом или кириллицей ломал `newtz run`/`corpus run`/`measure` на Windows (просьба №20)."""
+    s = str(arg)
+    return subprocess.list2cmdline([s]) if os.name == "nt" else shlex.quote(s)
+
+
+def run_shell(cmd: str, timeout: int, env: dict) -> subprocess.CompletedProcess:
+    """Запуск агента строкой команды: вывод читается как UTF-8 (дочернему Python — PYTHONIOENCODING), чтобы
+    русский текст в stderr не ронял харнес на Windows с кодовой страницей cp1251/cp866."""
+    return subprocess.run(cmd, shell=True, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          timeout=timeout, cwd=str(ROOT), env={**env, "PYTHONIOENCODING": "utf-8"})
 
 MD_DECOR = re.compile(r"\*\*|__|`")
 _QUOTES = re.compile(r"[«»“”„\"'‘’]")

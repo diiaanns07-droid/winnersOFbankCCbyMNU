@@ -171,3 +171,23 @@ def test_latin_allow_standards_bodies_iana():
 
     assert latin_words("смещение UTC+5 с идентификатором IANA (база tz)", set()) == []
     assert latin_words("поле note не заполнено", set()) == ["note"]
+
+
+def test_shell_quote_posix_and_windows(monkeypatch):
+    """Просьба №20: на Windows строку команды разбирает cmd.exe — нужны двойные кавычки, не одинарные shlex."""
+    from evaluation.v2 import common
+
+    assert common.shell_quote("/tmp/а б/report.md") == "'/tmp/а б/report.md'"
+    monkeypatch.setattr(common.os, "name", "nt")
+    assert common.shell_quote(r"C:\bcc\новые ТЗ\source.md") == '"C:\\bcc\\новые ТЗ\\source.md"'
+    assert common.shell_quote(r"C:\bcc\source.md") == r"C:\bcc\source.md"
+
+
+def test_run_shell_reads_utf8_output():
+    import sys
+
+    from evaluation.v2 import common
+
+    cmd = f"{common.shell_quote(sys.executable)} -c \"import sys; sys.stderr.write('ошибка ₸')\""
+    r = common.run_shell(cmd, 60, dict(__import__('os').environ))
+    assert r.returncode == 0 and "ошибка ₸" in r.stderr

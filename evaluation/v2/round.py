@@ -18,7 +18,7 @@ import sys
 import time
 from pathlib import Path
 
-from .common import ROOT
+from .common import ROOT, shell_quote
 from .measure import MEAS, slugify
 
 
@@ -52,7 +52,7 @@ def _clean_jobs(a, py: str, logs: Path, sha: str) -> list[tuple[str, list[str]]]
     for name, model, root, cases, title in sets:
         o = logs / name
         cmd_tpl = ("{python} -m bcc_review {input} {output} --provider {provider} --model {model} -q "
-                   f"--runs-dir {o / 'runs'}")
+                   f"--runs-dir {shell_quote(o / 'runs')}")
         out.append((name, [py, "-m", "evaluation.v2.newtz", "run", "--out", str(o), "--root", str(root),
                            "--cases", *cases, "--provider", "claude_cli", "--model", model, "--cmd", cmd_tpl,
                            "--jobs", "2", "--label", f"{a.name}: {title}, {sha}, {model}", "--save"]))
@@ -100,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
     if not a.no_corpus:
         out = logs / "corpus"
         cmd_tpl = ("{python} -m bcc_review {input} {output} --provider {provider} --model {model} -q "
-                   f"--runs-dir {out / 'runs'}")
+                   f"--runs-dir {shell_quote(out / 'runs')}")
         jobs.append(("corpus", [py, "-m", "evaluation.v2.corpus", "run", "--out", str(out), "--provider", "claude_cli",
                                 "--model", a.corpus_model, "--cmd", cmd_tpl, "--jobs", str(a.corpus_jobs),
                                 "--label", f"{a.name}: {sha}, {a.corpus_model}", "--save"]))
@@ -110,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
         if [c for c in discover(OPEN2) if c["variant"] != "error"]:
             out = logs / "newtz"
             cmd_tpl = ("{python} -m bcc_review {input} {output} --provider {provider} --model {model} -q "
-                       f"--runs-dir {out / 'runs'}")
+                       f"--runs-dir {shell_quote(out / 'runs')}")
             jobs.append(("newtz", [py, "-m", "evaluation.v2.newtz", "run", "--out", str(out), "--provider", "claude_cli",
                                    "--model", a.newtz_model, "--cmd", cmd_tpl, "--jobs", "2",
                                    "--label", f"{a.name}: {sha}, {a.newtz_model}", "--save"]))

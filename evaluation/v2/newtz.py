@@ -21,14 +21,13 @@ import concurrent.futures as cf
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 from . import score as sc
-from .common import ROOT, source_owner
+from .common import ROOT, run_shell, shell_quote, source_owner
 
 OPEN2 = ROOT / "evaluation" / "v2" / "open2"
 RESULTS_DIR = ROOT / "evaluation" / "v2" / "newtz_results"
@@ -88,12 +87,12 @@ def run_one(c: dict, out: Path, cmd_tpl: str, provider: str, model: str, timeout
     d.mkdir(parents=True, exist_ok=True)
     if reuse and (d / "report.json").exists():
         return {"key": _key(c), "rc": 0, "seconds": None, "reused": True}
-    cmd = cmd_tpl.format(python=shlex.quote(sys.executable), input=shlex.quote(c["doc"]),
-                         output=shlex.quote(str(d / "report.md")), provider=provider, model=model)
+    cmd = cmd_tpl.format(python=shell_quote(sys.executable), input=shell_quote(c["doc"]),
+                         output=shell_quote(str(d / "report.md")), provider=provider, model=model)
     env = dict(os.environ, PYTHONPATH=str(ROOT / "src") + os.pathsep + os.environ.get("PYTHONPATH", ""))
     t0 = time.monotonic()
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout, cwd=str(ROOT), env=env)
+        r = run_shell(cmd, timeout, env)
         rc, tail = r.returncode, (r.stderr or r.stdout)[-800:]
     except subprocess.TimeoutExpired:
         rc, tail = -9, f"таймаут {timeout} с"

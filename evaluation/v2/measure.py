@@ -13,7 +13,6 @@ import argparse
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -21,7 +20,7 @@ import time
 from pathlib import Path
 
 from . import score as sc
-from .common import ROOT
+from .common import ROOT, run_shell, shell_quote
 
 MEAS = ROOT / "evaluation" / "v2" / "measurements"
 HISTORY = ROOT / "evaluation" / "v2" / "history.jsonl"
@@ -39,12 +38,12 @@ def slugify(label: str) -> str:
 
 def run_agent(inp: Path, out_dir: Path, cmd_tpl: str, provider: str, model: str, timeout: int) -> tuple[int, str, float]:
     out_dir.mkdir(parents=True, exist_ok=True)
-    cmd = cmd_tpl.format(python=shlex.quote(sys.executable), input=shlex.quote(str(inp)),
-                         output=shlex.quote(str(out_dir / "report.md")), provider=provider, model=model)
+    cmd = cmd_tpl.format(python=shell_quote(sys.executable), input=shell_quote(str(inp)),
+                         output=shell_quote(str(out_dir / "report.md")), provider=provider, model=model)
     env = dict(os.environ, PYTHONPATH=str(ROOT / "src") + os.pathsep + os.environ.get("PYTHONPATH", ""))
     t0 = time.monotonic()
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout, cwd=str(ROOT), env=env)
+        r = run_shell(cmd, timeout, env)
         rc, log = r.returncode, f"$ {cmd}\nrc={r.returncode}\n--- stdout\n{r.stdout[-6000:]}\n--- stderr\n{r.stderr[-6000:]}"
     except subprocess.TimeoutExpired:
         rc, log = -9, f"$ {cmd}\nтаймаут {timeout} с"
