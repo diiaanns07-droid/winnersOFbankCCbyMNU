@@ -1297,6 +1297,17 @@ def next_round(clar: dict, questions: list[dict]) -> list[dict]:
             rule = rule if not rule or rule.endswith((".", "!", "?")) else rule + "."
         out.append({"kind": "partial" if a else "postponed", "finding_id": ", ".join(fids), "question_id": qid,
                     "lines": [_head(qid, topic.get(qid, "")) + (rule + " " if rule else "") + todo]})
+    # без ответа: вопрос, варианты и что будет без ответа — пояснением (строку ответа владелец пишет сам)
+    for q in questions:
+        qid = q.get("id") if isinstance(q, dict) else None
+        if not qid or qid not in (clar.get("unanswered") or []) or qid in by_q:
+            continue
+        opts = "; ".join(f"{_cl.option_label(i)} — {_one_line(o)}" for i, o in enumerate(q.get("options") or []))
+        note = f"{_one_line(q.get('question'))}" + (f" Варианты: {opts}." if opts else "")
+        if q.get("if_no_answer"):
+            note += f" Если ответа не будет: {q['if_no_answer']}."
+        out.append({"kind": "unanswered", "finding_id": ", ".join(q.get("finding_ids") or []), "question_id": qid,
+                    "lines": [], "note": note, "head": _head(qid, q.get("topic", "")).rstrip()})
     return out
 
 
@@ -1315,6 +1326,10 @@ def render_next_answers(clar: dict, document: str = "", report: str = "") -> str
     if todo:
         lines += ["## Что решить", ""]
         for n in todo:
+            if n["kind"] == "unanswered":
+                lines += [f"> {n['question_id']} ({n['finding_id']}): без ответа. {n.get('note', '')}",
+                          f"> Ответ — строкой «{n.get('head') or n['question_id'] + ':'} буква или свой текст».", ""]
+                continue
             what = {"conflict": "ответы расходятся, оставьте одну строку",
                     "partial": "решена только часть, допишите решение"}.get(n["kind"], "решение отложено, впишите его")
             lines += [f"> {n.get('question_id') or 'Общие решения'} ({n['finding_id']}): {what}", *n["lines"], ""]
@@ -1335,7 +1350,8 @@ def render_next_answers(clar: dict, document: str = "", report: str = "") -> str
     decided = [d for d in clar.get("decisions") or [] if _one_line(d)]
     if decided:
         lines += ["## Решения", "", *[f"- {_one_line(d)}" for d in decided], ""]
-    rest = [q for q in clar.get("unanswered") or [] if q not in busy]
+    rest = [q for q in clar.get("unanswered") or [] if q not in busy
+            and not any(n.get("question_id") == q for n in todo)]
     if rest:
         lines += [f"> Без ответа остаются: {', '.join(rest)}. Ответ можно дописать строкой «{rest[0]} [тема]: ответ» "
                   f"в раздел выше.", ""]

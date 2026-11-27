@@ -710,7 +710,7 @@ def _round(answers_text, decisions):
 
 def test_next_round_conflict_gives_one_line_per_reply_and_round_trips():
     clar = _round(TWO, [{"finding_id": "D-01", "conflicting_answers": ["Q-01.1", "Q-01.2"], "reason": "расходятся"}])
-    n = clar["next_round"]
+    n = [x for x in clar["next_round"] if x["kind"] != "unanswered"]
     assert [x["kind"] for x in n] == ["conflict"] and n[0]["finding_id"] == "D-01" and len(n[0]["lines"]) == 2
     assert all(x.startswith("Q-01 [Код ответа при отказе антифрода]: ") for x in n[0]["lines"])
     text = recheck.render_next_answers(clar)
@@ -723,7 +723,7 @@ def test_next_round_conflict_gives_one_line_per_reply_and_round_trips():
 
 def test_next_round_partial_placeholder_is_not_an_answer_until_filled():
     clar = _round(PARTIAL, [{"finding_id": "D-03", "status": "resolved", "by": ["Q-03"], "reason": "снят Q-03"}])
-    n = clar["next_round"]
+    n = [x for x in clar["next_round"] if x["kind"] != "unanswered"]
     assert [x["kind"] for x in n] == ["partial"] and "<решите: Что делать после истечения срока" in n[0]["lines"][0]
     text = recheck.render_next_answers(clar)
     r = recheck.resolve_answers(QS, recheck.load_answers(text))
@@ -738,7 +738,7 @@ def test_next_round_partial_placeholder_is_not_an_answer_until_filled():
 def test_next_answers_file_keeps_agreed_answers_and_decisions():
     clar = _round("Q-03: B\nQ-02: Через шлюз, без прямых вызовов.\n\n## Решения\n- Храним журнал 90 дней.\n",
                   [{"finding_id": "D-03", "status": "resolved", "by": ["Q-03"], "reason": "снят Q-03"}])
-    assert clar["next_round"] == []
+    assert [(x["kind"], x["question_id"]) for x in clar["next_round"]] == [("unanswered", "Q-01")]
     r = recheck.resolve_answers(QS, recheck.load_answers(recheck.render_next_answers(clar, "spec.md", "out.md")))
     got = {a["question_id"]: (a["choice"], a["answer"]) for a in r["answered"]}
     assert got["Q-03"] == ("B", "48 часов") and got["Q-02"] == ("", "Через шлюз, без прямых вызовов.")
@@ -752,3 +752,27 @@ def test_run_modes_writes_next_answers_file(tmp_path):
     path = tmp_path / "rep.answers-next.md"
     assert path.exists() and out["clarification"]["next_answers_file"] == str(path)
     assert "## Что решить" in path.read_text(encoding="utf-8")
+
+
+def test_if_no_answer_from_findings():
+    from bcc_review.v2.stages import clarify
+    by = {"D-01": {"id": "D-01", "severity": "critical", "blocks": "development"},
+          "D-02": {"id": "D-02", "severity": "major", "blocks": "both"},
+          "D-03": {"id": "D-03", "severity": "critical", "blocks": "both"}}
+    assert clarify.if_no_answer({"finding_ids": ["D-01", "D-02"]}, by).startswith("разработку начинать нельзя: D-01 — блокер")
+    assert clarify.if_no_answer({"finding_ids": ["D-03"]}, by).startswith("разработку и тестирование начинать нельзя")
+    assert clarify.if_no_answer({"finding_ids": ["D-02"]}, by).startswith("D-02 остаётся открытым")
+    assert clarify.if_no_answer({"finding_ids": ["D-09"]}, by) == ""
+    qs = clarify.cover_critical([{"id": "Q-01", "finding_ids": ["D-02"], "blocking": False}], list(by.values())[1:2])
+    assert qs[0]["if_no_answer"].startswith("D-02 остаётся открытым")
+
+
+def test_next_answers_lists_unanswered_with_options_and_consequence():
+    qs = [dict(q, if_no_answer="разработку начинать нельзя: D-01 — блокер") if q["id"] == "Q-01" else q for q in QS]
+    rep = dict(_report(), questions=qs)
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(_resp([]))), rep, "Q-03: B\n")["clarification"]
+    text = recheck.render_next_answers(clar)
+    assert "> Q-01 (D-01): без ответа. Какой код вернуть при отказе антифрода? Варианты: A — 422; B — 403." in text
+    assert "Если ответа не будет: разработку начинать нельзя: D-01 — блокер." in text
+    r = recheck.resolve_answers(QS, recheck.load_answers(text))
+    assert [a["question_id"] for a in r["answered"]] == ["Q-03"]  # пояснения «>» — не ответы
