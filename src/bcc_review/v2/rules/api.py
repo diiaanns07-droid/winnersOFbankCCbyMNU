@@ -967,12 +967,30 @@ IDEM_REPLAY = re.compile(
     r"первоначального|предыдущего))", re.I)
 
 
+# повтор с теми же параметрами: «Повторный вызов с теми же суммой и сроком возвращает действующие условия»
+REPLAY_PARAMS = re.compile(
+    r"\bповторн\w*\s+(?:запрос|вызов|обращени)\w*\s+(?:метода\s+)?с\s+(?:теми\s+же|такими\s+же)\s+([^.;]{3,60}?)\s+"
+    r"(?:возвращает|возвращается|отдаёт|отдает)\s+([^.;]{3,80})", re.I)
+
+
 def rule_idempotent_replay(doc: Doc, out: dict) -> None:
     for x in doc.lines:
         if not x.text or x.is_code:
             continue
         m = IDEM_REPLAY.search(x.joined)
         if not m:
+            p = REPLAY_PARAMS.search(x.joined)
+            if p and not re.match(r"\s*(?:код|ошибк|статус)|\s*[1-5]\d\d\b", p.group(2), re.I):
+                frag = x.joined[p.start():].split(".")[0].strip()
+                out["signals"].append(signal(
+                    "api.idempotent_replay", x, frag,
+                    f"Справка, не дефект: документ сам задаёт исход повторного вызова с теми же {p.group(1).strip()} — "
+                    f"{p.group(2).strip().rstrip('.')}. Шаги логики описывают первый вызов; что вернуть на повтор после "
+                    "отказа, подписания или другой смены состояния — уточнение (minor), а не противоречие «особое "
+                    "правило против шага» и не critical. Справка — только об этом повторе: остальные особые правила "
+                    "сверяй с функциональными требованиями как обычно.",
+                    ("consistency", "qa", "architect", "risk", "analyst"), "inventory"))
+                return
             continue
         frag = x.joined[m.start():].split(".")[0].strip()
         out["signals"].append(signal(
