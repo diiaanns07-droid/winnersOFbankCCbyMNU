@@ -207,7 +207,7 @@ def test_schema_field_names_in_texts_become_russian():
 
 
 def test_other_candidates_limited_conflicts_kept():
-    """Противоречия модели остаются все; прочих замечаний — два: покрытие приёмкой и проверяемость первыми."""
+    """Противоречия модели остаются все; прочих — по одному: покрытие приёмкой, проверяемость, пустой раздел."""
     base = {"requirement_ids": ["R-02"], "evidence": [{"quote": "x", "line": 12}], "problem": "p", "scenario": "s",
             "impact": "i", "recommendation": "r", "rewrite": "", "question": "", "blocks": "testing",
             "severity": "major"}
@@ -218,10 +218,13 @@ def test_other_candidates_limited_conflicts_kept():
            dict(base, title="Коды", kind="status_conflict", criterion="set_consistent"),
            dict(base, title="Покрытие", kind="missing_element", criterion="set_validatable")]
     raw.append(dict(base, title="Покрытие-2", kind="missing_element", criterion="set_validatable", severity="minor"))
+    raw.append(dict(base, title="Заглушка", kind="placeholder", criterion="complete", requirement_ids=[]))
+    raw.append(dict(base, title="Заглушка-2", kind="placeholder", criterion="complete", severity="minor"))
     out = lens_qa.postprocess({"candidates": raw}, REQS)
-    assert [c["title"] for c in out["candidates"]] == ["Два исхода", "Метрика", "Коды", "Покрытие"]
-    assert {d["title"] for d in out["dropped"]} == {"Неоднозначность", "Контракт", "Покрытие-2"}
-    assert all("не больше 2" in d["reason"] for d in out["dropped"])
+    assert [c["title"] for c in out["candidates"]] == ["Два исхода", "Метрика", "Коды", "Покрытие", "Заглушка"]
+    assert out["candidates"][-1]["severity"] == "minor"  # пустой раздел тестирования — minor
+    assert {d["title"] for d in out["dropped"]} == {"Неоднозначность", "Контракт", "Покрытие-2", "Заглушка-2"}
+    assert all("не больше 3" in d["reason"] for d in out["dropped"])
     # неоднозначность одного места без своих видов — тоже снимается: это зона аналитика
     only = lens_qa.postprocess({"candidates": [raw[0]]}, REQS)
     assert only["candidates"] == [] and [d["title"] for d in only["dropped"]] == ["Неоднозначность"]
