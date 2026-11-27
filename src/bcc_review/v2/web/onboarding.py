@@ -123,23 +123,24 @@ def verify_key(provider: str, key: str) -> tuple[bool, str]:
         code = 2
     text = _scrub("\n".join(lines), key)
     vendor = VENDOR[provider]
-    if code == 0:
+    if code == 0 or "Модель ответила" in text:
         return True, "Ключ работает"
     if "Ключ рабочий" in text:
         return True, "Ключ работает, но лимит запросов сейчас исчерпан — подождите минуту перед проверкой"
-    fails = [ln[len(NO):].strip() for ln in text.splitlines() if ln.startswith(NO)]
-    detail = " ".join(fails) or text
+    tail = text.split("Провайдер:", 1)[-1]
+    fails = [ln.strip()[len(NO):].strip() for ln in tail.splitlines() if ln.strip().startswith(NO)]
+    detail = " ".join(fails) or tail
+    status = re.search(r"\b(400|401|403)\b", tail)
     low = detail.lower()
     if re.search(r"не установлен|no module|pip install", low):
         return False, _first_sentence(f"Не хватает пакета для {vendor}: выполните pip install -r requirements.txt.")
-    if re.search(r"прокси|брандмауэр|не ответил|не отвечает|соединени|network|timeout|timed out", low):
+    if not status and re.search(r"прокси|брандмауэр|не ответил|не отвечает|соединени|network|timeout|timed out", low):
         return False, f"Нет связи с {vendor}: проверьте интернет, прокси или брандмауэр."
-    status = re.search(r"\b(400|401|403)\b", detail)
+    if not status and re.search(r"\b429\b|лимит запросов|quota|rate.?limit", low):
+        return True, "Ключ работает, но лимит запросов сейчас исчерпан — подождите минуту перед проверкой"
     if status or re.search(r"ключ|key|auth|отклон|invalid|permission", low):
         said = f"{vendor} ответил {status.group(1)}" if status else f"{vendor} его отклонил"
         return False, f"Ключ не подошёл: {said}. Скопируйте ключ целиком."
-    if re.search(r"\b429\b|лимит|quota|rate", low):
-        return True, "Ключ работает, но лимит запросов сейчас исчерпан — подождите минуту перед проверкой"
     return False, _first_sentence(detail) or "Проверка не прошла. Попробуйте ещё раз."
 
 
@@ -419,8 +420,8 @@ def welcome_page() -> str:
 <a id="w-get" href="{GEMINI_KEY_URL}" target="_blank" rel="noopener noreferrer" data-gemini="{GEMINI_KEY_URL}" data-claude="{CLAUDE_KEY_URL}">получить за минуту</a></div>
 <div class="w-field"><input id="w-key" name="key" type="password" placeholder="AIza…" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="w-msg">
 <button type="button" id="w-show" class="w-show" aria-pressed="false" aria-controls="w-key">показать</button></div>
-<p id="w-msg" class="w-msg" role="status"></p>
 <div class="w-actions"><button id="w-check" class="w-btn w-main" type="submit">Проверить ключ</button></div>
+<p id="w-msg" class="w-msg" role="status"></p>
 <div id="w-done" class="w-done" hidden>
 <label class="w-check"><input id="w-remember" type="checkbox" checked> Запомнить на этом компьютере (файл .env)</label>
 <div class="w-actions"><button id="w-open" class="w-btn w-main" type="button">Открыть систему</button></div>
