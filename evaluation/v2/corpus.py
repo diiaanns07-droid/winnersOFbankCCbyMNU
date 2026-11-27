@@ -244,7 +244,10 @@ def harness_score(out: Path, preds: Path, fmt: str, sub: str = "harness") -> dic
     hd = out / sub
     cmd = [sys.executable, "-m", "evaluation.harness", "--gold", str(CORPUS / "labels.jsonl"), "--pred", str(preds),
            "--manifest", str(CORPUS / "manifest.json"), "--out-dir", str(hd), "--render-format", fmt]
-    r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT))
+    # счётчик печатает русский текст: на Windows (cp1251/cp866) без UTF-8 падал на «₸» и подобных (просьба №16);
+    # код evaluation/harness не трогаем — его SHA-256 записан в протоколе (HANDOFF.md, controls/SELFCHECK.md)
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(ROOT),
+                       env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     (out / f"{sub.replace('/', '_')}.log").write_text(r.stdout + r.stderr, encoding="utf-8")
     mp = hd / "metrics.json"
     if r.returncode != 0 or not mp.exists():

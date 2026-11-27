@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -456,7 +457,8 @@ def clarity_gates(row: dict | None) -> list[dict]:
 def stress_gate() -> dict:
     import subprocess
     r = subprocess.run([sys.executable, "-m", "pytest", "tests/v2/test_03_stress.py", "-q", "-p", "no:cacheprovider"],
-                       capture_output=True, text=True, cwd=str(ROOT), timeout=900)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(ROOT), timeout=900,
+                       env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     last = (r.stdout.strip().splitlines() or ["—"])[-1]
     return {**_check("Надёжность: стресс-набор №03", "0 падений", last[:80], r.returncode == 0, "№03"),
             "source": "pytest tests/v2/test_03_stress.py"}
