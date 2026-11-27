@@ -1,0 +1,35 @@
+$ /usr/local/bin/python -m bcc_review /home/user/winnersOFbankCCbyMNU/release/input/requirements.md /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/stabil_nost_sonnet_6d03683_sonnet_2/report.md --provider claude_cli --model sonnet --no-cache --runs-dir /home/user/winnersOFbankCCbyMNU/out/round/stabil_nost_sonnet/runs
+rc=0
+--- stdout
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 29 дефектов (критичных 5, существенных 14, незначительных 10), вопросов 10
+Разработка: нельзя · тестирование: нельзя
+  D-01 Критерий приёмки №2 относит покупку к февралю, Ф-2 — к январю — блокирует разработку и тестирование
+  D-02 Ф-3 (один push в месяц) противоречит Ф-4 (push при следующем достижении) — блокирует разработку и тестирование
+  D-03 Недопустимая сумма: ответ 200 с ERROR против кода 400 — блокирует разработку и тестирование
+Прогон завершён полностью: 3 мин 37 с, 9 вызовов модели, claude-sonnet-5-5; цитат сверено 81 из 81
+Отчёт: /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/stabil_nost_sonnet_6d03683_sonnet_2/report.md и /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/stabil_nost_sonnet_6d03683_sonnet_2/report.json
+  ! судья: 2 замечаний (пожелания полноты) сведены в одно незначительное
+HTML: /home/user/winnersOFbankCCbyMNU/evaluation/v2/measurements/stabil_nost_sonnet_6d03683_sonnet_2/report.html
+
+--- stderr
+Документ: /home/user/winnersOFbankCCbyMNU/release/input/requirements.md
+  segment: запуск
+  segment: готово за 28 с, вызовов 1
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  lens_analyst: запуск
+  lens_qa: запуск
+  lens_risk: запуск
+  lens_architect: запуск
+  consistency: запуск
+  lens_architect: готово за 38 с, вызовов 1, кандидатов 12
+  lens_qa: готово за 39 с, вызовов 1, кандидатов 5
+  lens_analyst: готово за 42 с, вызовов 1, кандидатов 10
+  consistency: готово за 65 с, вызовов 1, кандидатов 14
+  lens_risk: готово за 71 с, вызовов 1, кандидатов 8
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 64
+  judge: запуск
+  judge: готово за 94 с, вызовов 2
+  clarify: запуск
+  clarify: готово за 25 с, вызовов 1
