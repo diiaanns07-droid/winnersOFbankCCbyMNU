@@ -345,10 +345,13 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
             continue
         first = by_n.get(int(r["line_start"])) or {}
         parts = [p.strip() for p in str(first.get("section") or "").split("›") if p.strip()]
-        for head in reversed(parts):  # source_id — само название раздела (паспорт метода)
-            if sid != head and _strip_num(sid).lower() == _strip_num(head).lower():
-                sid = head
+        for head in reversed(parts):  # source_id — само название раздела: допустимо только у таблицы (паспорт метода)
+            if _strip_num(sid).lower() == _strip_num(head).lower():
+                sid = head if _is_row(_text(first)) else ""
                 break
+        if not sid:
+            r["source_id"] = ""
+            continue
         m = re.match(r"^(?P<pre>.+?)(?P<sep>: |, п\. |, строка )(?P<rest>.+)$", sid)
         if m:
             pre = m.group("pre").strip()
