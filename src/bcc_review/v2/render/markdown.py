@@ -699,6 +699,13 @@ def _q_word(c: _Ctx, form: str) -> str:
             ("mark", True): "⛔ блокирует", ("mark", False): "❗ первоочередной"}[(form, blocked)]
 
 
+def _q_need(c: _Ctx, n: int) -> str:
+    """«, на 6 нужен ответ до начала работы» — одинаково на первом экране, в сводке и приложении А."""
+    if not n:
+        return ""
+    return f", на {n} нужен ответ до начала работы" if _blockers(c) else f", на {n} — ответить в первую очередь"
+
+
 def _counts_line(c: _Ctx) -> str:
     s = c.summary
     fs = s.get("findings", {})
@@ -713,8 +720,7 @@ def _counts_line(c: _Ctx) -> str:
     if qs:
         blocking = sum(1 for q in qs if q.get("blocking"))
         parts.append(f"**{len(qs)}** {plural(len(qs), 'вопрос', 'вопроса', 'вопросов')} владельцу"
-                     + ((f", на {blocking} нужен ответ до начала работы" if _blockers(c)
-                         else f", на {blocking} — ответить в первую очередь") if blocking else ""))
+                     + _q_need(c, blocking))
     return " · ".join(parts)
 
 
@@ -1684,7 +1690,7 @@ def _summary(c: _Ctx) -> list[str]:
     rows = [["Требований выделено", num(nreq)], ["С нарушениями", num(nreq - clean)], ["Без замечаний", num(clean)],
             ["Нарушений (дефектов)", f"{total}: " + " · ".join(f"{SEV_ICON[k]} {fs.get(k, 0)}" for k in SEV_ICON)],
             ["Цитат сверено программой", f"{ok} из {qt}"],
-            ["Вопросов владельцу", f"{len(qs)}, из них {_q_word(c, 'many')} {sum(1 for q in qs if q.get('blocking'))}"]]
+            ["Вопросов владельцу", f"{len(qs)}" + _q_need(c, sum(1 for q in qs if q.get("blocking")))]]
     out = [h2("s5", "5. Сводка"), ""] + table(["Показатель", "Значение"], rows) + [""]
     out += ["**Критичные дефекты по видам** (п. 6 ТЗ: непроверяемые, противоречивые, неполные)", ""]
     rows = []
@@ -1763,7 +1769,7 @@ def _appendix_questions(c: _Ctx) -> list[str]:
     blocking = sum(1 for q in qs if q.get("blocking"))
     cl = c.r.get("clarification") or {}
     answered = {a.get("question_id"): a for a in cl.get("answers") or [] if isinstance(a, dict)}
-    out += [f"{len(qs)} {plural(len(qs), 'вопрос', 'вопроса', 'вопросов')}, {_q_word(c, 'many')} — {blocking}. "
+    out += [f"{len(qs)} {plural(len(qs), 'вопрос', 'вопроса', 'вопросов')}{_q_need(c, blocking)}. "
             f"Ответ — буква варианта или свой текст, по строке на вопрос (`Q-01: B`); повторный прогон с ответами: "
             f"`python -m bcc_review ВХОД ОТЧЁТ.md --answers ответы.md`.", ""]
     for q in sorted(qs, key=lambda q: (not q.get("blocking"), _id_num(q.get("id")))):
