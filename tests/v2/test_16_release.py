@@ -264,7 +264,8 @@ def test_docker_and_scripts_install_with_constraints():
     assert re.search(r"^COPY requirements\.txt constraints\.txt \./", docker, re.M), "Dockerfile без constraints.txt"
     for script in ("_env.sh", "_env.ps1"):
         assert "constraints.txt" in _read(ROOT / "scripts" / script), script
-    assert "constraints.txt" in _read(WORKFLOWS / "tests.yml")
+    for wf in ("tests.yml", "report.yml"):
+        assert "constraints.txt" in _read(WORKFLOWS / wf), wf
 
 
 # --------------------------------------------------------------------------- Python 3.11
