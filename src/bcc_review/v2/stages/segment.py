@@ -384,6 +384,23 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
     return requirements
 
 
+def merge_bare_codes(view: dict, requirements: list[dict]) -> list[dict]:
+    """Требование из голого кода ответа («404» под фразой «…возвращается 404…») склеивается с соседом выше."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    out: list[dict] = []
+    for r in sorted(requirements, key=lambda x: (x["line_start"], x["line_end"])):
+        code = _text(by_n.get(int(r["line_start"])) or {}).strip().strip("*").strip().rstrip(".")
+        prev = out[-1] if out else None
+        if (prev is not None and re.fullmatch(r"[1-5]\d\d", code) and 0 < r["line_start"] - prev["line_end"] <= 2
+                and code in prev["quote"] and (not prev["source_id"] or prev["source_id"] == f"Статус {code}")
+                and (not r["source_id"] or r["source_id"] == f"Статус {code}")):
+            prev["line_end"] = max(prev["line_end"], r["line_end"])
+            prev["source_id"], prev["kind"] = f"Статус {code}", "api"
+            continue
+        out.append(r)
+    return out
+
+
 def uniquify_source_ids(requirements: list[dict]) -> list[dict]:
     """Повторяющийся непустой source_id уточняется разделом: «1.3.2 Коды ответа: Статус 200»."""
     from collections import Counter
@@ -930,6 +947,7 @@ def segment_from_response(view: dict, raw: dict,
         auto = len(reqs) - before
     for r in reqs:
         r.pop("auto", None)
+    reqs = merge_bare_codes(view, reqs)
     canonical_source_ids(view, reqs)
     uniquify_source_ids(reqs)
     assign_ids(reqs)

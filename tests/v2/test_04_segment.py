@@ -457,3 +457,15 @@ def test_several_requirements_on_one_line_kept():
         "excluded": []}
     out = sg.segment_from_response(v, raw)
     assert [r["source_id"] for r in out["requirements"]] == ["Статус 200", "Статус 400", "Статус 404"]
+
+
+def test_bare_status_code_merged_with_sentence(official_view):
+    raw = _official_raw()
+    raw["requirements"] = [r for r in raw["requirements"] if r["source_id"] != "Статус 404"] + [
+        {"source_id": "", "kind": "api", "summary": "чужая карта", "line_start": 189, "line_end": 189,
+         "quote": "Для чужой карты возвращается 404, как и для отсутствующей карты."},
+        {"source_id": "Статус 404", "kind": "api", "summary": "404", "line_start": 190, "line_end": 192, "quote": "404"}]
+    out = sg.segment_from_response(official_view, raw)
+    last = out["requirements"][-1]
+    assert (last["source_id"], last["line_start"], last["line_end"]) == ("Статус 404", 189, 192)
+    assert len(out["requirements"]) == 40
