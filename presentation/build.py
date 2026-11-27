@@ -66,7 +66,10 @@ def from_report(path: Path | None) -> dict:
             ok += ev.get("verified") in ("exact", "normalized", "fuzzy")
     models = ", ".join(run.get("models_used") or []) or run.get("model_requested", "")
     dur = run.get("duration_s")
-    src = f"отчёт агента {path.name}: модель {models}" + (f", {dur / 60:.0f} мин" if dur else "") + \
+    calls = run.get("calls") or {}
+    when = ("ответы модели из кэша живого прогона" if calls.get("cached") and not calls.get("total")
+            else (f"{dur / 60:.0f} мин" if dur else ""))
+    src = f"отчёт агента {path.name}: модель {models}" + (f", {when}" if when else "") + \
           (f", коммит {run.get('commit', '')[:7]}" if run.get("commit") else "")
     n = len(crit)
     title = (f"{n} {_plural(n, 'блокер', 'блокера', 'блокеров')}, <em>которые агент нашёл сам</em>" if n
@@ -253,7 +256,10 @@ def make_pptx(pngs: list[Path], deck: Path) -> Path:
     notes = _notes()
     for i, p in enumerate(pngs):
         s = prs.slides.add_slide(blank)
-        s.shapes.add_picture(str(p), 0, 0, width=prs.slide_width, height=prs.slide_height)
+        jpg = p.with_suffix(".jpg")  # JPEG вместо PNG: файл PPTX в 4–5 раз меньше, на экране разницы нет
+        from PIL import Image
+        Image.open(p).convert("RGB").save(jpg, quality=88, optimize=True)
+        s.shapes.add_picture(str(jpg), 0, 0, width=prs.slide_width, height=prs.slide_height)
         txt = notes.get(i + 1) or (titles[i] if i < len(titles) else "")
         if txt:
             s.notes_slide.notes_text_frame.text = txt

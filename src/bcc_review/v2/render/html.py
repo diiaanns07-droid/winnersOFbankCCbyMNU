@@ -272,7 +272,9 @@ def _lref(m: re.Match) -> str:
 def tx(v: Any) -> str:
     """Текст модели для показа: «L038» → «строка 38», critical → критичный, затем экранирование."""
     s = "" if v is None else str(v)
-    return e(_SEV_WORD.sub(lambda m: _SEV_RU[m.group(1)], _LREF.sub(_lref, s)))
+    s = _SEV_WORD.sub(lambda m: _SEV_RU[m.group(1)], _LREF.sub(_lref, s))
+    s = re.sub(r"(^|[.!?]\s+)(строк)", lambda m: m.group(1) + "С" + m.group(2)[1:], s)  # «L035 обещает…» в начале фразы
+    return e(s)
 
 
 def _fmt_int(n: Any) -> str:
