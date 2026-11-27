@@ -328,6 +328,7 @@ class GeminiProvider:
         self._sleep = sleep
         self._clock = clock
         self._lock = threading.Lock()
+        self._availability = threading.Condition(self._lock)
         self.concurrency = int(concurrency or cfg["concurrency"]
                                or profiles.for_model(self.default_model).get("concurrency") or DEFAULT_CONCURRENCY)
         self._gate = threading.BoundedSemaphore(max(1, self.concurrency))
@@ -408,6 +409,17 @@ class GeminiProvider:
             return max(0.0, float(self.rpm))
         return float(profiles.for_model(model).get("rpm") or 0)
 
+    def _wait_for_model(self, model: str, seconds: float) -> float:
+        """Прервать ожидание, если параллельный этап получил окончательный отказ для этой модели."""
+        if self._sleep is not time.sleep:
+            self._sleep(seconds)  # виртуальные часы для воспроизводимого прогона
+            return seconds
+        start = self._clock()
+        with self._availability:
+            if self._availability.wait_for(lambda: model in self._dead, timeout=seconds):
+                return min(seconds, max(0.0, self._clock() - start))
+        return seconds
+
     def _pace(self, model: str, deadline: float) -> float:
         """Скользящее окно: ждём, только если за последние 60 с к модели ушло уже ``rpm`` запросов.
 
@@ -429,7 +441,7 @@ class GeminiProvider:
                     wait = 0.0   # не успеваем дождаться: отправляем, 429 обработает Retry-After
             win.append(now + wait)
         if wait > 0:
-            self._sleep(wait)
+            return self._wait_for_model(model, wait)
         return wait
 
     # ------------------------------------------------------------------ invoke
@@ -453,18 +465,18 @@ class GeminiProvider:
         while idx < len(chain):
             current = chain[idx]
             idx += 1
-            dead = self._dead.get(current)
-            if dead is not None:
-                attempts.append({"model": current, "skipped": dead.kind})
-                last = last or dead
-                if dead.kind == "quota":
-                    quota_exc = quota_exc or dead
-                    if not reserved:
-                        reserved = True
-                        self._add_reserve(chain, idx)
-                continue
             transient = network = rate = empty = 0
             while True:
+                dead = self._dead.get(current)
+                if dead is not None:
+                    attempts.append({"model": current, "skipped": dead.kind})
+                    last = last or dead
+                    if dead.kind == "quota":
+                        quota_exc = quota_exc or dead
+                        if not reserved:
+                            reserved = True
+                            self._add_reserve(chain, idx)
+                    break
                 remaining = deadline - self._clock()
                 if remaining < 5:
                     raise self._final(last or ProviderError("timeout", f"Бюджет времени вызова Gemini ({total:.0f} с) "
@@ -478,14 +490,26 @@ class GeminiProvider:
                 started = self._clock()
                 try:
                     with self._gate:
+                        if current in self._dead:
+                            continue
                         waited = self._pace(current, deadline)
                         if waited:
                             attempts.append({"model": current, "rpm_wait_s": round(waited, 1)})
+                        if current in self._dead:
+                            continue
                         started = self._clock()
                         remaining = deadline - started
-                        result = adapter.invoke(model=current, messages=sent, schema=schema,
-                                                timeout_s=max(MIN_DEADLINE_S, min(per_call, remaining)),
-                                                max_output_tokens=max_tokens)
+                        try:
+                            result = adapter.invoke(model=current, messages=sent, schema=schema,
+                                                    timeout_s=max(MIN_DEADLINE_S, min(per_call, remaining)),
+                                                    max_output_tokens=max_tokens)
+                        except ProviderError as exc:
+                            if exc.kind in NEXT_MODEL:
+                                # Сообщить ожидающим до освобождения слота отправки.
+                                with self._availability:
+                                    self._dead[current] = exc
+                                    self._availability.notify_all()
+                            raise
                 except ProviderError as exc:
                     last = exc
                     kind = exc.kind
@@ -495,7 +519,6 @@ class GeminiProvider:
                     if kind == "quota" and quota_limit(exc) is not None:
                         attempts[-1]["quota_limit"] = quota_limit(exc)
                     if kind in NEXT_MODEL:
-                        self._dead[current] = exc
                         if kind == "quota":
                             quota_exc = quota_exc or exc
                             if not reserved:
@@ -510,7 +533,7 @@ class GeminiProvider:
                     if kind in TRANSIENT:
                         cooling = self._cooling.get(current, 0.0) > self._clock()
                         if transient < len(self.retry_delays) and not cooling:
-                            self._sleep(self.retry_delays[transient])
+                            self._wait_for_model(current, self.retry_delays[transient])
                             transient += 1
                             continue
                         # повторы исчерпаны (или модель уже «остывает»): COOL_S секунд пробуем её один раз без пауз
@@ -521,7 +544,7 @@ class GeminiProvider:
                         if wait is None:
                             wait = self.retry_delays[min(rate, len(self.retry_delays) - 1)] * 2
                         if rate < RATE_WAITS and wait <= self.max_rate_wait_s and deadline - self._clock() > wait + 5:
-                            self._sleep(wait + 0.5)
+                            self._wait_for_model(current, wait + 0.5)
                             rate += 1
                             continue
                         break
