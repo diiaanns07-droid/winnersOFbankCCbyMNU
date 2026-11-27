@@ -35,6 +35,8 @@ jobs:
         include:
           - os: ubuntu-latest
             python: "3.13"
+          - os: ubuntu-latest
+            python: "3.14"
     steps:
       - uses: actions/checkout@v4
 
@@ -57,7 +59,7 @@ jobs:
         env:
           PYTHONUTF8: "1"
 
-      - name: Колёса зависимостей для всех ОС и Python 3.11–3.14 (без них pip собирает из исходников)
+      - name: Колёса зависимостей для всех ОС и Python 3.11–3.15 (без них pip собирает из исходников)
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
         run: python scripts/check_wheels.py
 

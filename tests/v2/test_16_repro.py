@@ -204,3 +204,22 @@ def test_report_content_does_not_depend_on_hash_seed(tmp_path):
     for key in ("requirements", "excluded", "findings", "rejected", "questions", "verdict", "acceptance_checks",
                 "pair_checks", "trace", "glossary", "test_cases", "checklist"):
         assert a.get(key) == b.get(key), key
+
+
+def test_report_has_no_local_paths(tmp_path, monkeypatch):
+    """В отчёте нет абсолютных путей машины, где он сделан: тот же вход в другой папке даёт тот же отчёт."""
+    import shutil
+
+    deep = tmp_path / "Мои документы" / "ТЗ v2"
+    deep.mkdir(parents=True)
+    doc = deep / DOC.name
+    shutil.copyfile(DOC, doc)
+    from bcc_review.v2 import __main__ as cli
+
+    out = deep / "отчёт" / "r.md"
+    assert cli.main([str(doc), str(out), "--provider", "mock", "--no-cache", "--runs-dir", str(tmp_path / "runs"),
+                     "-q", "--no-html"]) == 0
+    for path in (out, out.with_suffix(".json")):
+        text = path.read_text(encoding="utf-8")
+        for needle in (str(tmp_path), str(ROOT), str(Path.home())):
+            assert needle not in text, f"{path.name}: локальный путь {needle}"
