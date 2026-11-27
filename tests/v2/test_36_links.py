@@ -128,3 +128,19 @@ def test_repository_submission_links_are_not_broken():
               if strict or not (p.link.path in PENDING_FROM_OTHERS and not (ROOT / p.link.path).exists())]
     assert not broken, "битые ссылки:\n" + "\n".join(
         f"{p.link.source}:{p.link.line}: {p.link.target} — {p.reason}" for p in broken)
+
+
+def test_reports_table_shows_source_path_and_verifies(tmp_path):
+    """scripts/reports_table.py: вход — путь исходника от корня (как повторить), verify — OK на настоящем отчёте."""
+    out = tmp_path / "reports"
+    src = "evaluation/dev/corpus/cases/cashback.base/source.md"
+    r = subprocess.run([sys.executable, "-m", "bcc_review", src, str(out / "other_topic_cashback.md"),
+                        "--provider", "mock", "--no-html", "-q", "--runs-dir", str(tmp_path / "runs")],
+                       cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+    assert r.returncode == 0, r.stdout + r.stderr
+    spec = importlib.util.spec_from_file_location("reports_table", ROOT / "scripts" / "reports_table.py")
+    reports_table = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(reports_table)
+    rows = reports_table.rows(out, {"other_topic_cashback": str(ROOT / src)})
+    assert [(row["report"], row["input"], row["verify"]) for row in rows] == [("other_topic_cashback.md", src, "OK")]
+    assert f"`{src}`" in reports_table.table(rows)
