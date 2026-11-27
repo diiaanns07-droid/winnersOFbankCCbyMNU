@@ -141,7 +141,17 @@ python -m bcc_review verify reports/my/requirements.json release/input/requireme
 
 ## Пример первого экрана
 
-![Первый экран HTML-отчёта: вердикт, число замечаний, «Исправить первым»](presentation/img/report_first.png)
+Первый запуск `./start.sh`: BCC AI просит ключ модели, можно продолжить без ключа.
+
+![Знакомство с BCC AI: ключ Gemini или Claude, «Продолжить без ключа»](presentation/img/web_welcome.png)
+
+Сайт без ключа: готовые отчёты сдачи и проверка своего документа на одном столе.
+
+![Сайт BCC Review: готовые отчёты, лист официального ТЗ, 33 замечания и вопросы владельцу](presentation/img/web_home.png)
+
+Первый экран HTML-отчёта [`reports/requirements.html`](reports/requirements.html): вердикт, числа, итог агента.
+
+![Первый экран HTML-отчёта: вердикт, число замечаний, итог агента](presentation/img/report_first.png)
 
 В терминале после прогона (здесь `--provider mock`: записанные ответы живого прогона Sonnet по документу кейса):
 
