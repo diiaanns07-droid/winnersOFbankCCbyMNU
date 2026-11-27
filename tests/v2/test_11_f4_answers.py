@@ -380,3 +380,25 @@ def test_explicit_no_answer_has_no_continuation():
 def test_blank_line_ends_answer():
     text = "Q-02: Через шлюз.\n\nПримечание для команды, не ответ.\n"
     assert recheck.parse_answers_text(text)["answers"][0]["text"] == "Через шлюз."
+
+
+# --------------------------------------------------------------------------- вопросы старого или чужого отчёта
+def test_question_without_id_does_not_crash():
+    w: list[str] = []
+    qs = [{"topic": "без номера", "question": "?", "options": ["a", "b"]}, "не словарь", QS[0]]
+    r = recheck.resolve_answers(qs, recheck.load_answers("Q-01: A\n"), w)
+    assert r["answered"][0]["question_id"] == "Q-01" and any("нет номера" in x for x in w)
+
+
+def test_question_ids_in_other_format_bind_and_label():
+    qs = [dict(q, id=q["id"].replace("Q-0", "Q-")) for q in QS]  # «Q-1», «Q-2», «Q-3» в старом отчёте
+    r = recheck.resolve_answers(qs, recheck.load_answers("Q-01: A\nQ-01: B\n"))
+    a = r["answered"][0]
+    assert a["question_id"] == "Q-1" and [x["label"] for x in a["replies"]] == ["Q-1.1", "Q-1.2"]
+    valid = recheck.answer_labels(r)
+    assert recheck.norm_labels(["Q-01.2", "q-1"], valid) == ["Q-1.2", "Q-1"]
+    resp = _resp([{"finding_id": "D-01", "status": "resolved", "by": ["Q-01"], "reason": "снят ответом Q-01"}])
+    rep = dict(_report(), questions=qs)
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(resp)), rep, "Q-01: A\nQ-01: B\n")["clarification"]
+    ch = next(c for c in clar["changes"] if c["finding_id"] == "D-01")
+    assert ch["status"] == "open" and ch["answer_conflict"] == ["Q-1.1", "Q-1.2"]  # разные буквы — конфликт

@@ -340,7 +340,13 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     warnings = warnings if warnings is not None else []
     for line in parsed.get("unparsed") or []:
         warnings.append(f"recheck: строка ответа не разобрана — «{line}» (формат: «Q-01: B» или «Q-01 [тема]: ответ»)")
-    by_id = {q["id"]: q for q in questions}
+    # вопрос без id (старый или чужой отчёт) не роняет весь режим --answers: он просто не участвует в привязке;
+    # номер вопроса сравнивается в одном виде («Q-1», «q1», «Q-01» → «Q-01»), в результат идёт номер из отчёта
+    valid_q = [q for q in questions or [] if isinstance(q, dict) and _qid(str(q.get("id") or ""))]
+    if len(valid_q) < len(questions or []):
+        warnings.append(f"recheck: у {len(questions) - len(valid_q)} вопросов отчёта нет номера — они пропущены")
+    questions = valid_q
+    by_id = {_qid(str(q["id"])): q for q in questions}
     answered: dict[str, dict] = {}
     extra: list[str] = []
     postponed: list[dict] = []  # вопросы, где владелец отложил решение целиком (для отчёта)
@@ -372,7 +378,8 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
                 sc, need = 0.5 * _topic_score(hint, x) + 0.5 * _text_score(text, x), 0.3
             else:
                 sc, need = _topic_score(hint, x), 0.4
-            pairs.append((sc + (0.01 if x["id"] == gk[0] else 0), need, gk, x["id"]))
+            xid = _qid(str(x["id"]))
+            pairs.append((sc + (0.01 if xid == gk[0] else 0), need, gk, xid))
     taken: dict[str, str] = {}  # вопрос → номер, с которым к нему пришла привязанная единица
     done: set[tuple] = set()
     ranked = sorted(pairs, key=lambda t: -t[0])
@@ -402,7 +409,7 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
                 q = bound[k]
             elif a.get("choice") is None and a.get("text"):
                 q = None  # тема не совпала однозначно ни с одним вопросом — это общее решение
-            elif q is not None and q["id"] in taken:
+            elif q is not None and _qid(str(q["id"])) in taken:
                 q = None
         if q is None:
             if a.get("text"):
@@ -570,6 +577,11 @@ _LABEL = re.compile(r"(Q\s*-?\s*\d{1,3}(?:\.\d{1,2})?)|(Решени\w*\s*-?\s*\
 
 def norm_labels(items: Iterable[str], valid: set[str]) -> list[str]:
     """«q-3», «Q-03», «решение 2» → «Q-03», «Решение-2»; только существующие ответы."""
+    # канонический вид → метка как в отчёте: вопрос «Q-1» в старом отчёте и ссылка модели «Q-01» — один ответ
+    canon: dict[str, str] = {}
+    for v in valid:
+        base, _, sub = str(v).partition(".")
+        canon[(_qid(base) + (f".{int(sub)}" if sub.isdigit() else "")) if base.upper().startswith("Q") else v] = v
     out: list[str] = []
     for raw in items or []:
         for m in _LABEL.finditer(str(raw)):
@@ -577,11 +589,12 @@ def norm_labels(items: Iterable[str], valid: set[str]) -> list[str]:
             if m.group(1):
                 base, _, sub = m.group(1).partition(".")
                 lab = _qid(base) + (f".{int(sub)}" if sub else "")
-                if lab not in valid and sub:
+                if lab not in canon and sub:
                     lab = _qid(base)
             else:
                 lab = "Решение-" + str(int(num)) if num else ""
-            if lab in valid and lab not in out:
+            lab = canon.get(lab, "")
+            if lab and lab not in out:
                 out.append(lab)
     return out
 
@@ -658,7 +671,7 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         result["status"] = "failed"
         return _finish(ctx, result)
 
-    by_id = {g["id"]: g for g in out_findings}
+    by_id = {g.get("id"): g for g in out_findings if g.get("id")}
     valid = answer_labels(resolved)
     keep = _cl.doc_codes(getattr(ctx, "view", None))
     for d in _one_decision_per_finding(raw.get("decisions") or []):
