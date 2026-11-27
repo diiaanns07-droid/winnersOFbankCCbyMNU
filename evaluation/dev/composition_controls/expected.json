@@ -1,0 +1,126 @@
+{
+  "schema": "bcc-eval-audit-controls/1",
+  "note": "Ручной ответ записан до запуска. Пара: rules_only базового прогона и rules_plus_llm сценария. Каждый сценарий меняет один кейс LLM-прогона; edge.empty (0 байт) в обоих режимах даёт run.status=failed и остаётся симметричным пропуском.",
+  "scenarios": {
+    "base": {
+      "change": "без изменений",
+      "exit_code": 0,
+      "matrix": [],
+      "partial": [],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 32
+    },
+    "same_name_changed": {
+      "change": "cashback.unit_change.accrued_in_tiyn/source.md изменён под тем же именем, манифест прежний",
+      "exit_code": 3,
+      "matrix": [
+        [
+          "sha_mismatch",
+          "rules_plus_llm",
+          "cashback.unit_change.accrued_in_tiyn"
+        ]
+      ],
+      "partial": [],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 31
+    },
+    "run_twice": {
+      "change": "autopay.two_statuses.range_422 прогнан второй раз (rerun/), predictions.jsonl объединён",
+      "exit_code": 3,
+      "matrix": [
+        [
+          "repeat",
+          "rules_plus_llm",
+          "autopay.two_statuses.range_422"
+        ]
+      ],
+      "partial": [],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 31
+    },
+    "clean_without_report": {
+      "change": "чистый cardblock.base: этап bank получает 529, продукт падает и не пишет report.json",
+      "exit_code": 3,
+      "matrix": [
+        [
+          "missing_report",
+          "rules_plus_llm",
+          "cardblock.base"
+        ]
+      ],
+      "partial": [],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 31
+    },
+    "requested_llm_got_rules_only": {
+      "change": "transfer_limit.range_boundary.reaching_rejects без ключа Anthropic: адаптер не создан, отчёт rules_only",
+      "exit_code": 3,
+      "matrix": [
+        [
+          "mode_mismatch",
+          "rules_plus_llm",
+          "transfer_limit.range_boundary.reaching_rejects"
+        ]
+      ],
+      "partial": [],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 31
+    },
+    "valid_partial": {
+      "change": "cashback.two_statuses.bad_category_200: inventory получил успешный ответ, individual — 529; partial",
+      "exit_code": 0,
+      "matrix": [],
+      "partial": [
+        [
+          "rules_plus_llm",
+          "cashback.two_statuses.bad_category_200"
+        ]
+      ],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 32
+    },
+    "old_report_fields": {
+      "change": "report.json кейса autopay.paraphrase.nfr без run.mode, run.calls и run.stages (старый формат)",
+      "exit_code": 4,
+      "matrix": [
+        [
+          "unknown",
+          "rules_plus_llm",
+          "autopay.paraphrase.nfr"
+        ]
+      ],
+      "partial": [],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 31
+    },
+    "hidden_llm_failure": {
+      "change": "cardblock.unit_change.blocked_at_utc: оба запроса cross.pairs получают 529; продукт пишет status=complete, вызовы не учтены. Добавлен после первого запуска семи сценариев, ответ записан до прогона этого сценария",
+      "exit_code": 0,
+      "matrix": [],
+      "partial": [
+        [
+          "rules_plus_llm",
+          "cardblock.unit_change.blocked_at_utc"
+        ]
+      ],
+      "excluded_symmetric": [
+        "edge.empty"
+      ],
+      "admissible": 32
+    }
+  }
+}
