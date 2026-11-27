@@ -121,6 +121,8 @@ def load(path: str | Path) -> dict:
                 doc = _read_as_markdown(p, data, read_document)
             except Exception:  # noqa: BLE001 — не вышло как Markdown: читаем как простой текст
                 doc = None
+        if doc is None and fmt in ("md", "txt") and _utf16_without_bom(data):
+            doc = _read_as_markdown(p, data, read_document, suffix=p.suffix.lower())
         if doc is None:
             doc = read_document(p)
     except Exception as exc:  # noqa: BLE001 — читатель v1 не должен ронять v2 на MD/TXT
@@ -145,7 +147,9 @@ def load(path: str | Path) -> dict:
         sizes = _page_sizes(p) if fmt == "pdf" else {}
         lines = _block_lines(doc or {}, sizes, warnings)
     title = _title(doc, lines, p)
-    if fmt == "pdf" or _single_root(lines, title, doc):  # в PDF уровни заголовков — по кеглю, почти все первые
+    if _NUMBERED_HEAD.match(title):
+        pass  # «1. Назначение» — первый раздел, а не название документа: раздел у строк не вырезаем
+    elif fmt == "pdf" or _single_root(lines, title, doc):  # в PDF уровни заголовков — по кеглю, почти все первые
         _strip_title_from_sections(lines, title)
     pages = None
     if fmt == "pdf":
@@ -188,11 +192,12 @@ def _looks_markdown(text: str) -> bool:
     return heads >= 2 or delims >= 2 or (heads >= 1 and (delims >= 1 or bold >= 2))
 
 
-def _read_as_markdown(p: Path, data: bytes, read_document) -> dict:
-    """Прочитать TXT читателем Markdown v1 (копия с расширением .md во временном каталоге); строки — те же."""
+def _read_as_markdown(p: Path, data: bytes, read_document, suffix: str = ".md") -> dict:
+    """Прочитать TXT читателем Markdown v1 (копия с расширением .md во временном каталоге); строки — те же.
+    С ``suffix`` — копия в UTF-8 с тем же расширением (кодировка, которую читатель v1 не узнаёт сам)."""
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
-        md = Path(tmp) / (p.stem + ".md")
+        md = Path(tmp) / (p.stem + suffix)
         md.write_text(_decode_text(data), encoding="utf-8")
         return read_document(md)
 
@@ -364,10 +369,32 @@ def _decode_text(data: bytes) -> str:
     """UTF-8 (с BOM или без), иначе Windows-1251 — так сохраняют текст в Блокноте на русской Windows."""
     if data.startswith(b"\xff\xfe") or data.startswith(b"\xfe\xff"):
         return data.decode("utf-16", errors="replace")
+    bom_less = _utf16_without_bom(data)
+    if bom_less:
+        return data.decode(bom_less, errors="replace")
     try:
         return data.decode("utf-8-sig")
     except UnicodeDecodeError:
         return data.decode("cp1251", errors="replace")
+
+
+def _utf16_without_bom(data: bytes) -> str | None:
+    """UTF-16 без метки порядка байт (выгрузки из Java/.NET): в тексте на кириллице и латинице каждый второй байт —
+    0x00 или 0x04. Ищем нули в чётных или нечётных позициях первых 4 КБ."""
+    head = data[:4096]
+    if len(head) < 8 or len(head) % 2:
+        head = head[: len(head) - len(head) % 2]
+    if len(head) < 8:
+        return None
+    even, odd = head[0::2], head[1::2]
+    z_even, z_odd = even.count(0) / len(even), odd.count(0) / len(odd)
+    hi_even = sum(1 for b in even if b in (0, 4)) / len(even)
+    hi_odd = sum(1 for b in odd if b in (0, 4)) / len(odd)
+    if hi_even > 0.9 and z_even > 0.2 and z_odd < 0.05:
+        return "utf-16-be"
+    if hi_odd > 0.9 and z_odd > 0.2 and z_even < 0.05:
+        return "utf-16-le"
+    return None
 
 
 def _load_converted(p: Path) -> dict:
@@ -534,6 +561,8 @@ def _text_lines(text: str, doc: dict | None, tab_cells: bool = False) -> list[di
                 t = " | ".join(c for c in cells if c)
                 kinds[k] = "table_row"
         t = _clean(t)
+        if "\\|" in t and (kinds[k] == "table_row" or _TABLE_ROW_SRC.match(src)):
+            t = t.replace("\\|", "|")  # GFM: «\|» в ячейке (и в коде внутри ячейки) — сама черта
         html_row = None if in_fence or _MD_FENCE.match(src) else _html_table_line(t)
         if html_row is not None:
             t = html_row
@@ -1145,10 +1174,25 @@ def _borderless_tables(blocks: list[dict], sizes: dict) -> tuple[list[dict], lis
         pieces: dict[int, set[int]] = {}
         for i, par in parent_of.items():
             pieces.setdefault(par, set()).add(i)
+        in_multi = {i for c in comps if len({col_of[j] for j in c}) >= 2 for i in c}
         for comp in comps:
             cols = sorted({col_of[i] for i in comp})
             if len(cols) < 2:
                 continue
+            # продолжение последней ячейки / пункта списка отдельным блоком («…не более» / «трёх суток.»): блок
+            # той же колонки (не первой) сразу под группой, со строчной буквы, ни в какой другой группе
+            bottom = max(_bbox(blocks[i])[3] for i in comp)
+            for i in sorted(idxs, key=lambda i: _bbox(blocks[i])[1]):
+                bi = _bbox(blocks[i])
+                if i in comp or i in in_multi or col_of[i] not in cols[1:] or bi[1] < bottom - 2:
+                    continue
+                if bi[1] - bottom > 0.6 * max(bi[3] - bi[1], 1.0) or bi[3] - bi[1] > 40:
+                    break
+                if str(blocks[i].get("text") or "").strip()[:1].islower() and i not in parent_of:
+                    comp.append(i)
+                    bottom = bi[3]
+                    continue
+                break
             if any(not pieces[parent_of[i]] <= set(comp) for i in comp if i in parent_of):
                 continue  # блок, разрезанный по колонкам, должен целиком попасть в таблицу
             frags = [dict(f, col=cols.index(col_of[i])) for i in sorted(comp) for f in _frags_of(blocks[i])]
@@ -1159,7 +1203,10 @@ def _borderless_tables(blocks: list[dict], sizes: dict) -> tuple[list[dict], lis
             if aligned < 2 or aligned < 0.4 * len(rows):
                 continue
             # колонка из одних маркеров списка («•», «1.», «а)») — это список: пункт на каждый маркер
-            is_list = len(cols) == 2 and all(_LIST_MARK.match(f["text"].strip()) for f in frags if f["col"] == 0)
+            # (номер из Word — «1» и «.» отдельными фрагментами: маркер ряда собирается из фрагментов колонки)
+            is_list = len(cols) == 2 and all(
+                _LIST_MARK.match(_join_frags([f for f in r if f["col"] == 0]).strip())
+                for r in rows if any(f["col"] == 0 for f in r))
             # ячейки одной строки таблицы стоят на одной базовой линии (±1 pt); в вёрстке в две колонки ряды
             # колонок совпадают по высоте лишь местами (заголовки, интервалы абзацев сдвигают их)
             strict = aligned if is_list else 0
@@ -1540,11 +1587,16 @@ def _strip_title_from_sections(lines: list[dict], title: str) -> None:
             ln["section"] = s[len(pref):]
 
 
+_NUMBERED_HEAD = re.compile(r"^\s*(?:\d{1,2}(?:\.\d{1,2})*[.)]?|[IVX]{1,4}\.|(?:Раздел|Глава)\s+\d+\.?)\s+\S")
+
+
 def _title(doc: dict | None, lines: list[dict], path: Path) -> str:
     blocks = (doc or {}).get("blocks") or []
     for b in blocks:
         if b.get("kind") == "heading":
             level = (b.get("loc") or {}).get("level") or (b.get("loc") or {}).get("heading_level")
+            if _NUMBERED_HEAD.match(_clean(str(b.get("text") or ""))):
+                break  # нумерованный раздел («1. Назначение») — не название: берём название из свойств файла
             if level in (1, "1", None) and str(b.get("text") or "").strip():
                 return _clean(str(b["text"])).strip()
             break
@@ -1555,8 +1607,12 @@ def _title(doc: dict | None, lines: list[dict], path: Path) -> str:
     return first[:120] if first else path.stem
 
 
+_TABLE_ROW_SRC = re.compile(r"^\s*\|?.*\S\s*\|")
+
+
 def _clean(t: str) -> str:
-    t = t.replace("\t", " ").replace("\r", "")
+    # перевод строки внутри строки вида («<br>» в ячейке Markdown, разрыв строки Word) ломает нумерацию «L008| …»
+    t = t.replace("\t", " ").replace("\r", "").replace("\n", " ").replace("\u2028", " ").replace("\u2029", " ")
     t = re.sub("[\u00ad\u200b\u200c\u200d\u2060\ufeff]", "", t)
     if t.strip() and not t.strip(" |"):
         return ""  # строка таблицы из пустых ячеек
