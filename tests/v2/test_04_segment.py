@@ -826,3 +826,48 @@ def test_very_long_document_at_most_four_chunks(tmp_path):
     assert all(b2 == a1 - 1 for (_, b2), (a1, _) in zip(chunks, chunks[1:]))  # без дыр и пересечений
     long_view = sg.load_view(str(STRUCT / "long.md"))  # 616 строк — по-прежнему части до 250 строк
     assert all(b - a + 1 <= sg.CHUNK_MAX_LINES for a, b in sg.plan_chunks(long_view))
+
+
+# ---- волна 3, вторая сессия: расхождения haiku с офлайн-нарезкой и фикстурой ---------------------------------
+
+OPEN2 = ROOT / "evaluation" / "v2" / "open2"
+
+
+def test_haiku_official_bare_code_with_body_joins_status_requirement(official_view):
+    """haiku отдал «404» с телом ответа (L190–192) в excluded как пример: требование «Статус 404» — строки
+    189–192, как в фикстуре (sonnet) и офлайн-нарезке, иначе цитата тела не находит своё требование."""
+    raw = json.loads((ANSWERS / "official.haiku.json").read_text(encoding="utf-8"))
+    out = sg.segment_from_response(official_view, raw)
+    ref = json.loads((FIX / "official" / "segment.json").read_text(encoding="utf-8"))["requirements"]
+    assert _keys(out["requirements"]) == _keys(ref)
+    assert not any(e["line_start"] <= 192 and e["line_end"] >= 190 for e in out["excluded"])
+    assert out["coverage"]["uncovered"] == []
+
+
+def test_bare_code_block_absorbed_only_after_its_requirement():
+    view = _view(["Для чужой карты возвращается 404.", "404", "", '{"message":"нет"}', "",
+                  "Ответ 400 — неверный запрос.", "", '{"message":"x"}'])
+    view["lines"][3]["kind"] = view["lines"][7]["kind"] = "code"
+    raw = {"requirements": [
+        {"source_id": "", "kind": "api", "summary": "Код 404 для чужой карты", "line_start": 1, "line_end": 1},
+        {"source_id": "", "kind": "api", "summary": "Код 400 — неверный запрос", "line_start": 6, "line_end": 6}],
+        "excluded": [{"what": "Пример 404", "line_start": 2, "line_end": 4, "reason": "пример"},
+                     {"what": "Пример 400", "line_start": 8, "line_end": 8, "reason": "пример тела 400"}]}
+    out = sg.segment_from_response(view, raw)
+    r404 = out["requirements"][0]
+    assert (r404["source_id"], r404["line_start"], r404["line_end"]) == ("Статус 404", 1, 4)
+    # тело без голого кода под абзацем — пример, остаётся в excluded
+    assert [(e["line_start"], e["line_end"]) for e in out["excluded"]] == [(8, 8)]
+
+
+def test_haiku_param_location_note_not_in_source_id():
+    """«`cardId` (path)» в ячейке: haiku пишет ID «Метод 2…: cardId (path)», офлайн и sonnet — «…: cardId»."""
+    view = sg.load_view(str(OPEN2 / "grace_clean" / "source.md"))
+    raw = json.loads((ANSWERS / "grace_clean.haiku.json").read_text(encoding="utf-8"))
+    out = sg.segment_from_response(view, raw)
+    sids = {r["source_id"] for r in out["requirements"]}
+    assert "Метод 2. Включение и выключение напоминания: cardId" in sids
+    assert "Метод 2. Включение и выключение напоминания: enabled" in sids
+    assert not any("(path)" in s or "(body" in s for s in sids)
+    offline = sg.heuristic_segment(view)["requirements"]
+    assert _keys(out["requirements"]) == _keys(offline)

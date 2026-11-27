@@ -595,6 +595,19 @@ def _drop_method_qualifier(sid: str, parts: list[str]) -> str:
     return sid
 
 
+_PARAM_CELL = re.compile(r"^(?P<name>[A-Za-z_][\w.{}/\[\]-]{0,39})\s*\((?P<q>[^()]{1,40})\)$")
+
+
+def _param_name(first: dict, rest: str) -> str:
+    """Имя параметра без пометки места из той же ячейки: «cardId (path)», «enabled (body, application/json)» →
+    «cardId», «enabled» — как в офлайн-нарезке; одна модель пометку переписывает в ID, другая нет."""
+    cell = _MD_DECOR.sub("", _text(first)).strip().strip("|").strip().split(" | ")[0].strip()
+    m = _PARAM_CELL.match(re.sub(r"\s+", " ", rest.strip()))
+    if m and cell.startswith(m.group("name")) and _PARAM_CELL.match(cell):
+        return m.group("name")
+    return rest
+
+
 def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
     """Одно оформление source_id при любом прогоне и любой модели.
 
@@ -649,6 +662,8 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
             if parts and any(_strip_num(pre).lower() == _strip_num(h).lower() for h in parts):
                 pre = parts[-1]  # префикс — всегда ближайший заголовок (таблица под «A › B» → «B: …»)
             sep, rest = m.group("sep"), m.group("rest")
+            if sep == ": " and _is_row(_text(first)):
+                rest = _param_name(first, rest)
             if sep in (", п. ", ", строка ") and rest.isdigit():
                 sep = ", строка " if _is_row(_text(first)) else ", п. "
             sid = f"{pre}{sep}{rest}"
@@ -716,6 +731,54 @@ def merge_bare_codes(view: dict, requirements: list[dict]) -> list[dict]:
             continue
         out.append(r)
     return out
+
+
+def _bare_code(text: str) -> str | None:
+    t = _MD_DECOR.sub("", text or "").strip().strip("*").strip().rstrip(".")
+    return t if re.fullmatch(r"[1-5]\d\d", t) else None
+
+
+def absorb_bare_code_blocks(view: dict, requirements: list[dict], excluded: list[dict],
+                            headings: set[int] | None = None) -> tuple[list[dict], list[dict]]:
+    """«…возвращается 404…» + голый код «404» + тело ответа — одно описание кода, как в офлайн-нарезке и у sonnet.
+
+    haiku отдаёт «404» с телом в excluded («пример к статусу 404»), и у требования «Статус 404» нет тела ответа —
+    замечание с цитатой тела («Карта не найдена») не находит своё требование. Поглощается исключённый блок, который
+    стоит сразу за требованием (между ними — только пустые строки, не больше двух) и состоит из голого кода, уже
+    названного в требовании, и строк кода (тело, JSON). Заголовков внутри блока нет."""
+    headings = headings or set()
+    by_n = {int(x["n"]): x for x in _lines(view)}
+
+    def content(a: int, b: int) -> list[int]:
+        return [n for n in range(a, b + 1) if not is_trivial(_text(by_n.get(n) or {}))]
+
+    def codeish(n: int) -> bool:
+        x = by_n.get(n) or {}
+        return x.get("kind") == "code" or bool(_CODEISH.match(_text(x)))
+
+    reqs = sorted(requirements, key=lambda x: (x["line_start"], x["line_end"]))
+    keep: list[dict] = []
+    for e in sorted(excluded, key=lambda x: (x["line_start"], x["line_end"])):
+        a, b = int(e["line_start"]), int(e["line_end"])
+        body = content(a, b)
+        prev = next((r for r in reversed(reqs) if r["line_end"] < a), None)
+        if not body or prev is None or any(n in headings for n in range(a, b + 1)) \
+                or a - prev["line_end"] > 3 or content(prev["line_end"] + 1, a - 1):
+            keep.append(e)
+            continue
+        own = content(prev["line_start"], prev["line_end"])
+        text = " ".join(_text(by_n.get(n) or {}) for n in own)
+        lead = _bare_code(_text(by_n.get(body[0]) or {}))          # блок начинается с голого кода «404»
+        last = _bare_code(_text(by_n.get(own[-1]) or {})) if own else None  # код уже в конце требования
+        code, rest = (lead, body[1:]) if lead else (last, body)
+        if (code and code in _CODE_RE.findall(text) and (lead or rest)
+                and (not prev["source_id"] or prev["source_id"] == f"Статус {code}")
+                and all(codeish(n) for n in rest)):
+            prev["line_end"] = b
+            prev["source_id"], prev["kind"] = f"Статус {code}", "api"
+            continue
+        keep.append(e)
+    return reqs, keep
 
 
 # пункт перечня кодов внутри одной строки: «200. Ответ в случае… 400. Ответ в случае…» (DOCX/PDF склеили строки)
@@ -1564,6 +1627,7 @@ def segment_from_response(view: dict, raw: dict,
     reqs, excl = demote_examples(view, reqs, excl)
     reqs, excl = demote_non_requirements(view, reqs, excl)
     reqs = merge_bare_codes(view, reqs)
+    reqs, excl = absorb_bare_code_blocks(view, reqs, excl, headings)
     reqs = merge_same_source_ids(reqs, view)
     reqs = split_status_lists(view, reqs)
     canonical_source_ids(view, reqs)
