@@ -1013,11 +1013,26 @@ def _confirmed_critical(f: dict, members: list[dict], all_cands: list[dict] | No
     а сосед другого вида по тем же строкам («порядок погашения не описан») — не второе мнение о противоречии.
     Живой haiku на релизе: ложные critical на чистых grace_v2 («платёж до выписки: Ф-2 против шага 3», сосед —
     пропуск по тем же строкам) и insurance_v2 («отказ после досрочного погашения: Ф-4 против 409», только
-    попарная сверка). Неопределённое ключевое событие (К4/К5) по-прежнему подтверждается соседом по строкам."""
-    if f.get("kind") not in CONFLICT_KINDS:
+    попарная сверка). То же для «неверного значения» (формула против примера). Неопределённое ключевое событие
+    (К4/К5) по-прежнему подтверждается соседом по строкам."""
+    if f.get("kind") not in _STRICT_CONFIRM_KINDS:
         return _confirmed(f, members, all_cands)
-    conflicts = [c for c in all_cands or [] if _s(c.get("kind")) in CONFLICT_KINDS]
+    conflicts = [c for c in all_cands or [] if _s(c.get("kind")) in _STRICT_CONFIRM_KINDS]
     return _confirmed(f, members, conflicts, MAJOR_STRUCTURED_ORIGINS)
+
+
+# «Неверное значение» (формула против примера) — то же утверждение о двух местах; на живом haiku ни разу не был
+# настоящим critical, а ложный был: repay, «платёж 51 681 ₸ не по формуле» — модель сама ошиблась в расчёте.
+_STRICT_CONFIRM_KINDS = frozenset(CONFLICT_KINDS) | {"incorrect"}
+
+
+def _raised_from_minor(members: list[dict]) -> bool:
+    """Судья поднял до critical то, что все ревьюеры сочли незначительным, и строки приёмки нет. На живых
+    прогонах haiku (≈ 40 отчётов) настоящие К судья поднимал только из major; подъём из minor был один, и ложный
+    (insurance_clean: «повтор подключения на подписанной заявке», особое правило того же метода)."""
+    sevs = [_s(m.get("severity")) for m in members if _s(m.get("severity"))]
+    return bool(sevs) and all(s == "minor" for s in sevs) and not any(
+        _s(m.get("origin")) in MAJOR_STRUCTURED_ORIGINS for m in members)
 
 
 def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_sources: int = 0,
@@ -1046,6 +1061,8 @@ def _calibrate(f: dict, members: list[dict], ctx: Any, warnings: list[str], run_
             why = "противоречие подтверждено цитатой только одного места"
         elif run_sources >= MIN_SOURCES_FOR_CONSENSUS and not _confirmed_critical(f, members, all_cands):
             why = "critical подтвердил только один ревьюер"
+        elif _raised_from_minor(members):
+            why = "все ревьюеры предложили minor, строки приёмки нет"
         elif critical_support and not _critical_support(members, run_has_critical):
             why = "подъём до critical без опоры: ни один ревьюер не предложил critical, нет строки приёмки, " \
                   "ревьюеров меньше трёх"

@@ -82,3 +82,43 @@ def test_key_event_ambiguity_still_confirmed_by_neighbour_of_other_kind():
     other = cand("C-010", 40, "в течение 14 дней", kind="incomplete", criterion="set_complete",
                  source="lens:qa", reqs=(), extra=[(124, "409")])
     assert _run([main, other] + _background(), kind="ambiguity") == "critical"
+
+
+def test_incorrect_value_from_pair_check_alone_is_not_critical():
+    """«Пример не совпадает с формулой» — тоже утверждение о двух местах (ложный critical haiku на repay)."""
+    main = _main(origin="pair_check")
+    main["kind"] = "status_conflict"
+    cands = [main] + _background()
+    fs = [finding("F01", ["C-001"], severity="critical", kind="incorrect", criterion="correct", priority=1,
+                  title=TITLE, scenario=SCEN, impact="Тест строки приёмки падает у верной реализации.")]
+    fs += [finding(f"F{i:02d}", [c["id"]], severity="minor", kind=c["kind"], criterion=c["criterion"])
+           for i, c in enumerate(cands[1:], 2)]
+    res = judge.run(Ctx(FakeLLM(response(fs)), requirements=[]), cands)
+    assert res["findings"][0]["severity"] != "critical"
+
+
+def _two_reviewers(sev: str, origin: str = "") -> str:
+    a = _main(source="lens:analyst")
+    b = _main("C-002", source="lens:architect", origin=origin)
+    a["severity"], b["severity"] = sev, sev
+    cands = [a, b] + _background()
+    fs = [finding("F01", ["C-001", "C-002"], severity="critical", kind="contradiction", criterion="set_consistent",
+                  priority=1, title=TITLE, scenario=SCEN, impact="Клиент получит отказ вместо возврата премии.")]
+    fs += [finding(f"F{i:02d}", [c["id"]], severity="minor", kind=c["kind"], criterion=c["criterion"])
+           for i, c in enumerate(cands[2:], 2)]
+    res = judge.run(Ctx(FakeLLM(response(fs)), requirements=[]), cands)
+    return res["findings"][0]["severity"]
+
+
+def test_critical_raised_from_minor_by_judge_is_not_critical():
+    """Оба ревьюера сочли минорным, судья поднял на две ступени — ложный critical haiku на insurance_clean."""
+    assert _two_reviewers("minor") != "critical"
+
+
+def test_critical_raised_from_major_stays():
+    """Настоящие К судья поднимает из major (insurance «ставка 27 %», qr «ttl минуты/секунды»)."""
+    assert _two_reviewers("major") == "critical"
+
+
+def test_critical_raised_from_minor_with_acceptance_line_stays():
+    assert _two_reviewers("minor", origin="acceptance_check") == "critical"
