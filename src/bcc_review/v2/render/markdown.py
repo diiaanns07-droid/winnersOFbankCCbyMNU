@@ -1702,8 +1702,9 @@ def _appendix_questions(c: _Ctx) -> list[str]:
         lines = [" · ".join(head), prose(q.get("question"))]
         evs = [e for e in q.get("evidence") or [] if isinstance(e, dict) and e.get("quote")]
         if evs:
-            lines.append("Где: " + "; ".join(f"{lines_word(e.get('line_start'), e.get('line_end'))} "
-                                             f"{quote_md(e.get('quote'), 90)}" for e in evs[:3]))
+            prefer = [r for fid in q.get("finding_ids") or [] for r in (c.f_by_id.get(fid) or {}).get("requirement_ids") or []]
+            lines.append("Где: " + "; ".join(f"{esc(c.ev_place(e, prefer))}: {quote_md(e.get('quote'), 90)}"
+                                             for e in evs[:3]))
         opts = [o for o in q.get("options") or [] if str(o).strip()]
         tail = []
         if q.get("why"):
