@@ -241,11 +241,16 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
         if not hint:
             continue
         for x in questions:
-            sc = _topic_score(hint, x) + 0.25 * _text_score(a.get("text", ""), x) + (0.01 if x["id"] == a["id"] else 0)
-            pairs.append((sc, k, x["id"]))
+            # свой текст ответа — такой же признак, как тема: «возвраты и повторный push» по теме ближе к вопросу
+            # о повторном push, а по тексту ответа — к вопросу о возвратах. Ответ буквой — только по теме.
+            if a.get("text"):
+                sc, need = 0.5 * _topic_score(hint, x) + 0.5 * _text_score(a["text"], x), 0.3
+            else:
+                sc, need = _topic_score(hint, x), 0.4
+            pairs.append((sc + (0.01 if x["id"] == a["id"] else 0), need, k, x["id"]))
     taken: set[str] = set()
-    for sc, k, qid in sorted(pairs, key=lambda t: -t[0]):
-        if sc < 0.4 or k in bound or qid in taken:
+    for sc, need, k, qid in sorted(pairs, key=lambda t: -t[0]):
+        if sc < need or k in bound or qid in taken:
             continue
         bound[k] = by_id[qid]
         taken.add(qid)
@@ -358,6 +363,7 @@ def answer_labels(resolved: dict) -> set[str]:
         {f"Решение-{i}" for i in range(1, len(resolved["decisions"]) + 1)}
 
 
+_CLASH = re.compile(r"противореч|расходятся|несовместим|взаимоисключ|разн\w* исход", re.I)
 _LABEL = re.compile(r"(Q\s*-?\s*\d{1,3})|(Решени\w*\s*-?\s*\d{1,3})", re.I)
 
 
@@ -463,6 +469,8 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         rc["status"], rc["reason"] = status, _plain_reason(str(d.get("reason", "")).strip(), keep)
         # два ответа противоречат друг другу — дефект остаётся открытым, владелец выбирает один ответ
         clash = norm_labels(list(d.get("conflicting_answers") or []), valid)
+        if len(clash) < 2 and _CLASH.search(rc["reason"]):  # модель описала противоречие ответов только в причине
+            clash = norm_labels([rc["reason"]], valid)
         if len(clash) >= 2:
             rc["answer_conflict"] = clash
             if status != "open":
@@ -493,8 +501,16 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         elif status == "resolved":
             rc["severity_after"] = ""
     for g in out_findings:
-        if g["recheck"]["affected"] and not g["recheck"]["reason"]:
-            g["recheck"]["reason"] = "модель не оценила дефект — оставлен открытым"
+        rc = g["recheck"]
+        if not rc["affected"] or rc["reason"]:
+            continue
+        names = ", ".join(rc.get("answer_ids") or [])
+        if rc["status"] == "resolved" and names:
+            rc["reason"] = f"снят ответом {names}"
+        elif rc["status"] == "changed" and names:
+            rc["reason"] = f"частично снят ответом {names}"
+        else:
+            rc["status"], rc["reason"] = "open", "модель не оценила дефект — оставлен открытым"
 
     n = _next_candidate_number(report, findings)
     for c in raw.get("candidates") or []:

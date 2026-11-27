@@ -3,8 +3,8 @@
     python scripts/repro_check.py out/a/report.json out/b/report.json            # JSON и рядом лежащие .md
     python scripts/repro_check.py a.json b.json --content                         # только содержимое: без паспорта
 
-Сравнивает JSON по полям (время, номер прогона и длительности этапов не считаются) и Markdown построчно (даты,
-длительности и номер прогона заменены на «<время>»). С --content паспорт прогона (вызовы, токены, кэш) не
+Сравнивает JSON по полям (время, номер прогона и длительности этапов не считаются), Markdown и HTML построчно
+(даты, длительности и номер прогона заменены на «<время>»). С --content паспорт прогона (вызовы, токены, кэш) не
 сравнивается: так проверяют прогон без кэша против прогона из кэша. Код выхода 0 — совпадают, 1 — нет.
 """
 from __future__ import annotations
@@ -20,6 +20,8 @@ TIME_KEYS = {"run_id", "started_at", "finished_at", "duration_s", "seconds"}
 # в --content: поля паспорта, которые честно различаются у прогона без кэша и из кэша
 PASSPORT_KEYS = {"calls", "tokens", "cost_usd", "stage_stats", "models_used", "commit", "dirty", "warnings"}
 MD_TIME = [
+    re.compile(r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?(?:[+-]\d{2}:\d{2}|Z)?"),  # ISO (HTML, JSON внутри)
+    re.compile(r'"(?:duration_s|seconds)": ?[0-9.]+'),
     re.compile(r"\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}(?:–\d{2}:\d{2})?(?: \(UTC[+-]\d+\))?"),
     re.compile(r"\b\d+ мин(?: \d+ с)?\b|\b\d+(?:[.,]\d+)? с\b"),
     re.compile(r"\b\d{8}-\d{6}-[0-9a-f]{4}\b"),
@@ -59,6 +61,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("b", type=Path)
     ap.add_argument("--content", action="store_true", help="не сравнивать паспорт прогона (вызовы, токены, кэш)")
     args = ap.parse_args(argv)
+    for path in (args.a, args.b):
+        if not path.is_file():
+            print(f"Нет файла отчёта: {path}", file=sys.stderr)
+            return 2
     ja = json.loads(args.a.read_text(encoding="utf-8"))
     jb = json.loads(args.b.read_text(encoding="utf-8"))
     if args.content:
@@ -67,13 +73,15 @@ def main(argv: list[str] | None = None) -> int:
             for k in PASSPORT_KEYS:
                 run.pop(k, None)
     problems = diff_json(ja, jb)
-    md_a, md_b = args.a.with_suffix(".md"), args.b.with_suffix(".md")
     md_diff: list[str] = []
-    if md_a.exists() and md_b.exists() and not args.content:
-        la = mask_md(md_a.read_text(encoding="utf-8")).splitlines()
-        lb = mask_md(md_b.read_text(encoding="utf-8")).splitlines()
-        md_diff = [ln for ln in difflib.unified_diff(la, lb, str(md_a), str(md_b), n=0, lineterm="")
-                   if ln[:1] in "+-" and not ln.startswith(("+++", "---"))]
+    for suffix in (".md", ".html"):
+        fa, fb = args.a.with_suffix(suffix), args.b.with_suffix(suffix)
+        if not (fa.exists() and fb.exists()) or args.content:
+            continue
+        la = mask_md(fa.read_text(encoding="utf-8")).splitlines()
+        lb = mask_md(fb.read_text(encoding="utf-8")).splitlines()
+        md_diff += [f"{suffix[1:]}: {ln}" for ln in difflib.unified_diff(la, lb, str(fa), str(fb), n=0, lineterm="")
+                    if ln[:1] in "+-" and not ln.startswith(("+++", "---"))]
     if not problems and not md_diff:
         print("Совпадают, кроме времени" + (" (содержимое, без паспорта)" if args.content else "") + ".")
         return 0
@@ -82,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
         for p in problems[:30]:
             print("  " + p)
     if md_diff:
-        print(f"Markdown: {len(md_diff)} различных строк")
+        print(f"Markdown/HTML: {len(md_diff)} различных строк")
         for ln in md_diff[:30]:
             print("  " + ln[:200])
     return 1

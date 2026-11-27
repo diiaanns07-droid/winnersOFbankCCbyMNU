@@ -35,6 +35,8 @@ jobs:
         include:
           - os: ubuntu-latest
             python: "3.13"
+          - os: ubuntu-latest
+            python: "3.14"
     steps:
       - uses: actions/checkout@v4
 
@@ -51,13 +53,13 @@ jobs:
 
       # UTF-8 только для pytest: вспомогательные скрипты тестов №02, №03, №15 печатают русский текст в конвейер, а на
       # Windows без UTF-8 его кодировка — cp1252 (UnicodeEncodeError). Сам агент от этого не зависит: его кодировки
-      # проверяет test_16_windows_encoding (задаёт cp1252 и C-локаль сам), а шаги ниже идут без PYTHONUTF8.
+      # проверяет test_16_windows_encoding (задаёт cp1252 и C-локаль сам), а прогоны mock и verify ниже — без PYTHONUTF8.
       - name: Тесты tests/v2
         run: python -m pytest tests/v2 -q
         env:
           PYTHONUTF8: "1"
 
-      - name: Колёса зависимостей для всех ОС и Python 3.11–3.14 (без них pip собирает из исходников)
+      - name: Колёса зависимостей для всех ОС и Python 3.11–3.15 (без них pip собирает из исходников)
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
         run: python scripts/check_wheels.py
 

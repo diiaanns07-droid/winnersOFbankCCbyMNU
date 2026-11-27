@@ -4,7 +4,8 @@
 # а pip ставит ровно эти версии — установка через неделю даст то же, что сегодня.
 #
 # Проверено: колёса (готовые сборки, без компилятора) есть для Windows x64, macOS Apple Silicon и Intel,
-# Linux x64 и arm64 (Docker на Mac с M-процессором), Python 3.11–3.14 — scripts/check_wheels.py.
+# Linux x64 и arm64 (Docker на Mac с M-процессором), Python 3.11–3.15 — scripts/check_wheels.py.
+# PyYAML — 6.0.4: в 6.0.3 нет колёс для Python 3.15.
 # cryptography (её тянет google-auth для Gemini) — 48.0.1: в 49+ нет колёс для Intel Mac, pip стал бы собирать
 # её из исходников и упал бы без Rust.
 #
@@ -44,7 +45,7 @@ Pygments==2.21.0
 pymupdf==1.28.2
 pytest==9.2.0
 python-docx==1.2.0
-PyYAML==6.0.3
+PyYAML==6.0.4
 referencing==0.37.0
 requests==2.34.2
 rpds-py==2026.9.1

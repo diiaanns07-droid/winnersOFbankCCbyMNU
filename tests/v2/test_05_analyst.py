@@ -189,6 +189,29 @@ def test_postprocess_mature_keeps_only_conflicts():
     assert len(pp(cands, mature=False)) == 5
 
 
+def test_postprocess_mature_keeps_language_defect_proven_by_quote():
+    pp = _load_stage().postprocess
+    vague = _cand("быстро", "major", "unverifiable", lines=(7,))
+    vague["evidence"][0]["quote"] = "Сервис отвечает быстро и без задержек"
+    plain = _cand("пробел", "major", "unverifiable", lines=(8,))
+    opened = _cand("перечень", "minor", "ambiguity", lines=(9,))
+    opened["evidence"][0]["quote"] = "Исключаются переводы, платежи и т. д."
+    kept = [c["title"] for c in pp([plain, vague, opened], mature=True)]
+    assert kept == ["быстро", "перечень"]
+    many = []
+    for i in range(4):
+        c = _cand(f"язык {i}", "major", "ambiguity", lines=(20 + i,))
+        c["evidence"][0]["quote"] = "по возможности удобно"
+        many.append(c)
+    assert len(pp(many, mature=True)) == _load_stage().MATURE_MAX_LANGUAGE
+
+
+def test_prompt_asks_for_readable_texts():
+    text = PROMPT.read_text(encoding="utf-8")
+    assert "до 12 слов" in text and "было → стало" in text and "<уточнить:" in text
+    assert "R-xx" in text  # внутренние коды в тексты не пишем
+
+
 def test_run_reports_maturity_and_applies_strict_mode():
     mod = _load_stage()
 

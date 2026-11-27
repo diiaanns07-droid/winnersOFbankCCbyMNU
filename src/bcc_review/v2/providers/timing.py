@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import sys
 from pathlib import Path
@@ -76,11 +77,34 @@ def summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     par = max((by_stage[s]["seconds"] for s in PARALLEL if s in by_stage), default=0.0)
     crit = {"segment": by_stage.get("segment", {}).get("seconds", 0.0), "parallel": par,
             "judge": by_stage.get("judge", {}).get("seconds", 0.0), "clarify": by_stage.get("clarify", {}).get("seconds", 0.0)}
+    spans = _spans(rows)
+    # вопросы с 9c5ea31 (№01) идут параллельно с судьёй: на пути — только то, что дольше
+    clarify_parallel = bool(spans.get("clarify") and spans.get("judge") and spans["clarify"][0] < spans["judge"][1]
+                            and spans["judge"][0] < spans["clarify"][1])
+    tail = max(crit["judge"], crit["clarify"]) if clarify_parallel else crit["judge"] + crit["clarify"]
     events = [r for r in rows if r.get("event")]
-    return {"calls": cs, "stages": by_stage, "critical_path_s": round(sum(crit.values()), 1), "critical": crit,
+    wall = (max(e for _, e in spans.values()) - min(b for b, _ in spans.values())) if spans else 0.0
+    return {"calls": cs, "stages": by_stage, "critical_path_s": round(crit["segment"] + par + tail, 1), "critical": crit,
+            "clarify_parallel": clarify_parallel, "model_wall_s": round(wall, 1),
             "events": [{k: v for k, v in e.items() if k != "t"} for e in events],
             "tokens_out": sum(c.get("out", 0) for c in cs), "thinking": sum(c.get("thinking", 0) for c in cs),
             "errors": sum(1 for c in cs if c.get("error"))}
+
+
+def _spans(rows: list[dict[str, Any]]) -> dict[str, tuple[float, float]]:
+    """(начало, конец) каждого этапа в секундах по меткам ``t`` трассы (конец вызова минус его длительность)."""
+    out: dict[str, tuple[float, float]] = {}
+    for r in rows:
+        if r.get("event") or "seconds" not in r or not r.get("t"):
+            continue
+        try:
+            end = dt.datetime.fromisoformat(str(r["t"])).timestamp()
+        except ValueError:
+            continue
+        start = end - float(r.get("seconds") or 0)
+        b, e = out.get(r.get("stage") or "", (start, end))
+        out[r.get("stage") or ""] = (min(b, start), max(e, end))
+    return out
 
 
 def render(run_dir: Path, s: dict[str, Any]) -> str:
@@ -108,8 +132,11 @@ def render(run_dir: Path, s: dict[str, Any]) -> str:
         lines.append(f"  {c['stage']:15} {c['model'][:24]:24} {c['seconds']:6.1f} {c['in']:7} {c['out']:7} "
                      f"{c['thinking']:8} {c['cache_read']:7}  {', '.join(notes)}")
     cr = s["critical"]
+    tail = (f"max(судья {cr['judge']:.0f}, вопросы {cr['clarify']:.0f} — параллельно)" if s.get("clarify_parallel")
+            else f"судья {cr['judge']:.0f} + вопросы {cr['clarify']:.0f}")
     lines += ["", f"Критический путь: {s['critical_path_s']:.0f} с = нарезка {cr['segment']:.0f} + параллельные "
-                  f"(самый долгий) {cr['parallel']:.0f} + судья {cr['judge']:.0f} + вопросы {cr['clarify']:.0f}",
+                  f"(самый долгий) {cr['parallel']:.0f} + {tail}",
+              f"От первого до последнего вызова модели (по меткам трассы): {s.get('model_wall_s', 0):.0f} с",
               f"Выход всего: {s['tokens_out']} ток., из них рассуждения {s['thinking']}; ошибок вызова: {s['errors']}"]
     shown = [e for e in s["events"] if e.get("event") in ("split", "expand_output", "fallback_model", "rpm_wait")]
     if shown:
