@@ -924,7 +924,7 @@ def _brief(c: _Ctx) -> list[str]:
                     + "".join(f", {f['id']} — только {BLOCKS.get(f.get('blocks'), '—')}" for f in odd)
                     + "; что не так, где и что сделать (по порядку):", ""]
         for i, f in enumerate(blockers, 1):
-            act = _screen_text(c, _action(f))
+            act = _screen_text(c, _action(f, limit=260))  # у блокера действие — отдельной строкой, места больше
             tail = f"; останавливает только {BLOCKS.get(f.get('blocks'), '—')}." if f in odd else "."
             out.append(f"{i}. {SEV_ICON.get(f.get('severity'), '')} [{f['id']}](#{anchor(f['id'])}) "
                        f"**{prose(f.get('title'))}** — {prose(c.where_short(f, limit=5))}{tail}"
@@ -1127,9 +1127,14 @@ def _action(f: dict, limit: int = 190) -> str:
     части предложения («;», «:»), а не посреди слова."""
     sent = first_sentence(_plain_ids(" ".join(str(f.get("recommendation") or "").split())), 10 ** 4).rstrip(".")
     if len(sent) > limit:
+        ok = lambda i: sent.rfind("<", 0, i) <= sent.rfind(">", 0, i) and sent.rfind("(", 0, i) <= sent.rfind(")", 0, i)  # noqa: E731
         cuts = [i for i in (sent.rfind("; ", 0, limit), sent.rfind(": ", 0, limit), sent.rfind(" — ", 0, limit))
-                if i > limit * 0.5 and sent.rfind("<", 0, i) <= sent.rfind(">", 0, i)]  # не внутри «<уточнить: …>»
-        sent = sent[:max(cuts)] if cuts else shorten(sent, limit)
+                if i > limit * 0.5 and ok(i)]  # не внутри «<уточнить: …>» и скобок
+        comma = sent.rfind(", ", 0, limit)
+        if not cuts and comma > limit * 0.6 and ok(comma):
+            sent = sent[:comma].rstrip(" ,") + "…"  # граница части предложения, а не середина слова
+        else:
+            sent = sent[:max(cuts)] if cuts else shorten(sent, limit)
         open_ph = sent.rfind("<")
         if open_ph > sent.rfind(">"):  # обрезка пришлась на «<уточнить: …» — место убираем целиком
             sent = sent[:open_ph].rstrip(" ,;:—.") + "…"

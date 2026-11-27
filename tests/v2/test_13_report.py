@@ -976,3 +976,10 @@ def test_quote_cut_inside_document_quotes_is_closed_and_joins_read_cleanly():
     assert markdown.quote_md("кнопка «Сохранить»") == "«кнопка «Сохранить»»"
     assert markdown.prose("единые имена во всех схемах.; Порог настраивает") == \
         "единые имена во всех схемах. Порог настраивает"
+
+
+def test_action_cut_at_clause_boundary():
+    rec = ("Зафиксировать, какое событие процессинга (авторизация или клиринг) учитывается в расходах, как "
+           "обрабатываются отмена авторизации и расхождение сумм, и привести цель и срок отправки в соответствие")
+    act = markdown._action({"recommendation": rec}, limit=150)
+    assert act.endswith("расхождение сумм…") and "(авторизация или клиринг)" in act
