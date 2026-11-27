@@ -2002,3 +2002,67 @@ def write(report: dict, path) -> str:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(text, encoding="utf-8")
     return text
+
+
+# ================================================================== рубрика понятности (WAVE3.md)
+
+RUBRIC = {
+    "title": "заголовок до 12 слов",
+    "place": "место: строка (и страница для PDF), ID требования или раздел",
+    "problem": "проблема в 1–3 предложениях",
+    "scenario": "сценарий для противоречия или неполноты",
+    "impact": "последствие",
+    "fix": "исправление: «было → стало» или вопрос владельцу",
+    "codes": "в тексте нет внутренних кодов и латиницы вне имён",
+}
+_RUBRIC_CODES = re.compile(r"\bC-\d{2,4}\b|\blens[:_]\w+|\bsame_subject\b|\bL\d{2,4}\b|\b(?:critical|major|minor)\b")
+_SCENARIO_KINDS = CONFLICT_KINDS | {"missing_element", "incomplete"}
+
+
+def _sentences(text: str) -> int:
+    return len([x for x in _SENT_SPLIT.split(" ".join(str(text or "").split())) if x.strip()])
+
+
+def rubric(report: dict) -> dict:
+    """Проверка каждого критичного и существенного дефекта по рубрике понятности WAVE3.md.
+
+    Возвращает {"checked", "passed", "share", "failed": {D-…: [пункты рубрики]}, "by_item": {пункт: число провалов}}.
+    Проверяется то, что видит читатель: карточка отчёта (место — как его пишет рендер, тексты — после «L038» →
+    «строка 38»)."""
+    rep = _clean_report(report)
+    c = _Ctx(rep)
+    is_pdf = (rep.get("document") or {}).get("format") in ("pdf", "docx")
+    failed: dict[str, list[str]] = {}
+    for f in c.findings:
+        if f.get("severity") not in ("critical", "major"):
+            continue
+        bad = []
+        if len(str(f.get("title") or "").split()) > 12:
+            bad.append("title")
+        evs = [e for e in f.get("evidence") or [] if isinstance(e.get("line_start"), int)]
+        if not evs or (is_pdf and (rep.get("document") or {}).get("format") == "pdf"
+                       and not all(e.get("page") for e in evs)) or any(not c.ev_label(e, f.get("requirement_ids") or [])
+                                                                       for e in evs):
+            bad.append("place")
+        n = _sentences(f.get("problem"))
+        if not 1 <= n <= 3:
+            bad.append("problem")
+        if f.get("kind") in _SCENARIO_KINDS and not str(f.get("scenario") or "").strip():
+            bad.append("scenario")
+        if not str(f.get("impact") or "").strip():
+            bad.append("impact")
+        if not (str(f.get("recommendation") or "").strip() and (str(f.get("rewrite") or "").strip()
+                                                                or str(f.get("question") or "").strip()
+                                                                or c.q_by_finding.get(f.get("id")))):
+            bad.append("fix")
+        shown = " ".join(_LREF.sub(_lref, str(f.get(k) or "")) for k in
+                         ("title", "problem", "scenario", "impact", "recommendation"))
+        if _RUBRIC_CODES.search(re.sub(r"`[^`]*`", "", shown)):
+            bad.append("codes")
+        if bad:
+            failed[f["id"]] = bad
+    checked = sum(1 for f in c.findings if f.get("severity") in ("critical", "major"))
+    by_item = {k: sum(1 for v in failed.values() if k in v) for k in RUBRIC}
+    return {"checked": checked, "passed": checked - len(failed),
+            "share": round((checked - len(failed)) / checked, 3) if checked else 1.0,
+            "failed": failed, "by_item": {k: v for k, v in by_item.items() if v}}

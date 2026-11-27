@@ -531,3 +531,16 @@ def test_offline_does_not_claim_unchecked_criteria_are_fine():
     md = markdown.render(r)
     assert "✅ нарушений не найдено" not in md and "❔ без модели не проверялся" in md
     assert "4.2–4.5." in md and "### 4.3." not in md
+
+
+def test_rubric_counts_cards_against_wave3(sample):
+    res = markdown.rubric(sample)  # фикстура собрана вручную: часть карточек без «было → стало» — так и считается
+    assert res["checked"] == 25 and res["passed"] == 25 - len(res["failed"]) and set(res["by_item"]) <= set(markdown.RUBRIC)
+    r = copy.deepcopy(sample)
+    f = next(x for x in r["findings"] if x["severity"] == "major")
+    f["title"] = "очень длинный заголовок " * 5
+    f["problem"] = "См. L038 и C-007."
+    f["rewrite"] = f["question"] = ""
+    r["questions"] = [q for q in r.get("questions") or [] if f["id"] not in q.get("finding_ids", [])]
+    bad = markdown.rubric(r)["failed"][f["id"]]
+    assert {"title", "codes", "fix"} <= set(bad), bad
