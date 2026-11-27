@@ -19,7 +19,7 @@ def plain_warn(text) -> str:
     m = _md._STAGE_PREFIX.match(s)
     if m and _md.stage_key(m.group(1)) in _md.STAGES:
         s = f"{_md.STAGES[_md.stage_key(m.group(1))][0]}: " + s[m.end():]
-    s = _md._EXC.sub("", s)
+    s = _md._EXC_PAREN.sub("", _md._EXC.sub("", s))
     s = _md._STAGE_WORD.sub(lambda m: f"«{_md.STAGES[m.group(1)][0]}»", s)
     s = _md._SEV_WORD.sub(lambda m: _md.SEV_NAME[m.group(1)], s)
     return _md._LREF.sub(_md._lref, s)

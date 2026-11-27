@@ -343,6 +343,11 @@ def dejargon(text: str) -> str:
     return _LENS.sub(sub, text)
 
 
+_EXC_PAREN = re.compile(r"\s*\((?:[A-Z][A-Za-z]*(?:Error|Exception|Exceeded|Timeout))\)")
+_PRODUCT = re.compile(r"(?<![«\w`])(?:Claude Code|Google AI Studio|Google Gemini)(?![»\w])")
+_FLAG = re.compile(r"(?<![\w`-])--[a-z][\w-]*(?:[ =](?![а-яё])[A-Za-z0-9][\w.:-]*)?")
+
+
 def warn_text(text) -> str:
     """Предупреждение этапа по-русски: «clarify: …» → «Вопросы: …», «lens_risk» → «Риски», critical → критичный;
     служебные префиксы исключений («BudgetExceeded: judge: budget:») убираются."""
@@ -351,9 +356,11 @@ def warn_text(text) -> str:
     if m and stage_key(m.group(1)) in STAGES:
         s = f"{STAGES[stage_key(m.group(1))][0]}: " + s[m.end():]
     s = _EXC.sub("", s)
+    s = _EXC_PAREN.sub("", s)
     s = _STAGE_WORD.sub(lambda m: f"«{STAGES[m.group(1)][0]}»", s)
     s = _SEV_WORD.sub(lambda m: SEV_NAME[m.group(1)], s)
-    return prose(s)
+    s = _PRODUCT.sub(lambda m: f"«{m.group(0)}»", s)
+    return prose(_FLAG.sub(lambda m: f"`{m.group(0)}`", s))
 
 
 def _cap(s: str) -> str:
