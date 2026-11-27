@@ -562,7 +562,7 @@ def test_nfr_without_share_and_load_is_major_from_code():
     [c] = out["candidates"]
     assert c["origin"] == "nfr_check" and c["severity"] == "major" and c["kind"] == "unverifiable"
     assert c["requirement_ids"] == ["R-05"] and c["evidence"][0]["line"] == 20
-    assert c["title"] == "Норматив «в течение минуты» (строка 20) нельзя проверить: нет доли событий и нагрузки"
+    assert c["title"] == "Норматив «в течение минуты» нельзя проверить: нет доли событий и нагрузки"
     assert "нагрузка" in c["problem"] and c["rewrite"].startswith("Сообщение")
     assert [d["title"] for d in out["dropped"]] == ["НФТ без метрики"], "модельное того же вида — в dropped"
 
@@ -637,7 +637,7 @@ def test_model_candidate_texts_without_internal_codes():
            "scenario": "По П-1 (L010) итог 5, по строке L012 — 6.", "impact": "i", "recommendation": "r",
            "rewrite": "", "question": "", "blocks": "both"}
     c = lens_qa.postprocess({"candidates": [raw]}, REQS)["candidates"][0]
-    assert c["title"] == "П-1 и R-02 дают разный итог"
+    assert c["title"] == "П-1 и строка 12 дают разный итог"  # без своего номера — строка документа
     assert c["problem"] == "По П-1 (строка 10) — 5." and "L0" not in c["scenario"]
     assert "по строке 12" in c["scenario"]
 

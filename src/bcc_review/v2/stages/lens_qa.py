@@ -401,10 +401,10 @@ def _line_refs(text: str) -> str:
         before = m.string[:m.start()].rstrip(" ")
         if not before or before[-1] in ".!?:;\n":
             return f"Строка {int(m.group(2))}" if before or m.start() == 0 else f"строка {int(m.group(2))}"
-        if before[-1] in "(,—–-":  # «(L040)», перечисление — уже отделено
-            return f"строка {int(m.group(2))}"
+        if before[-1] in "(,—–-/…" or re.search(r"(?:^|\s)(?:и|или|либо|а|но)$", before, re.I):
+            return f"строка {int(m.group(2))}"  # «(L040)», перечисление, «Ф-1 и L150» — уже отделено
         return f"(строка {int(m.group(2))})"  # «особое правило L131 задаёт» → «особое правило (строка 131) задаёт»
-    text = re.sub(r"\b(?:строк[а-я]{0,2}\s+)?L0*(\d{1,4})\s*[–-]\s*L?0*(\d{1,4})\b",
+    text = re.sub(r"\b(?:строк[а-я]{0,2}\s+)?L0*(\d{1,4})\s*[–…-]\s*L?0*(\d{1,4})\b",
                   lambda m: f"строки {m.group(1)}–{m.group(2)}", text or "", flags=re.I)
     text = re.sub(r"\b(строк[а-я]{0,2}\s+)L0*(\d{1,4})\b", r"\1\2", text, flags=re.I)  # «строке L012»
     return re.sub(r"\b((?:по|в|на|из|до|от|у|для|с)\s+)?L0*(\d{1,4})\b", sub, text, flags=re.I)
@@ -424,11 +424,18 @@ def humanize_ids(text: str, index: Mapping[str, Mapping[str, Any]]) -> str:
     def sub(m: re.Match) -> str:
         if m.group(0) in rows:
             return f"критерий приёмки №{rows.index(m.group(0)) + 1}"
-        src = _s((index.get(m.group(0)) or {}).get("source_id"))
-        return src if src and _DOC_ID.fullmatch(src) else m.group(0)
+        r = index.get(m.group(0)) or {}
+        src = _s(r.get("source_id"))
+        if src and _DOC_ID.fullmatch(src):
+            return src
+        line = _int(r.get("line_start"))
+        # у требования нет короткого номера («Особые правила, п. 1», «Статус 409») — строка документа; падеж и
+        # скобки расставит _line_refs, как для «L128» модели
+        return f"L{line:03d}" if line else m.group(0)
     text = re.sub(r"\bR-\d+\b", sub, text)
     text = _line_refs(text)
-    return re.sub(r"\b([A-Za-zА-Яа-яЁё]{1,6}-\d+) \(\1\)", r"\1", text)  # «Ф-2 (Ф-2)» после замены
+    text = re.sub(r"\b([A-Za-zА-Яа-яЁё]{1,6}-\d+) \(\1\)", r"\1", text)  # «Ф-2 (Ф-2)» после замены
+    return re.sub(r"\b([А-ЯЁA-Z][А-Яа-яЁёA-Za-z]{0,5}-\d+)(?:, \1\b)+", r"\1", text)  # «Ф-6, Ф-6» → «Ф-6»
 
 
 _RULE_FIX = re.compile(r"^\s*(?:правило|требование)\s*(?:[^:]{0,40})?:\s*", re.I)
@@ -926,7 +933,8 @@ def nfr_candidate(checks: list[Mapping[str, Any]], index: Mapping[str, Mapping[s
     else:
         short = {"metric": "норматива", "start_end": "точек замера", "share": "доли событий", "load": "нагрузки"}
         gaps = [short[k] for k in first["missing"] if k in ("share", "load")] or [short[k] for k in first["missing"]]
-        title = f"{name} нельзя проверить: нет {' и '.join(gaps[:2])}{more}"
+        title = f"{name.replace(where, '') if name.startswith('Норматив') else name} нельзя проверить: нет " \
+                f"{' и '.join(gaps[:2])}{more}"  # место — в цитате; заголовок до 12 слов
         dm = _doc_metric(first) or first["metric"]
         what = f"норматив «{dm}» без условий замера" if dm else "нет числового норматива"
         scenario = (f"Нагрузочный тест: 95 % событий уложились в норматив «{dm or '—'}», 5 % — нет; "
