@@ -72,8 +72,11 @@ def test_open2_unchanged_with_document(name):
     view = docview.load(ROOT / "evaluation" / "v2" / "open2" / name / "source.md")
     with_doc = lens_qa.postprocess(d["responses"][0], d["requirements"], view)
     without = lens_qa.postprocess(d["responses"][0], d["requirements"])
-    assert [(c["severity"], c["title"]) for c in with_doc["candidates"]] == \
-        [(c["severity"], c["title"]) for c in without["candidates"]]
+    # с документом (незрелым) кандидаты вне зоны линзы идут судье с пометкой (С6), остальное — то же
+    own = [c for c in with_doc["candidates"] if c.get("origin") != lens_qa.ZONE_ORIGIN]
+    assert [(c["severity"], c["title"]) for c in own] == [(c["severity"], c["title"]) for c in without["candidates"]]
+    zone = [c for c in with_doc["candidates"] if c.get("origin") == lens_qa.ZONE_ORIGIN]
+    assert len(zone) <= lens_qa.MAX_ZONE_HANDOFF and all(c["severity"] == "minor" for c in zone)
 
 
 def _nfr(quote: str, line: int, rid: str = "R-99") -> dict:
@@ -146,3 +149,51 @@ def test_acceptance_row_without_quotes_builds_no_candidate():
     out = lens_qa.postprocess({"acceptance_checks": [check]}, [])
     assert out["candidates"] == [] and len(out["acceptance_checks"]) == 1
     assert any("без цитат" in w for w in out["warnings"])
+
+
+# ---------------------------------------------------------------- С6: кандидаты вне зоны — судье с пометкой
+
+
+def _other(title: str, sev: str = "major") -> dict:
+    return lens_qa.normalize_candidate({"title": title, "kind": "incomplete", "criterion": "complete", "severity": sev,
+                                        "evidence": [{"quote": "Проверить сумму и переключатель.", "line": 117}]})
+
+
+def test_out_of_zone_handed_to_judge_on_immature_document():
+    """bf95 (sonnet, официальный): «Шаг логики не проверяет активность и валюту карты» линза снимала «вне зоны», а
+    аналитик и архитектор его не дали — пункт эталона С6 до судьи не доходил. Теперь — судье, minor с подсказкой."""
+    kept, dropped = lens_qa.limit_other_candidates([_other("Шаг логики не проверяет активность и валюту карты")],
+                                                   handoff=True)
+    assert dropped == [] and len(kept) == 1
+    c = kept[0]
+    assert c["origin"] == lens_qa.ZONE_ORIGIN and c["zone"] == lens_qa.ZONE_NOTE
+    assert c["severity"] == "minor" and c["severity_hint"] == "major"
+
+
+def test_out_of_zone_handoff_limited_and_off_without_handoff():
+    cands = [_other("первое", "minor"), _other("второе"), _other("третье"), _other("четвёртое")]
+    kept, dropped = lens_qa.limit_other_candidates([dict(c) for c in cands], handoff=True)
+    assert len(kept) == lens_qa.MAX_ZONE_HANDOFF and len(dropped) == len(cands) - lens_qa.MAX_ZONE_HANDOFF
+    # сильнейшие по уровню модели, при равном — по порядку модели
+    assert [c["title"] for c in kept] == ["второе", "третье"]
+    assert all("передано не больше" in d["reason"] for d in dropped)
+    kept, dropped = lens_qa.limit_other_candidates([dict(c) for c in cands])
+    assert kept == [] and len(dropped) == 4
+
+
+def test_out_of_zone_dropped_on_mature_document():
+    """Вычитанный документ (корпус): прочее по-прежнему снимается — там это был основной шум линзы."""
+    view = docview.load(ROOT / "release" / "input" / "requirements.md")
+    raw = {"candidates": [{"title": "Шаг логики не проверяет активность и валюту карты", "kind": "incomplete",
+                           "criterion": "complete", "severity": "major",
+                           "evidence": [{"quote": "Проверить сумму и переключатель.", "line": 121}]}]}
+    seg = _json(QA / "segments" / "official.json")["requirements"]
+    out = lens_qa.postprocess(raw, seg, view)  # официальный — незрелый: передаётся
+    assert [c.get("origin") for c in out["candidates"]] == [lens_qa.ZONE_ORIGIN]
+    old_mature = lens_qa.mature_document
+    try:
+        lens_qa.mature_document = lambda v: True
+        out = lens_qa.postprocess(raw, seg, view)
+    finally:
+        lens_qa.mature_document = old_mature
+    assert out["candidates"] == [] and "вне зоны" in out["dropped"][0]["reason"]

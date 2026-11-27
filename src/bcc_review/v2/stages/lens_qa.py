@@ -639,13 +639,23 @@ def _other_rank(c: Mapping[str, Any]) -> int:
     return _OTHER
 
 
-def limit_other_candidates(cands: list[dict]) -> tuple[list[dict], list[dict]]:
-    """Противоречия модели (два места — два исхода) остаются все; вне противоречий линза держит только свои
-    виды — не больше одного замечания о покрытии приёмкой, одного о проверяемости и одного о пустом разделе
-    (заглушка «заполняется тестировщиками» — minor). Прочее (неоднозначность
-    одного места, неполнота, контракт API, доставка сообщений) — зона аналитика и архитектора: на чистых
-    документах корпуса и №18 это был основной шум линзы. Снятые идут в ``dropped`` (отчёт: «отклонено линзой»).
-    """
+ZONE_ORIGIN = "out_of_zone"
+ZONE_NOTE = "вне зоны тестировщика — тема аналитика или архитектора"
+MAX_ZONE_HANDOFF = 2  # кандидатов вне зоны, передаваемых судье с пометкой (на незрелом документе)
+
+
+def limit_other_candidates(cands: list[dict], handoff: bool = False) -> tuple[list[dict], list[dict]]:
+    """Противоречия модели (два места — два исхода) остаются все; вне противоречий линза держит свои виды — не
+    больше одного замечания о покрытии приёмкой, одного о проверяемости и одного о пустом разделе (заглушка
+    «заполняется тестировщиками» — minor). Прочее (неоднозначность одного места, неполнота, контракт API,
+    доставка сообщений) — зона аналитика и архитектора.
+
+    ``handoff=False`` — прочее снимается в ``dropped`` (так на вычитанном документе: там это был основной шум
+    линзы на корпусе). ``handoff=True`` — до :data:`MAX_ZONE_HANDOFF` таких кандидатов (сильнейшие, по порядку
+    модели) идут судье с пометкой зоны (``origin = out_of_zone``, ``zone``): уровень — ``minor``, прежний — в
+    ``severity_hint``. Судья держит их наравне с кандидатами владельцев зоны: на официальном (прогон `bf95`)
+    линза сама снимала «логика метода не проверяет активность и валюту карты» (С6), а аналитик и архитектор
+    в том прогоне его не дали — до судьи пункт эталона не доходил."""
     sev = {"critical": 0, "major": 1, "minor": 2}
     best: dict[int, dict] = {}
     for c in cands:
@@ -655,17 +665,32 @@ def limit_other_candidates(cands: list[dict]) -> tuple[list[dict], list[dict]]:
         if r < _OTHER and (r not in best or sev.get(c.get("severity"), 3) < sev.get(best[r].get("severity"), 3)):
             best[r] = c
     keep = {id(c) for c in best.values()}
+    others = [c for c in cands if c.get("kind") not in _CONFLICT_FAMILY and _other_rank(c) == _OTHER]
+    passed = ({id(c) for c in sorted(others, key=lambda c: sev.get(c.get("severity"), 3))[:MAX_ZONE_HANDOFF]}
+              if handoff else set())
     kept, dropped = [], []
     for c in cands:
         if c.get("kind") in _CONFLICT_FAMILY or id(c) in keep:
             kept.append(c)
+        elif id(c) in passed:
+            kept.append(mark_out_of_zone(c))
         else:
             why = ("второе замечание того же вида" if _other_rank(c) < _OTHER
-                   else "вне зоны линзы тестировщика (неоднозначность, неполнота, контракт — у аналитика и архитектора)")
+                   else "вне зоны линзы тестировщика (неоднозначность, неполнота, контракт — у аналитика и архитектора)"
+                   + (f"; судье передано не больше {MAX_ZONE_HANDOFF} таких" if handoff else ""))
             dropped.append({**c, "reason": f"снято линзой тестировщика: {why}; вне противоречий — не больше "
                                           f"{MAX_OTHER_CANDIDATES} замечаний (покрытие приёмкой, проверяемость, "
                                           "пустой раздел)"})
     return kept, dropped
+
+
+def mark_out_of_zone(c: Mapping[str, Any]) -> dict:
+    """Кандидат вне зоны линзы — судье с пометкой: ``origin``, ``zone``; уровень ``minor`` (прежний — подсказка)."""
+    c = {**c, "origin": ZONE_ORIGIN, "zone": ZONE_NOTE}
+    if c.get("severity") != "minor":
+        c.setdefault("severity_hint", c.get("severity"))
+        c["severity"] = "minor"
+    return c
 
 
 def coverage_share(checks: list[Mapping[str, Any]], reqs: list[Mapping[str, Any]]) -> tuple[int, int]:
@@ -1109,10 +1134,11 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
         t["id"] = f"T-{i:02d}"
     tests = [{"id": t["id"], **{k: v for k, v in t.items() if k != "id"}} for t in tests]
 
-    kept, dropped = limit_other_candidates(kept)
+    mature = mature_document(view)
+    kept, dropped = limit_other_candidates(kept, handoff=view is not None and not mature)
     dropped = [{**c, "reason": NO_QUOTE_REASON} for c in no_quote] + dropped
     calibrate_coverage(kept, checks, reqs, tests)
-    if mature_document(view):
+    if mature:
         dropped += drop_coverage_on_mature(kept)
     dropped += calibrate_verifiability(kept, reqs)
     dropped += calibrate_nfr_contradictions(kept, reqs)

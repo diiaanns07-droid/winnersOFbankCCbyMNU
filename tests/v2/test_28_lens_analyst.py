@@ -115,7 +115,8 @@ def _fake_lens_run(answers: dict):
     return run
 
 
-def test_run_two_views_on_immature_document():
+def test_run_two_views_on_immature_document(monkeypatch):
+    monkeypatch.setattr(A, "TWO_VIEWS", True)  # выключено по умолчанию до замера
     view = docview.load(OFFICIAL)
     q38, q64 = view["lines"][37]["text"][:50], view["lines"][63]["text"][:40]
     first = [{**_cand("месяц", "critical", [38, 64], "event_conflict"),
@@ -140,7 +141,8 @@ def test_run_one_view_on_mature_document():
     assert calls == ["object"] and "views" not in out
 
 
-def test_run_second_view_failure_keeps_first():
+def test_run_second_view_failure_keeps_first(monkeypatch):
+    monkeypatch.setattr(A, "TWO_VIEWS", True)  # выключено по умолчанию до замера
     view = docview.load(OFFICIAL)
     ctx = _Ctx(view)
     out = A.run(ctx, lens_run=_fake_lens_run({"first": [_cand("одно", "major", [29])], "second": RuntimeError("сбой")}))
