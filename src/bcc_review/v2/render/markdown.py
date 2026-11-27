@@ -180,10 +180,21 @@ _HTML_START = re.compile(r"<(?=[A-Za-z/!?])")
 _DOC_ID = re.compile(r"[A-Za-zА-Яа-яЁё]{0,6}[-.]?\d+(?:[.-]\d+)*[a-zа-я]?")
 
 
+def _no_links(text: str) -> str:
+    """Своя Markdown-ссылка в тексте модели («[Ф-3](#ф-3)», «[тут](http://…)») — простым текстом: якоря в отчёте
+    ставит только код, чужая ссылка вела бы в никуда (вне `кода`; «\\(» GitHub показывает как «(»)."""
+    if "](" not in text:
+        return text
+    parts = re.split(r"(`[^`]*`)", text)
+    for i in range(0, len(parts), 2):
+        parts[i] = parts[i].replace("](", "]\\(")
+    return "".join(parts)
+
+
 def esc(text) -> str:
-    """Текст модели или документа в строку Markdown: без переводов строк и без HTML-тегов."""
+    """Текст модели или документа в строку Markdown: без переводов строк, без HTML-тегов и без своих ссылок."""
     s = " ".join(str(text or "").split())
-    return _HTML_START.sub(r"\\<", s)
+    return _no_links(_HTML_START.sub(r"\\<", s))
 
 
 _LREF = re.compile(r"(?:(?<![\w-])([А-Яа-яЁё]{1,20})\s+)?\bL0*(\d{1,5})"
@@ -370,10 +381,35 @@ _PRODUCT = re.compile(r"(?<![«\w`])(?:Claude Code|Google AI Studio|Google Gemin
 _FLAG = re.compile(r"(?<![\w`-])--[a-z][\w-]*(?:[ =](?![а-яё])[A-Za-z0-9][\w.:-]*)?")
 
 
+_SEV_GEN = {"critical": "критичного", "major": "существенного", "minor": "незначительного"}
+_SEV_AFTER_DO = re.compile(r"\bдо (critical|major|minor)\b")
+# «судья: 'Заголовок, обрезанный на 60 знаков' понижен до major (…)» — repr Python в тексте этапа
+_REPR_CUT = re.compile(r"(?<![\w«])(['\"])(.{1,60}?)\1(?= понижен| повышен| снят| объединён| отклонён)")
+# «вопрос «текст[:60]» отброшен — …» (этап вопросов)
+_QUOTE_CUT = re.compile(r"(вопрос\w* «)(.{60})(» отброшен)")
+CUT_AT = 60
+
+
+def _cut_mark(inner: str) -> str:
+    """Обрезанный этапом на CUT_AT знаков заголовок — по границе слова и с многоточием («…или кл» → «…или…»)."""
+    if len(inner) < CUT_AT:
+        return inner
+    sp = inner.rfind(" ")
+    return (inner[:sp] if sp > CUT_AT * 0.6 else inner).rstrip(" ,.;:—-") + "…"
+
+
+def warn_quotes(s: str) -> str:
+    """Тексты этапов о дефектах и вопросах: «'…' понижен до major» → «… понижен до существенного», обрезка на
+    60 знаков — с многоточием (было: «…авторизация или кл'»)."""
+    s = _SEV_AFTER_DO.sub(lambda m: "до " + _SEV_GEN[m.group(1)], s)
+    s = _REPR_CUT.sub(lambda m: f"«{_cut_mark(m.group(2))}»", s)
+    return _QUOTE_CUT.sub(lambda m: m.group(1) + _cut_mark(m.group(2)) + m.group(3), s)
+
+
 def warn_text(text) -> str:
     """Предупреждение этапа по-русски: «clarify: …» → «Вопросы: …», «lens_risk» → «Риски», critical → критичный;
     служебные префиксы исключений («BudgetExceeded: judge: budget:») убираются."""
-    s = dejargon(" ".join(str(text or "").split()))
+    s = warn_quotes(dejargon(" ".join(str(text or "").split())))
     m = _STAGE_PREFIX.match(s)
     if m and stage_key(m.group(1)) in STAGES:
         s = f"{STAGES[stage_key(m.group(1))][0]}: " + s[m.end():]
@@ -571,10 +607,22 @@ def source_name(src: str) -> str:
     return f"этап `{s}`" if s else "—"
 
 
+_BARE_PIPE = re.compile(r"(\\*)\|")
+
+
+def _table_cell(value) -> str:
+    """Последняя защита строки таблицы: перевод строки — пробел, «|» без экранирования — «\\|».
+
+    Чётное число обратных косых перед «|» (в документе уже было «\\|», и `cell()` дал «\\\\|») не экранирует черту —
+    GitHub разрезал бы ячейку и сдвинул столбцы; добавляем ещё одну косую."""
+    s = re.sub(r"[\r\n]+", " ", "" if value is None else str(value))
+    return _BARE_PIPE.sub(lambda m: m.group(1) + ("" if len(m.group(1)) % 2 else "\\") + "|", s)
+
+
 def table(header: list[str], rows: list[list[str]], align: list[str] | None = None) -> list[str]:
     align = align or [":---"] * len(header)
-    out = ["| " + " | ".join(header) + " |", "| " + " | ".join(align) + " |"]
-    out += ["| " + " | ".join(r) + " |" for r in rows]
+    out = ["| " + " | ".join(_table_cell(h) for h in header) + " |", "| " + " | ".join(align) + " |"]
+    out += ["| " + " | ".join(_table_cell(x) for x in r) + " |" for r in rows]
     return out
 
 
@@ -1261,7 +1309,112 @@ def _before_after(c: _Ctx) -> list[str]:
                 f"{num(cl.get('open', 0))}, новых конфликтов из-за ответов {len(cl.get('new_findings') or [])}"
                 + (f": {c.f_links(cl['new_findings'])}" if cl.get("new_findings") else "")
                 + ". Подробно — [приложение А](#pa).", ""]
-    return out
+    return out + _next_round(c, first_screen=True)
+
+
+def _next_file(c: _Ctx) -> str:
+    """Файл ответов следующего круга (№32: ``<отчёт>.answers-next.md``) — путь как в командной строке, абсолютный —
+    только имя (в отчёт не пишутся пути машины)."""
+    from pathlib import PurePath
+
+    cl = c.r.get("clarification") or {}
+    raw = cl.get("next_answers_file") if isinstance(cl.get("next_answers_file"), str) else ""
+    if not raw and getattr(c, "out_path", None):
+        out = PurePath(str(c.out_path))
+        raw = str(out.with_name(out.stem + ".answers-next.md"))
+    if not raw:
+        return ""
+    pp = PurePath(raw)
+    return (pp.name if pp.is_absolute() else pp.as_posix()).replace("`", "")
+
+
+def _open_questions(c: _Ctx) -> list[dict]:
+    """Что осталось решить после ответов — по вопросу одна запись (№32 ``next_round``, ``answer_conflicts``,
+    ``postponed``): {"qid", "kind": conflict|partial|postponed|unanswered, "fids", "sides": [(метка, текст)], "text"}."""
+    cl = c.r.get("clarification") or {}
+    qs = {q.get("id"): q for q in c.r.get("questions") or [] if isinstance(q, dict)}
+    by_q: dict[str, dict] = {}
+
+    def item(qid: str, kind: str) -> dict:
+        it = by_q.setdefault(qid, {"qid": qid, "kind": kind, "fids": [], "sides": [], "text": ""})
+        rank = {"conflict": 0, "partial": 1, "postponed": 2, "unanswered": 3}
+        if rank.get(kind, 9) < rank.get(it["kind"], 9):
+            it["kind"] = kind
+        return it
+
+    for x in cl.get("answer_conflicts") or []:
+        if not isinstance(x, dict):
+            continue
+        labels = [str(a) for a in x.get("answers") or []]
+        qid = next((lab.split(".")[0] for lab in labels if lab.startswith("Q-")), "") or str(x.get("question_id") or "")
+        it = item(qid or "решения", "conflict")
+        if x.get("finding_id") and x["finding_id"] not in it["fids"]:
+            it["fids"].append(x["finding_id"])
+        texts = x.get("texts") if isinstance(x.get("texts"), dict) else {}
+        for lab in labels:
+            side = (lab, str(texts.get(lab) or ""))
+            if side not in it["sides"]:
+                it["sides"].append(side)
+    for x in cl.get("postponed") or []:
+        if isinstance(x, dict) and x.get("question_id"):
+            it = item(x["question_id"], "partial" if x.get("partial") else "postponed")
+            it["text"] = it["text"] or str(x.get("text") or "")
+    for x in cl.get("next_round") or []:
+        if isinstance(x, dict) and x.get("question_id"):
+            it = item(x["question_id"], str(x.get("kind") or "unanswered"))
+            for fid in re.split(r",\s*", str(x.get("finding_id") or "")):
+                if fid and fid not in it["fids"]:
+                    it["fids"].append(fid)
+    for qid in cl.get("unanswered") or []:
+        if qid in qs and qid not in by_q:
+            item(qid, "unanswered")
+    for qid, it in by_q.items():
+        if not it["fids"]:
+            it["fids"] = list((qs.get(qid) or {}).get("finding_ids") or [])
+    order = {"conflict": 0, "partial": 1, "postponed": 2, "unanswered": 3}
+    return sorted(by_q.values(), key=lambda it: (order.get(it["kind"], 9), _id_num(it["qid"])))
+
+
+OPEN_KIND = {"conflict": "ответы расходятся — оставьте один", "partial": "решена часть, остальное отложено",
+             "postponed": "решение отложено", "unanswered": "без ответа"}
+
+
+def _open_line(c: _Ctx, it: dict, limit: int = 110) -> str:
+    q = next((q for q in c.r.get("questions") or [] if isinstance(q, dict) and q.get("id") == it["qid"]), {})
+    qref = f"[{it['qid']}](#{anchor(it['qid'])})" if q else esc(it["qid"])
+    head = f"{qref} — {OPEN_KIND.get(it['kind'], it['kind'])}" + (f" ({c.f_links(it['fids'])})" if it["fids"] else "")
+    if it["kind"] == "conflict" and it["sides"]:
+        tail = " ↔ ".join(f"{esc(lab)} {quote_md(txt, limit // 2 + 20)}" if txt else esc(lab)
+                          for lab, txt in it["sides"][:3])
+    elif it["text"]:
+        tail = "отложено: " + quote_md(it["text"], limit)
+    elif q.get("if_no_answer"):
+        tail = "если ответа не будет: " + prose(shorten(_lower_first(str(q["if_no_answer"]).split(";")[0]), limit))
+    else:
+        tail = ""
+    return head + (f": {tail}" if tail else "")
+
+
+def _next_round(c: _Ctx, first_screen: bool) -> list[str]:
+    """«Осталось решить ответами»: расхождения, отложенное, без ответа + файл следующего круга (№32)."""
+    if not (c.r.get("clarification") or {}):
+        return []
+    items = _open_questions(c)
+    if not items:
+        return []
+    shown = items[:5] if first_screen else items
+    out = [f"**Осталось решить ответами ({len(items)}):**", ""]
+    out += [f"- {_open_line(c, it, 110 if first_screen else 200)}" for it in shown]
+    if len(items) > len(shown):
+        out.append(f"- и ещё {len(items) - len(shown)} — [приложение А](#pa)")
+    nxt = _next_file(c)
+    if nxt:
+        out_json, _, doc_arg = _report_paths(c)
+        md_arg = out_json.with_suffix(".md").as_posix() if out_json and not out_json.is_absolute() else "ОТЧЁТ.md"
+        out += ["", f"Строки для следующего круга уже записаны в `{nxt}` (там же — согласованные ответы): оставьте одну "
+                    f"строку на спорный вопрос, впишите решения и запустите `python -m bcc_review {doc_arg} "
+                    f"{md_arg} --answers {nxt}`."]
+    return out + [""]
 
 
 def _clarification_details(c: _Ctx) -> list[str]:
@@ -1318,7 +1471,12 @@ def _report_paths(c: _Ctx):
     out_json = PurePath(str(out)).with_suffix(".json") if out else None
     json_arg = (out_json.as_posix() if out_json and not out_json.is_absolute() else out_json.name if out_json
                 else "отчёт.json")
-    doc = str(c.doc.get("file") or "документ")
+    # документ — по пути, как его указали в командной строке (относительный: команду можно скопировать и
+    # выполнить из той же папки); абсолютный путь машины в отчёт не пишется — только имя файла
+    given = getattr(c, "doc_path", None)
+    given = PurePath(str(given)) if given else None
+    doc = (given.as_posix() if given and not given.is_absolute() and given.name == PurePath(
+        str(c.doc.get("file") or given.name)).name else str(c.doc.get("file") or "документ"))
     doc_arg = doc if re.fullmatch(r"[\w./\\:-]+", doc) else f'"{doc}"'
     clean = lambda x: str(x).replace("`", "").replace("|", "\\|")  # noqa: E731
     return out_json, clean(json_arg), clean(doc_arg)
@@ -2089,9 +2247,14 @@ def _appendix_questions(c: _Ctx) -> list[str]:
     blocking = sum(1 for q in qs if q.get("blocking"))
     cl = c.r.get("clarification") or {}
     answered = {a.get("question_id"): a for a in cl.get("answers") or [] if isinstance(a, dict)}
+    state = {it["qid"]: it for it in _open_questions(c)} if cl else {}
+    out_json, _, doc_arg = _report_paths(c)
+    known = getattr(c, "doc_path", None) and out_json and not out_json.is_absolute()
+    again = (f"python -m bcc_review {doc_arg} {out_json.with_suffix('.md').as_posix()} --answers ответы.md" if known
+             else "python -m bcc_review ВХОД ОТЧЁТ.md --answers ответы.md")
     out += [f"{len(qs)} {plural(len(qs), 'вопрос', 'вопроса', 'вопросов')}{_q_need(c, blocking)}. "
             f"Ответ — буква варианта или свой текст, по строке на вопрос (`Q-01: B`); повторный прогон с ответами: "
-            f"`python -m bcc_review ВХОД ОТЧЁТ.md --answers ответы.md`.", ""]
+            f"`{again}`.", ""]
     for q in sorted(qs, key=lambda q: (not q.get("blocking"), _id_num(q.get("id")))):
         head = [f"**<a id=\"{anchor(q.get('id'))}\"></a>{q.get('id')}**"
                 + (f" {esc(q['topic'])}" if q.get("topic") else ""),
@@ -2110,9 +2273,17 @@ def _appendix_questions(c: _Ctx) -> list[str]:
         if q.get("why"):
             tail.append(f"Зачем: {prose(q['why'])}")
         a = answered.get(q.get("id"))
-        if a:
+        st = state.get(q.get("id")) or {}
+        if a and st.get("kind") == "conflict" and st.get("sides"):
+            tail.append(f"**Ответы расходятся** ({c.f_links(st['fids'])} остаются открытыми — оставьте один): "
+                        + "; ".join(f"{esc(lab)} — {quote_md(txt, 220)}" for lab, txt in st["sides"] if txt))
+        elif a:
             choice = f"{a['choice']} — " if a.get("choice") else ""
             tail.append(f"**Ответ владельца:** {prose(choice + str(a.get('answer') or ''))}")
+        if st.get("text"):
+            tail.append(f"**Отложено владельцем:** {quote_md(st['text'], 220)}")
+        if q.get("if_no_answer") and (not a or st.get("kind") in ("partial", "postponed")):
+            tail.append(f"Если ответа не будет: {prose(_lower_first(str(q['if_no_answer'])))}")
         letter = [LETTERS[i] if i < len(LETTERS) else str(i + 1) for i in range(len(opts))]
         if opts and c.level < 2:
             out += [ln + "  " if i < len(lines) - 1 else ln for i, ln in enumerate(lines)] + [""]
@@ -2388,7 +2559,9 @@ def _clean(value, key: str = ""):
                 if isinstance(v, (int, float)) and not isinstance(v, bool):
                     out[k] = str(v)
                 continue
-            if k in ("evidence", "terms", "answers", "edits", "changes"):
+            if k == "answers" and isinstance(v, list) and v and not any(isinstance(x, dict) for x in v):
+                out[k] = [str(x) for x in v if isinstance(x, (str, int)) and str(x).strip()]  # метки реплик «Q-03.1»
+            elif k in ("evidence", "terms", "answers", "edits", "changes"):
                 out[k] = [_clean(x, k) for x in v if isinstance(x, dict)] if isinstance(v, list) else []
             elif k in _ID_LIST_KEYS:
                 out[k] = [str(x) for x in v if isinstance(x, (str, int, float)) and str(x).strip()] \
@@ -2415,9 +2588,10 @@ def _sections():
             ("Приложение Е. Методика", _appendix_method)]
 
 
-def _render_level(report: dict, level: int, out_path=None) -> str:
+def _render_level(report: dict, level: int, out_path=None, doc_path=None) -> str:
     c = _Ctx(_clean_report(report), level)
     c.out_path = out_path
+    c.doc_path = doc_path
     _KNOWN_IDS.clear()
     _KNOWN_IDS.update(str(f.get("id")) for f in c.findings)
     _KNOWN_IDS.update(str(q.get("id")) for q in c.reqs)
@@ -2451,13 +2625,14 @@ def _render_level(report: dict, level: int, out_path=None) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render(report: dict, *, max_lines: int | None = MAX_LINES, out_path=None) -> str:
+def render(report: dict, *, max_lines: int | None = MAX_LINES, out_path=None, doc_path=None) -> str:
     """Markdown-отчёт по report.json v2. Если отчёт длиннее max_lines, вспомогательные таблицы сжимаются
-    (содержание дефектов не теряется: полные данные — в report.json). ``out_path`` — куда пишется этот .md
-    (для команд проверки в паспорте: report.json лежит рядом с тем же именем)."""
+    (содержание дефектов не теряется: полные данные — в report.json). ``out_path`` — куда пишется этот .md,
+    ``doc_path`` — путь к документу из командной строки: по ним паспорт пишет команды проверки и повтора, которые
+    можно выполнить как есть (без них — «отчёт.json» и имя файла документа)."""
     text = ""
     for level in range(MAX_LEVEL + 1):
-        text = _render_level(report, level, out_path)
+        text = _render_level(report, level, out_path, doc_path)
         if max_lines is None or text.count("\n") <= max_lines:
             break
     return text
@@ -2473,14 +2648,14 @@ def export_text(md: str) -> str:
     out = _ANCHOR_TAG.sub("", md)
     out = _LINK_TITLE.sub(r"\1)", out)
     out = out.replace("\\|", "∣")
-    out = re.sub(r"\\([\\`*_\[\]<>#])", r"\1", out)
+    out = re.sub(r"\\([\\`*_\[\]<>#(])", r"\1", out)
     return out
 
 
-def write(report: dict, path) -> str:
+def write(report: dict, path, doc_path=None) -> str:
     from pathlib import Path
 
-    text = render(report, out_path=path)
+    text = render(report, out_path=path, doc_path=doc_path)
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(text, encoding="utf-8")
