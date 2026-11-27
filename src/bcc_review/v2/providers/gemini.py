@@ -280,7 +280,7 @@ class GeminiProvider:
         self._gate = threading.BoundedSemaphore(max(1, self.concurrency))
         self._adapters: dict[tuple[str, tuple], Any] = {}
         self._dead: dict[str, ProviderError] = {}       # модели, отключённые до конца прогона (404, квота)
-        self._no_thinking: set[str] = set()              # модели, отвергшие настройку рассуждений
+        self._no_thinking: set[tuple] = set()            # (модель, настройка рассуждений), которую модель отвергла
         self._text_schema: set[str] = set()              # модели, отвергшие схему ответа (слишком сложная)
 
     # ------------------------------------------------------------------ adapters
@@ -307,8 +307,9 @@ class GeminiProvider:
                    thinking_budget=thinking.get("thinking_budget"), thinking_level=thinking.get("thinking_level"))
 
     def _adapter(self, model: str, stage: str = "") -> tuple[Any, dict[str, Any], str]:
-        thinking = ({} if model in self._no_thinking
-                    else thinking_for(model, self.thinking_level, self.thinking_budget, stage))
+        thinking = thinking_for(model, self.thinking_level, self.thinking_budget, stage)
+        if (model, tuple(sorted(thinking.items()))) in self._no_thinking:
+            thinking = {}   # отвергнута именно эта настройка: другой уровень (low у нарезки) остаётся в силе
         mode = "text" if model in self._text_schema else "native"
         key = (model, tuple(sorted(thinking.items())), mode)
         with self._lock:
@@ -452,7 +453,7 @@ class GeminiProvider:
                         self._out_cap[current] = 32768 if max_tokens > 32768 else 8192
                         continue
                     if kind == "bad_request" and thinking and "think" in low:
-                        self._no_thinking.add(current)
+                        self._no_thinking.add((current, tuple(sorted(thinking.items()))))
                         continue
                     if kind == "bad_request" and mode == "native" and ("schema" in low or "too many states" in low):
                         self._text_schema.add(current)

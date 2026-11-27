@@ -167,3 +167,24 @@ def test_measured_stage_profile_sonnet_and_gemini():
         cmd = p.build_command("sonnet", SCHEMA, None, stage)
         assert (cmd[cmd.index("--effort") + 1] if "--effort" in cmd else None) == effort, stage
     assert "opus" not in profiles.STAGE_EFFORT        # opus — контрольные прогоны, без непроверенных отступлений
+
+
+def test_rejected_thinking_level_is_remembered_per_level_not_per_model():
+    """Модель отвергла medium — этапы с medium идут без настройки, а нарезка со своим low её сохраняет."""
+    from bcc_review.contracts import ProviderError
+    seen = []
+
+    def factory(model, thinking, schema_mode="native"):
+        class Adapter:
+            def invoke(self, **_):
+                seen.append(dict(thinking))
+                if thinking.get("thinking_level") == "medium":
+                    raise ProviderError("bad_request", "Thinking level MEDIUM is not supported for this model", status=400)
+                return {"data": {"answer": "да"}, "usage": {}, "model": "m", "stop_reason": "STOP", "meta": {}}
+        return Adapter()
+
+    p = GeminiProvider(api_key="k", env={}, adapter_factory=factory, sleep=lambda s: None)
+    p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, stage="judge")
+    p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, stage="judge")
+    p.invoke(model=None, messages=MESSAGES, schema=SCHEMA, timeout_s=60, stage="segment")
+    assert seen == [{"thinking_level": "medium"}, {}, {}, {"thinking_level": "low"}]
