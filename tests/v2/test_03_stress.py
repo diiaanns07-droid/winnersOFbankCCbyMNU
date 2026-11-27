@@ -255,3 +255,25 @@ def test_doc_rtf_odt_via_libreoffice(tmp_path, ext):
     assert v["file"] == src.name and v["title"] == ref["title"]
     assert v["warnings"][0].startswith(f"Документ {ext.upper()} прочитан через преобразование в DOCX")
     assert [x["n"] for x in dv.nonempty(ref) if not Q.verify_quote(v, x["text"])] == []
+
+
+@needs_docx
+def test_html_saved_from_word_matches_docx():
+    """HTML «Сохранить как веб-страницу» (LibreOffice/Word): переносы строк внутри <p> — пробелы, <li><p>…</p></li> —
+    один пункт с номером; построчно совпадает с DOCX и содержит все строки MD."""
+    h = dv.load(S / "word_saved.html")
+    dx = dv.load(ROOT / "release/input/requirements.docx")
+    md = dv.load(ROOT / "release/input/requirements.md")
+    assert h["title"] == md["title"] and len(h["lines"]) == len(dx["lines"])
+    assert all(Q.normalize(a["text"]) == Q.normalize(b["text"]) for a, b in zip(h["lines"], dx["lines"]))
+    assert [x["n"] for x in dv.nonempty(md) if not Q.verify_quote(h, x["text"])] == []
+    assert "5. При отклонении суммы вернуть прежнее состояние и результат ERROR." in _texts(h)
+
+
+@needs_docx
+def test_docx_tracked_changes_final_text_and_warning():
+    v = dv.load(S / "docx_tracked.docx")
+    assert "СН-2. Лимит снятия составляет 200 000 тенге в сутки." in _texts(v)
+    assert "100 000" not in _joined(v)
+    assert any("непринятые исправления (вставок 1, удалений 1)" in w for w in v["warnings"])
+    assert dv.load(S / "docx_merged.docx")["warnings"] == []

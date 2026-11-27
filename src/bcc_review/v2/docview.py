@@ -93,10 +93,28 @@ def load(path: str | Path) -> dict:
         ext = (doc or {}).get("extraction") or {}
         pages = ext.get("pages") or max((ln["page"] or 0 for ln in lines), default=0) or None
     warnings += _doc_warnings(doc)
+    if fmt == "docx":
+        warnings += _docx_revisions(data)
     if not any(ln["text"].strip() for ln in lines) and not warnings:
         warnings.append("В документе нет текста: проверять нечего.")
     return {"title": title, "file": p.name, "format": fmt, "sha256": sha, "lines": lines,
             "pages": pages, "warnings": _dedup(warnings)}
+
+
+def _docx_revisions(data: bytes) -> list[str]:
+    """Непринятые исправления Word (режим рецензирования): текст читается в итоговой редакции — об этом стоит сказать."""
+    import io
+    import zipfile
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            xml = z.read("word/document.xml").decode("utf-8", errors="ignore")
+    except Exception:  # noqa: BLE001
+        return []
+    ins, dels = len(re.findall(r"<w:ins\b", xml)), len(re.findall(r"<w:del\b", xml))
+    if not ins and not dels:
+        return []
+    return [f"В документе есть непринятые исправления (вставок {ins}, удалений {dels}): проверена итоговая редакция "
+            "— вставки учтены, удалённый текст не проверялся."]
 
 
 def _decode_text(data: bytes) -> str:
