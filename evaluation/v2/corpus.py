@@ -465,7 +465,7 @@ def main(argv: list[str] | None = None) -> int:
 
         dest = ROOT / "evaluation" / "v2" / "corpus_results" / slugify(label)
         dest.mkdir(parents=True, exist_ok=True)
-        for f in ("summary.md", "summary.json", "predictions.jsonl", "harness/metrics.json", "harness/matrix.jsonl"):
+        for f in ("summary.md", "summary.json", "predictions.jsonl", "harness/matrix.jsonl"):  # metrics.json — из predictions
             if (out / f).exists():
                 shutil.copy(out / f, dest / Path(f).name)
         print(f"сохранено: {dest.relative_to(ROOT)}")

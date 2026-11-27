@@ -51,9 +51,10 @@ python -m evaluation.v2.corpus run --out out/corpus --provider claude_cli --mode
 ```
 
 <!-- corpus:start -->
-| Прогон | Кейсов (не изм.) | TP | FP | FN | Дубли | Precision | Recall | F1 | Тревог на 8 чистых | critical / major на чистых | Вердикт «нельзя» на чистых | Recall по типам | Мин | Вызовов |
-| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- | ---: | :--- | ---: | ---: |
-| v2 офлайн-правила (09f0dfb) | 33 (0) | 12 | 3 | 16 | 0 | 0.800 | 0.429 | 0.558 | 0 | 0 / 0 | 0 | boundary_conflict 0/5, event_conflict 0/5, missing_element 5/6, status_conflict 3/6, unit_mismatch 4/6 | 0.1 | 0 |
+| Прогон | Кейсов (не изм.) | TP | FP | FN | Дубли | Precision | Recall | F1 | Recall кандидатов | Тревог на 8 чистых | Чистых с > 1 замечанием | critical / major на чистых | Вердикт «нельзя» на чистых | Recall по типам | Мин на кейс | Вызовов на кейс |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- | ---: | :--- | ---: | ---: |
+| v2 офлайн-правила (09f0dfb) | 33 (0) | 12 | 3 | 16 | 0 | 0.800 | 0.429 | 0.558 | — | 0 | — | 0 / 0 | 0 | boundary_conflict 0/5, event_conflict 0/5, missing_element 5/6, status_conflict 3/6, unit_mismatch 4/6 | 0.0 | 0.0 |
+| v2 haiku, 0f3d9dd (22 кейса) + 7d80df8 (11) | 33 (0) | 26 | 478 | 2 | 0 | 0.052 | 0.929 | 0.098 | 0.964 | 128 | 8 | 4 / 61 | 4 | boundary_conflict 4/5, event_conflict 5/5, missing_element 6/6, status_conflict 6/6, unit_mismatch 5/6 | 8.9 | 8.8 |
 <!-- corpus:end -->
 
 Для сравнения, v1 (ветка `bcc/eval-independent`, `docs/plan-v2/ref/BCC-quality-08d3af5.md`): правила — 0 из 28
