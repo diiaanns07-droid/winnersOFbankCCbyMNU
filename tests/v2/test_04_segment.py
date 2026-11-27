@@ -826,3 +826,120 @@ def test_very_long_document_at_most_four_chunks(tmp_path):
     assert all(b2 == a1 - 1 for (_, b2), (a1, _) in zip(chunks, chunks[1:]))  # без дыр и пересечений
     long_view = sg.load_view(str(STRUCT / "long.md"))  # 616 строк — по-прежнему части до 250 строк
     assert all(b - a + 1 <= sg.CHUNK_MAX_LINES for a, b in sg.plan_chunks(long_view))
+
+
+# ---- волна 3, вторая сессия: расхождения haiku с офлайн-нарезкой и фикстурой ---------------------------------
+
+OPEN2 = ROOT / "evaluation" / "v2" / "open2"
+
+
+def test_haiku_official_bare_code_with_body_joins_status_requirement(official_view):
+    """haiku отдал «404» с телом ответа (L190–192) в excluded как пример: требование «Статус 404» — строки
+    189–192, как в фикстуре (sonnet) и офлайн-нарезке, иначе цитата тела не находит своё требование."""
+    raw = json.loads((ANSWERS / "official.haiku.json").read_text(encoding="utf-8"))
+    out = sg.segment_from_response(official_view, raw)
+    ref = json.loads((FIX / "official" / "segment.json").read_text(encoding="utf-8"))["requirements"]
+    assert _keys(out["requirements"]) == _keys(ref)
+    assert not any(e["line_start"] <= 192 and e["line_end"] >= 190 for e in out["excluded"])
+    assert out["coverage"]["uncovered"] == []
+
+
+def test_bare_code_block_absorbed_only_after_its_requirement():
+    view = _view(["Для чужой карты возвращается 404.", "404", "", '{"message":"нет"}', "",
+                  "Ответ 400 — неверный запрос.", "", '{"message":"x"}'])
+    view["lines"][3]["kind"] = view["lines"][7]["kind"] = "code"
+    raw = {"requirements": [
+        {"source_id": "", "kind": "api", "summary": "Код 404 для чужой карты", "line_start": 1, "line_end": 1},
+        {"source_id": "", "kind": "api", "summary": "Код 400 — неверный запрос", "line_start": 6, "line_end": 6}],
+        "excluded": [{"what": "Пример 404", "line_start": 2, "line_end": 4, "reason": "пример"},
+                     {"what": "Пример 400", "line_start": 8, "line_end": 8, "reason": "пример тела 400"}]}
+    out = sg.segment_from_response(view, raw)
+    r404 = out["requirements"][0]
+    assert (r404["source_id"], r404["line_start"], r404["line_end"]) == ("Статус 404", 1, 4)
+    # тело без голого кода под абзацем — пример, остаётся в excluded
+    assert [(e["line_start"], e["line_end"]) for e in out["excluded"]] == [(8, 8)]
+
+
+def test_haiku_param_location_note_not_in_source_id():
+    """«`cardId` (path)» в ячейке: haiku пишет ID «Метод 2…: cardId (path)», офлайн и sonnet — «…: cardId»."""
+    view = sg.load_view(str(OPEN2 / "grace_clean" / "source.md"))
+    raw = json.loads((ANSWERS / "grace_clean.haiku.json").read_text(encoding="utf-8"))
+    out = sg.segment_from_response(view, raw)
+    sids = {r["source_id"] for r in out["requirements"]}
+    assert "Метод 2. Включение и выключение напоминания: cardId" in sids
+    assert "Метод 2. Включение и выключение напоминания: enabled" in sids
+    assert not any("(path)" in s or "(body" in s for s in sids)
+    offline = sg.heuristic_segment(view)["requirements"]
+    assert _keys(out["requirements"]) == _keys(offline)
+
+
+def test_haiku_official_pdf_bare_code_heading_joins_status():
+    """PDF: голый «404» читатель принял за заголовок (L125), haiku дал тело под ним (L126) отдельным
+    требованием «Статус 404» — итог = фикстуре PDF: одно требование «Статус 404» на строках 124–126."""
+    view = sg.load_view(str(ROOT / "release" / "input" / "requirements.pdf"))
+    raw = json.loads((ANSWERS / "official.pdf.haiku.json").read_text(encoding="utf-8"))
+    out = sg.segment_from_response(view, raw)
+    ref = json.loads((FIX / "official_pdf" / "segment.json").read_text(encoding="utf-8"))["requirements"]
+    assert _keys(out["requirements"]) == _keys(ref)
+
+
+def test_haiku_pdf_status_list_on_one_line_keeps_every_code():
+    """PDF отдал перечень из 8 кодов двумя строками (115–116); haiku поставил «Статус N» на одну строку с одной
+    цитатой — раньше код счёл 7 из 8 дублями. Теперь 8 требований, у каждого — цитата своего кода."""
+    view = sg.load_view(str(OPEN2 / "insurance" / "source.pdf"))
+    raw = json.loads((ANSWERS / "insurance.pdf.haiku.json").read_text(encoding="utf-8"))
+    out = sg.segment_from_response(view, raw)
+    st = [r for r in out["requirements"] if r["source_id"].startswith("Статус ")]
+    assert [r["source_id"][-3:] for r in st] == ["200", "400", "401", "404", "409", "422", "500", "502"]
+    for r in st:
+        assert r["quote"].startswith(r["source_id"][-3:] + ". Ответ"), r
+    md = sg.heuristic_segment(sg.load_view(str(OPEN2 / "insurance" / "source.md")))["requirements"]
+    assert [r["source_id"] for r in out["requirements"]] == [r["source_id"] for r in md]
+
+
+def test_md_soft_wrapped_paragraph_is_one_requirement_like_docx():
+    """Две строки одного абзаца Markdown без пустой строки — одно требование (в DOCX/PDF это одна строка);
+    перечень кодов «200. …» / «400. …» в одном абзаце по-прежнему делится по коду."""
+    view = _view(["Экран условий: сумма и срок.", "После выдачи: номер полиса.", "",
+                  "200. Ответ при успехе.", "400. Ответ при ошибке."], sections=["UI", "UI", "", "Статусы", "Статусы"])
+    for x in view["lines"]:
+        x["kind"] = "paragraph" if x["text"] else ""
+        x["block_id"] = "b1" if x["n"] <= 2 else ("b2" if x["n"] >= 4 else "")
+    raw = {"requirements": [
+        {"source_id": "", "kind": "ui", "summary": "Экран условий", "line_start": 1, "line_end": 1},
+        {"source_id": "", "kind": "ui", "summary": "После выдачи", "line_start": 2, "line_end": 2},
+        {"source_id": "Статус 200", "kind": "api", "summary": "Код 200", "line_start": 4, "line_end": 4},
+        {"source_id": "Статус 400", "kind": "api", "summary": "Код 400", "line_start": 5, "line_end": 5}],
+        "excluded": []}
+    out = sg.segment_from_response(view, raw)
+    assert [(r["source_id"], r["line_start"], r["line_end"]) for r in out["requirements"]] == [
+        ("", 1, 2), ("Статус 200", 4, 4), ("Статус 400", 5, 5)]
+    for case in ("insurance", "qr"):  # MD = DOCX по списку ID (раньше MD на 1 требование больше)
+        md = sg.heuristic_segment(sg.load_view(str(OPEN2 / case / "source.md")))["requirements"]
+        docx = sg.heuristic_segment(sg.load_view(str(OPEN2 / case / "source.docx")))["requirements"]
+        assert [r["source_id"] for r in md] == [r["source_id"] for r in docx]
+
+
+@pytest.mark.parametrize("case", ["grace_clean", "capital", "capital_clean", "insurance", "insurance_clean", "qr",
+                                  "qr_clean"])
+def test_offline_pdf_equals_md(case):
+    """PDF ТЗ №18 офлайн = MD по списку ID: пункт, продолжение которого ушло на новую страницу («…, проценты по» +
+    «счёту …»), — одно требование; шапка таблицы, повторённая на новой странице, — шапка, а не строка;
+    слово, разрезанное пробелом в узкой ячейке («проце нты», «consent Pd»), в ID склеено."""
+    md = sg.heuristic_segment(sg.load_view(str(OPEN2 / case / "source.md")))["requirements"]
+    pdf_view = sg.load_view(str(OPEN2 / case / "source.pdf"))
+    pdf = sg.heuristic_segment(pdf_view)
+    ids_md, ids_pdf = [r["source_id"] for r in md], [r["source_id"] for r in pdf["requirements"]]
+    if case == "insurance_clean":  # «страхова нии»: кусок «нии» встречается в документе чаще двух раз
+        ids_md = [s for s in ids_md if "Сведения о страх" not in s]
+        ids_pdf = [s for s in ids_pdf if "Сведения о страх" not in s]
+    assert ids_pdf == ids_md
+    assert sg.uncovered_lines(pdf_view, pdf["requirements"], pdf["excluded"]) == []
+
+
+def test_join_split_words_only_rare_fragments():
+    counts = {"проценты": 5, "проце": 1, "нты": 1, "и": 40, "не": 30, "условия": 3, "consentpd": 2, "consent": 1,
+              "pd": 1, "недоступна": 1, "доступна": 3}
+    assert sg.join_split_words("Условия и проце нты", counts) == "Условия и проценты"
+    assert sg.join_split_words("consent Pd", counts) == "consentPd"
+    assert sg.join_split_words("не доступна", counts) == "не доступна"  # «не» — частое слово

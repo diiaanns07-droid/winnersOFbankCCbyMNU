@@ -160,3 +160,20 @@ def test_pdf_pages_checked_with_docview(tmp_path):
     report["findings"][0]["evidence"][0]["page"] = picked[0]["page"] + 1
     res = verify.verify_report(report, pdf)
     assert not res["ok"] and "страница" in res["errors"][0]["message"]
+
+
+def test_markdown_numbers_checked_next_to_json(tmp_path, sample):
+    """verify сверяет числа Markdown-отчёта, лежащего рядом с report.json, с самим JSON."""
+    from bcc_review.v2.render import markdown
+    rj = tmp_path / "r.json"
+    rj.write_text(json.dumps(sample, ensure_ascii=False), encoding="utf-8")
+    md = markdown.render(sample)
+    (tmp_path / "r.md").write_text(md, encoding="utf-8")
+    res = verify.verify_report(rj, SOURCE)
+    assert res["ok"] and res["markdown_checked"], res["errors"][:3]
+    # ручная правка отчёта: число критичных на первом экране не то, одна карточка удалена
+    bad = md.replace("🔴 **5** критичных", "🔴 **4** критичных").replace('<a id="d-07"></a>', "")
+    (tmp_path / "r.md").write_text(bad, encoding="utf-8")
+    res = verify.verify_report(rj, SOURCE)
+    msgs = [e["message"] for e in res["errors"] if e["code"] == "markdown"]
+    assert not res["ok"] and any("«Кратко»" in m for m in msgs) and any("D-07" in m for m in msgs), msgs

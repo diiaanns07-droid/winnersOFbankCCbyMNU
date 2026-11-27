@@ -52,7 +52,12 @@ class Script:
         return Adapter()
 
 
+# Политику повторов проверяем на прежней короткой цепочке (3.8 → 3.6 → 3.5-lite); цепочка по умолчанию — test_defaults
+LEGACY_CHAIN = ["gemini-3.6-flash", "gemini-3.5-flash-lite"]
+
+
 def make(plan, **kw):
+    kw.setdefault("fallback_models", LEGACY_CHAIN)
     script = Script(plan)
     sleeps = []
     p = GeminiProvider(api_key="k", env={}, adapter_factory=script.factory, sleep=sleeps.append, **kw)
@@ -62,7 +67,9 @@ def make(plan, **kw):
 def test_defaults():
     cfg = settings({})
     assert cfg["model"] == DEFAULT_MODEL == "gemini-3.8-flash"
-    assert cfg["fallback_models"] == list(DEFAULT_FALLBACKS) == ["gemini-3.6-flash", "gemini-3.5-flash-lite"]
+    # бесплатный тариф: 20 запросов в сутки на каждую Flash (замер F3 27.11) — сначала все Flash, потом Flash-Lite
+    assert cfg["fallback_models"] == list(DEFAULT_FALLBACKS) == [
+        "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
     assert cfg["max_output_tokens"] is None                       # по профилю модели
     assert settings({"GEMINI_MAX_OUTPUT_TOKENS": "20000"})["max_output_tokens"] == 20000
     assert settings({"GEMINI_FALLBACK_MODELS": "off"})["fallback_models"] == []

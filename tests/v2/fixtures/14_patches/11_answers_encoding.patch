@@ -1,0 +1,17 @@
+diff --git a/src/bcc_review/v2/stages/recheck.py b/src/bcc_review/v2/stages/recheck.py
+index eacbc2c2..59a22a06 100644
+--- a/src/bcc_review/v2/stages/recheck.py
++++ b/src/bcc_review/v2/stages/recheck.py
+@@ -184,7 +184,11 @@ def load_answers(source: Any) -> dict:
+     s = str(source or "")
+     p = Path(s) if len(s) < 4096 and "\n" not in s else None
+     if p is not None and p.exists():
+-        text = p.read_text(encoding="utf-8-sig")
++        try:  # Блокнот на русской Windows сохраняет cp1251 или UTF-16 — та же расшифровка, что у документа
++            from ..docview import _decode_text
++            text = _decode_text(p.read_bytes())
++        except ImportError:
++            text = p.read_text(encoding="utf-8-sig", errors="replace")
+         if p.suffix.lower() == ".json":
+             return parse_answers_json(json.loads(text))
+     else:
