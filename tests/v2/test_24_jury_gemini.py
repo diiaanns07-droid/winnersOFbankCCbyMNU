@@ -83,6 +83,8 @@ def test_every_transient_fault_recovers_to_complete(tmp_path):
     assert status == "complete", text[-2000:]
     assert verdict["development"] == "no"
     fired = {(r["stage"], r["kind"]) for r in log}
+    # 400 «схема» у архитектора не уводит остальные этапы в режим «схема текстом» (v2.1: было 8 этапов, стало 1)
+    assert {r["stage"] for r in log if r["schema_mode"] == "text"} == {"lens_architect"}
     assert {(f["stage"], f["kind"]) for f in faults} <= fired   # каждый отказ действительно случился
     assert code == 0
 

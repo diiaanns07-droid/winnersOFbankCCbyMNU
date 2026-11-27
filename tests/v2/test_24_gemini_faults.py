@@ -165,3 +165,15 @@ def test_rpm_window_holds_under_parallel_lenses(server, monkeypatch):
         in_window = [x for x in times[i:] if x - t < 1.5 - 0.2]   # запас на дрожание потоков
         assert len(in_window) <= 2, times
     assert times[-1] - times[0] >= 2 * 1.5 - 0.5                  # 5 запросов при 2 за окно — минимум 2 окна
+
+
+def test_schema_rejected_once_keeps_other_schemas_native(server):
+    """v2.1: 400 «схема слишком сложная» у одного этапа не переводит остальные этапы модели в режим «текстом»."""
+    fake = server([{"kind": "400_schema"}])
+    p = provider()
+    ask(p)                                            # схема A: 400 → текстом
+    other = {"type": "object", "required": ["questions", "note"],
+             "properties": {"questions": {"type": "array", "items": {"type": "string"}}, "note": {"type": "string"}}}
+    p.invoke(model=None, messages=MESSAGES, schema=other, timeout_s=30, stage="clarify")   # схема B
+    ask(p)                                            # снова A — сразу текстом, без второго 400
+    assert [r["schema_mode"] for r in fake.log] == ["native", "text", "native", "text"]
