@@ -3,6 +3,7 @@
     python -m evaluation.v2.viewdiff 747364c 868787d               # все документы, которые читает оценка
     python -m evaluation.v2.viewdiff 28fe64f HEAD --all-formats    # и их DOCX/PDF рядом с MD
     python -m evaluation.v2.viewdiff A B --docs release/input/requirements.md --json out/viewdiff.json
+    python -m evaluation.v2.viewdiff 868787d 3e7133c --rules          # + правила без модели на чистых документах
 
 Зачем: после заморозки в код вливают правки (чтение, этапы), и каждую голову приходилось перемерять моделью —
 5–10 минут и разброс С ±1 между прогонами. Если вид документа (строки, разделы, название) и промпты этапов не
@@ -276,6 +277,79 @@ def render(res: dict) -> str:
     return "\n".join(L)
 
 
+def clean_docs() -> list[str]:
+    """Чистые документы оценки: 8 чистых №20, чистые версии open2, чистые кейсы корпуса (без пустого)."""
+    from .newtz import OPEN2, discover
+
+    out = [str(p.relative_to(ROOT)) for p in sorted((ROOT / "evaluation" / "v2" / "clean").glob("*/source.md"))]
+    for c in discover(OPEN2):
+        if c["variant"] == "clean" and c.get("doc"):
+            out.append(str(Path(c["doc"]).resolve().relative_to(ROOT)))
+    man = ROOT / "evaluation" / "dev" / "corpus" / "manifest.json"
+    if man.exists():
+        for c in json.loads(man.read_text(encoding="utf-8")).get("cases") or []:
+            if c.get("expected_outcome") == "clean" and c.get("case_id") != "edge.empty":
+                r = next((r for r in c.get("renders") or [] if r.get("format") == c.get("primary_render")), None)
+                if r:
+                    out.append(str(Path("evaluation/dev/corpus") / r["path"]))
+    return [p for p in dict.fromkeys(out) if (ROOT / p).exists()]
+
+
+def rules_at(sha: str, docs: list[str], timeout: int = 300) -> dict:
+    """Находки правил без модели (`--provider offline`) кодом коммита: {документ: {severity: n, "top": [...]}}."""
+    import os
+
+    out: dict[str, dict] = {}
+    with tempfile.TemporaryDirectory(prefix="viewdiff-rules-") as tmp:
+        src = export_src(sha, Path(tmp))
+        env = {**os.environ, "PYTHONPATH": str(src), "PYTHONIOENCODING": "utf-8"}
+        chk = subprocess.run([sys.executable, "-c", "import bcc_review; print(bcc_review.__file__)"], cwd=tmp, env=env,
+                             capture_output=True, text=True)
+        if not chk.stdout.strip().startswith(str(src)):
+            raise RuntimeError(f"bcc_review загружен не из выгруженного кода {sha[:7]}: {chk.stdout or chk.stderr}")
+        for i, doc in enumerate(docs):
+            md = Path(tmp) / "out" / f"{i:02d}.md"
+            md.parent.mkdir(exist_ok=True)
+            r = subprocess.run([sys.executable, "-m", "bcc_review", str(ROOT / doc), str(md), "--provider", "offline",
+                                "-q", "--runs-dir", str(Path(tmp) / "runs")], cwd=tmp, env=env, capture_output=True,
+                               text=True, encoding="utf-8", errors="replace", timeout=timeout)
+            rj = md.with_suffix(".json")
+            if not rj.exists():
+                out[doc] = {"error": f"rc={r.returncode}: {(r.stderr or r.stdout)[-200:]}"}
+                continue
+            fs = json.loads(rj.read_text(encoding="utf-8")).get("findings") or []
+            sev = {s: sum(1 for f in fs if f.get("severity") == s) for s in ("critical", "major", "minor")}
+            out[doc] = {**sev, "top": [f"{f.get('severity')}: {str(f.get('title') or '')[:80]}" for f in fs
+                                       if f.get("severity") in ("critical", "major")][:5]}
+    return out
+
+
+def rules_summary(ra: dict, rb: dict) -> dict:
+    """Сумма critical/major правил на чистых документах до и после, документы, где стало хуже или лучше."""
+    tot = {k: [sum(int(x.get(k) or 0) for x in r.values() if "error" not in x) for r in (ra, rb)]
+           for k in ("critical", "major", "minor")}
+    worse = [d for d in rb if "error" not in rb[d] and "error" not in (ra.get(d) or {"error": 1})
+             and (rb[d]["critical"], rb[d]["major"]) > (ra[d]["critical"], ra[d]["major"])]
+    better = [d for d in rb if "error" not in rb[d] and "error" not in (ra.get(d) or {"error": 1})
+              and (rb[d]["critical"], rb[d]["major"]) < (ra[d]["critical"], ra[d]["major"])]
+    errors = [d for d in set(ra) | set(rb) if "error" in (ra.get(d) or {}) or "error" in (rb.get(d) or {})]
+    return {"docs": len(set(ra) | set(rb)), "total": tot, "worse": worse, "better": better, "errors": errors}
+
+
+def rules_line(s: dict) -> str:
+    t = s["total"]
+    name = (lambda d: Path(d).parent.name or d)
+    line = (f"Правила без модели на {s['docs']} чистых документах: critical {t['critical'][0]} → {t['critical'][1]}, "
+            f"major {t['major'][0]} → {t['major'][1]}, minor {t['minor'][0]} → {t['minor'][1]}")
+    if s["better"]:
+        line += "; лучше — " + ", ".join(name(d) for d in s["better"])
+    if s["worse"]:
+        line += "; **хуже — " + ", ".join(name(d) for d in s["worse"]) + "**"
+    if s["errors"]:
+        line += f"; не прогнались — {len(s['errors'])}"
+    return line + "."
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m evaluation.v2.viewdiff", description=__doc__.split("\n\n")[0],
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -284,12 +358,26 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--docs", nargs="+", help="только эти документы (по умолчанию — все документы оценки)")
     ap.add_argument("--all-formats", action="store_true", help="и DOCX/PDF тех же документов, не только MD")
     ap.add_argument("--json", metavar="PATH", help="полный результат в JSON")
+    ap.add_argument("--rules", action="store_true",
+                    help="и правила без модели (--provider offline) на чистых документах оценки на обоих коммитах")
     a = ap.parse_args(argv)
     res = check(a.a, a.b, a.docs, a.all_formats)
+    if a.rules:
+        docs = clean_docs()
+        ra, rb = rules_at(res["a"], docs), rules_at(res["b"], docs)
+        res["rules"] = {"a": ra, "b": rb, **rules_summary(ra, rb)}
     if a.json:
         Path(a.json).parent.mkdir(parents=True, exist_ok=True)
         Path(a.json).write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
     sys.stdout.write(render(res))
+    if res.get("rules"):
+        rs = res["rules"]
+        sys.stdout.write("\n" + rules_line(rs) + "\n")
+        for d in sorted(set(rs["a"]) | set(rs["b"])):
+            x, y = rs["a"].get(d) or {}, rs["b"].get(d) or {}
+            if (x.get("critical"), x.get("major")) != (y.get("critical"), y.get("major")):
+                sys.stdout.write(f"* {d}: {x.get('critical')}/{x.get('major')} → {y.get('critical')}/{y.get('major')} "
+                                 f"(critical/major); было: {'; '.join(x.get('top') or []) or '—'}\n")
     return 0 if not res["diff"] and not res["errors"] else 1
 
 
