@@ -1,0 +1,72 @@
+{
+  "id": 46018964959,
+  "head_sha": "d013c123b984b3a2d519fa8b9c6c06871ed7e3eb",
+  "event": "push",
+  "status": "completed",
+  "conclusion": "failure",
+  "html_url": "https://github.com/diiaanns07-droid/winnersOFbankCCbyMNU/actions/runs/46018964959",
+  "created_at": "2026-11-27T14:46:44Z",
+  "jobs": [
+    {
+      "name": "Docker · mock и offline в контейнере",
+      "conclusion": "failure",
+      "status": "completed",
+      "recorded_steps": 0
+    },
+    {
+      "name": "ubuntu-latest · Python 3.14",
+      "conclusion": "failure",
+      "status": "completed",
+      "recorded_steps": 0
+    },
+    {
+      "name": "ubuntu-latest · Python 3.12",
+      "conclusion": "failure",
+      "status": "completed",
+      "recorded_steps": 0
+    },
+    {
+      "name": "windows-latest · Python 3.14",
+      "conclusion": "failure",
+      "status": "completed",
+      "recorded_steps": 0
+    },
+    {
+      "name": "macos-latest · Python 3.11",
+      "conclusion": "failure",
+      "status": "completed",
+      "recorded_steps": 0
+    },
+    {
+      "name": "windows-latest · Python 3.11",
+      "conclusion": "failure",
+      "status": "completed",
+      "recorded_steps": 0
+    },
+    {
+      "name": "windows-latest · Python 3.12",
+      "conclusion": "failure",
+      "status": "completed",
+      "recorded_steps": 0
+    },
+    {
+      "name": "macos-latest · Python 3.12",
+      "conclusion": "failure",
+      "status": "completed",
+      "recorded_steps": 0
+    },
+    {
+      "name": "ubuntu-latest · Python 3.11",
+      "conclusion": "failure",
+      "status": "completed",
+      "recorded_steps": 0
+    },
+    {
+      "name": "ubuntu-latest · Python 3.13",
+      "conclusion": "failure",
+      "status": "completed",
+      "recorded_steps": 0
+    }
+  ],
+  "docker_check_annotation": "GitHub did not start this job because of the account billing or spending limit."
+}

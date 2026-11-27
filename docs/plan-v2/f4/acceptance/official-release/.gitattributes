@@ -1,0 +1,2 @@
+requirements.md -text whitespace=-blank-at-eol,cr-at-eol
+requirements.json -text whitespace=-blank-at-eol,cr-at-eol
