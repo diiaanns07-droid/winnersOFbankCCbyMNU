@@ -9,7 +9,9 @@
 3. каждая цитата дефекта есть в исходнике на указанных строках (та же нормализация, что у сверки цитат);
 4. счётчики ``summary`` сходятся с перечнями, ссылки на D-/R-/Q- существуют;
 5. вердикт совпадает с правилом кода (CONTRACT.md, раздел 5);
-6. коммит агента записан.
+6. коммит агента записан;
+7. Markdown-отчёт рядом (тот же путь с ``.md``) говорит те же числа, что JSON: дефекты по серьёзности на первом
+   экране и в сводке, по карточке или строке таблицы на каждый открытый дефект, блокеры, вопросы, цитаты.
 """
 
 from __future__ import annotations
@@ -123,8 +125,54 @@ def _short(text: str, n: int = 70) -> str:
     return text if len(text) <= n else text[: n - 1].rstrip() + "…"
 
 
-def verify_report(report: dict | str | Path, source: str | Path) -> dict:
-    """Результат: {"ok", "errors": [{"code", "where", "message"}], "warnings": [...], "counts": {...}}."""
+_MD_COUNTS = re.compile(r"\*\*(\d+)\*\* дефект\w*: 🔴 \*\*(\d+)\*\* \w+ · 🟠 \*\*(\d+)\*\* \w+ · 🟡 \*\*(\d+)\*\*")
+_MD_SUMMARY = re.compile(r"\| (\d+): 🔴 (\d+) · 🟠 (\d+) · 🟡 (\d+) \|")
+
+
+def check_markdown(report: dict, md: str) -> tuple[list[str], list[str]]:
+    """Сверка чисел Markdown-отчёта с report.json: (ошибки, предупреждения)."""
+    errors: list[str] = []
+    if 'id="s0"' not in md:
+        return [], ["Markdown-отчёт не в формате агента v2 — числа в нём не сверялись"]
+    s = jsonout.compute_summary(report)
+    fs = s["findings"]
+    want = [sum(fs.values()), fs["critical"], fs["major"], fs["minor"]]
+    a, b = md.find('id="s0"'), md.find('id="s1"')
+    brief = md[a:b] if b > a else md
+    m = _MD_COUNTS.search(brief)
+    if not m or [int(x) for x in m.groups()] != want:
+        errors.append(f"«Кратко»: дефектов {list(m.groups()) if m else 'не найдено'}, в JSON {want}")
+    m = _MD_SUMMARY.search(md[md.find('id="s5"'):md.find('id="s6"')] if 'id="s5"' in md else md)
+    if not m or [int(x) for x in m.groups()] != want:
+        errors.append(f"«Сводка»: дефектов {list(m.groups()) if m else 'не найдено'}, в JSON {want}")
+    open_ids = {f.get("id") for f in jsonout.open_findings(report)}
+    anchors = re.findall(r'<a id="(d-\d+)"></a>', md)
+    shown = {x.upper() for x in anchors}
+    if shown != {str(i).upper() for i in open_ids}:
+        miss = sorted({str(i).upper() for i in open_ids} - shown)
+        extra = sorted(shown - {str(i).upper() for i in open_ids})
+        errors.append("дефекты в Markdown и JSON различаются" + (f": нет карточки у {', '.join(miss[:5])}" if miss else "")
+                      + (f"; лишние {', '.join(extra[:5])}" if extra else ""))
+    dup = sorted({x for x in anchors if anchors.count(x) > 1})
+    if dup:
+        errors.append(f"дефект показан дважды: {', '.join(dup[:5]).upper()}")
+    qn = len(report.get("questions") or [])
+    qa = len(set(re.findall(r'<a id="(q-\d+)"></a>', md)))
+    if qn and qa != qn:
+        errors.append(f"вопросов владельцу в приложении А {qa}, в JSON {qn}")
+    ok, total = s["quotes_verified"], s["quotes_total"]
+    if total and f"{ok} из {total}" not in md and f"все {total} цитат" not in md:
+        errors.append(f"число сверенных цитат ({ok} из {total}) в Markdown не указано")
+    return errors, []
+
+
+def verify_report(report: dict | str | Path, source: str | Path, *, markdown: str | Path | None = None) -> dict:
+    """Результат: {"ok", "errors": [{"code", "where", "message"}], "warnings": [...], "counts": {...}}.
+
+    ``markdown`` — путь или текст Markdown-отчёта; если не задан, а ``report`` — путь, берётся файл рядом (``.md``)."""
+    if markdown is None and not isinstance(report, dict):
+        cand = Path(report).with_suffix(".md")
+        markdown = cand if cand.is_file() else None
     if not isinstance(report, dict):
         report = jsonout.read(report)
     src = Path(source)
@@ -229,10 +277,20 @@ def verify_report(report: dict | str | Path, source: str | Path) -> dict:
     if run.get("status") != "complete":
         warnings.append(f"статус прогона: {run.get('status')}")
 
+    # 7. Markdown-отчёт говорит те же числа
+    md_checked = False
+    if markdown is not None:
+        md_text = Path(markdown).read_text(encoding="utf-8") if isinstance(markdown, Path) else str(markdown)
+        md_errors, md_warn = check_markdown(report, md_text)
+        for e in md_errors:
+            err("markdown", "отчёт .md", e)
+        warnings += md_warn
+        md_checked = not md_warn
+
     return {"ok": not errors, "errors": errors, "warnings": warnings,
             "counts": {"quotes_checked": checked, "quotes_verified": verified,
                        "findings": len(find_ids), "requirements": len(req_ids)},
-            "sha256": sha, "commit": commit}
+            "sha256": sha, "commit": commit, "markdown_checked": md_checked}
 
 
 def handles(report_path: str | Path) -> bool:
@@ -275,8 +333,9 @@ def main(argv: list[str] | None = None) -> int:
     elif result["ok"]:
         c = result["counts"]
         print(f"verify: OK — исходник совпадает (SHA-256 {result['sha256'][:12]}…), цитат на своих строках "
-              f"{c['quotes_verified']} из {c['quotes_checked']}, счётчики и вердикт сходятся, "
-              f"коммит {result['commit']}")
+              f"{c['quotes_verified']} из {c['quotes_checked']}, счётчики и вердикт сходятся"
+              + (", числа в отчёте .md те же" if result.get("markdown_checked") else "")
+              + f", коммит {result['commit'] or 'не записан'}")
         for w in result["warnings"][:10]:
             print(f"  ! {w}")
     else:

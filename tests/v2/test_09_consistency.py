@@ -544,7 +544,7 @@ def test_conflict_from_two_different_conditions_is_undefined():
     p = pair(one_condition=False)
     out = C.postprocess(answer(pair_checks=[p]), VIEW, REQS)
     assert out["pair_checks"][0]["verdict"] == "undefined"
-    assert out["candidates"][0]["severity"] == "major"
+    assert out["candidates"][0]["severity"] == "minor"  # порядок проверок — minor (волна 3)
     assert "one_condition" in C.PAIR_SCHEMA["properties"]
 
 

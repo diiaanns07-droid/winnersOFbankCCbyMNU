@@ -6,7 +6,12 @@
 надёжности, которой v1 не хватало на живых прогонах (404 у ``gemini-2.5-flash``, 503 у ``gemini-3.8-flash``):
 
 * модель по умолчанию ``gemini-3.8-flash`` (``GEMINI_MODEL``), затем цепочка ``GEMINI_FALLBACK_MODELS``
-  (по умолчанию ``gemini-3.6-flash,gemini-3.5-flash-lite``);
+  (по умолчанию все Flash, потом Flash-Lite: ``gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,
+  gemini-3.5-flash-lite,gemini-3.1-flash-lite``). Живой замер F3 27.11: бесплатный тариф — **20 запросов в
+  сутки на каждую модель Flash** (``GenerateRequestsPerDayPerProjectPerModel-FreeTier``, квота на проект
+  Google, не на ключ) и 500 у ``gemini-3.5-flash-lite``; прогон — 9–10 запросов. Квоты по моделям
+  независимы, поэтому четыре Flash в цепочке — около 8 прогонов в сутки на Flash, а не 2–4, прежде чем
+  ключ уйдёт на Flash-Lite (у него на официальном документе К 3/5 против 5/5);
 * 503/500/504/перегрузка/тайм-аут — до 3 повторов с паузой 2, 5, 10 с, затем следующая модель;
 * 404 (модель снята или недоступна ключу) и квота (дневная, нулевая) — сразу следующая модель,
   и до конца прогона эта модель больше не вызывается;
@@ -60,7 +65,10 @@ __all__ = ["DEFAULT_FALLBACKS", "DEFAULT_MODEL", "GeminiProvider", "settings"]
 
 PROVIDER = "gemini"
 DEFAULT_MODEL = "gemini-3.8-flash"
-DEFAULT_FALLBACKS = ("gemini-3.6-flash", "gemini-3.5-flash-lite")
+# Сначала все Flash (по 20 запросов в сутки на модель на бесплатном тарифе), потом Flash-Lite (500 и больше):
+# квоты считаются по модели, и каждая Flash в цепочке — ещё ~2 прогона на Flash вместо перехода на Lite.
+DEFAULT_FALLBACKS = ("gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite",
+                     "gemini-3.1-flash-lite")
 DEFAULT_MAX_OUTPUT_TOKENS = 32000
 DEFAULT_THINKING_LEVEL = "medium"   # Gemini 3.x
 DEFAULT_THINKING_BUDGET = 4096      # Gemini 2.x
@@ -129,7 +137,21 @@ def settings(env: Mapping[str, str] | None = None) -> dict[str, Any]:
         "concurrency": int(_num(env, "GEMINI_CONCURRENCY", 0) or 0) or None,   # None — по профилю модели
         "total_timeout_s": _num(env, "GEMINI_TOTAL_TIMEOUT_S", None),
         "rpm": _num(env, "GEMINI_RPM", None),   # None — по профилю модели; 0 — без окна
+        "reserve_models": _reserve(env, fallbacks, raw_fb),
     }
+
+
+def _reserve(env: Mapping[str, str], fallbacks: list[str], raw_fb: str | None) -> list[str]:
+    """Резерв на дневную квоту: модели цепочки по умолчанию, которых нет в заданной цепочке.
+
+    Нужен, когда цепочка задана явно (``.env`` из ``.env.example`` со старым списком ``3.6-flash,3.5-flash-lite``):
+    кончилась суточная квота Flash — сначала другие Flash из резерва, и только потом Flash-Lite.
+    ``GEMINI_RESERVE_MODELS=off`` (или ``GEMINI_FALLBACK_MODELS=off``) — без резерва.
+    """
+    raw = env.get("GEMINI_RESERVE_MODELS")
+    if (raw is not None and raw.strip().lower() in _OFF) or (raw_fb is not None and raw_fb.strip().lower() in _OFF):
+        return []
+    return _models(raw) if raw and raw.strip() else [DEFAULT_MODEL, *DEFAULT_FALLBACKS]
 
 
 def thinking_for(model: str, level: str | None, budget: str | None, stage: str = "") -> dict[str, Any]:
@@ -204,6 +226,16 @@ def _is_output_limit_error(low: str) -> bool:
     return any(m in low for m in ("max_output_tokens", "maxoutputtokens", "max output tokens", "output token"))
 
 
+def quota_limit(exc: Any) -> int | None:
+    """Лимит квоты из ответа Google («limit: 20» в тексте ошибки 429) — для понятного сообщения."""
+    import re
+    detail = getattr(exc, "detail", None) or {}
+    text = " ".join(str(x) for x in (detail.get("server_message") if isinstance(detail, Mapping) else "",
+                                     getattr(exc, "message", "")) if x)
+    m = re.search(r"limit:\s*(\d+)", text)
+    return int(m.group(1)) if m else None
+
+
 def _attempt_note(a: Mapping[str, Any]) -> str:
     """Короткая запись попытки для трассы: «gemini-3.8-flash 503», «gemini-3.8-flash ждал окно 12 с»."""
     if "rpm_wait_s" in a:
@@ -263,6 +295,8 @@ class GeminiProvider:
         self._api_key = api_key or cfg["api_key"]
         self.default_model = (model or cfg["model"]).strip().removeprefix("models/")
         self.fallback_models = _models(fallback_models) if fallback_models is not None else cfg["fallback_models"]
+        # резерв на дневную квоту — только для цепочки из окружения (явный fallback_models в коде — без резерва)
+        self.reserve_models = cfg["reserve_models"] if fallback_models is None else []
         self.rpm = rpm if rpm is not None else cfg["rpm"]   # None — по профилю каждой модели
         self._window: dict[str, deque] = {}
         self._window_lock = threading.Lock()
@@ -337,6 +371,16 @@ class GeminiProvider:
     def model_chain(self, model: str | None = None) -> list[str]:
         return _models([(model or "").strip() or self.default_model, *self.fallback_models])
 
+    def _add_reserve(self, chain: list[str], start: int) -> None:
+        """Дневная квота модели исчерпана: добавить резерв — Flash перед первой Flash-Lite оставшейся цепочки,
+        Flash-Lite в конец. Квоты по моделям независимы: каждая Flash — ещё ~2 прогона на Flash вместо Lite."""
+        extra = [m for m in self.reserve_models if m not in chain and m not in self._dead]
+        if not extra:
+            return
+        pos = next((i for i in range(start, len(chain)) if "lite" in chain[i].lower()), len(chain))
+        chain[pos:pos] = [m for m in extra if "lite" not in m.lower()]
+        chain.extend(m for m in extra if "lite" in m.lower())
+
     def reset(self) -> None:
         """Забыть модели, отключённые в этом прогоне."""
         with self._lock:
@@ -400,11 +444,21 @@ class GeminiProvider:
         stage_limit = int(max_output_tokens or 0)
         clean = [{"role": m.get("role"), "content": m.get("content")} for m in messages]
 
-        for current in chain:
+        quota_exc: ProviderError | None = None   # дневная квота — главное объяснение, если не ответит никто
+        reserved = False
+        idx = 0
+        while idx < len(chain):
+            current = chain[idx]
+            idx += 1
             dead = self._dead.get(current)
             if dead is not None:
                 attempts.append({"model": current, "skipped": dead.kind})
                 last = last or dead
+                if dead.kind == "quota":
+                    quota_exc = quota_exc or dead
+                    if not reserved:
+                        reserved = True
+                        self._add_reserve(chain, idx)
                 continue
             transient = network = rate = empty = 0
             while True:
@@ -435,8 +489,15 @@ class GeminiProvider:
                     attempts.append({"model": current, "kind": kind, "status": exc.status,
                                      "subkind": getattr(exc, "subkind", None),
                                      "retry_after_s": exc.retry_after_s, "seconds": round(self._clock() - started, 2)})
+                    if kind == "quota" and quota_limit(exc) is not None:
+                        attempts[-1]["quota_limit"] = quota_limit(exc)
                     if kind in NEXT_MODEL:
                         self._dead[current] = exc
+                        if kind == "quota":
+                            quota_exc = quota_exc or exc
+                            if not reserved:
+                                reserved = True
+                                self._add_reserve(chain, idx)
                         break
                     if is_empty_answer(exc):
                         if empty < EMPTY_RETRIES:
@@ -483,7 +544,10 @@ class GeminiProvider:
                 out["meta"]["schema_mode"] = mode
                 return out
         assert last is not None
-        raise self._final(last, chain, attempts, exhausted=True)
+        # не ответил никто: если хоть одна модель упёрлась в суточную квоту — объясняем квотой (когда сброс),
+        # а не последней ошибкой (например, 404 у резервной модели)
+        final = quota_exc if quota_exc is not None and last.kind != "quota" else last
+        raise self._final(final, chain, attempts, exhausted=True)
 
     # ------------------------------------------------------------------ results
 
