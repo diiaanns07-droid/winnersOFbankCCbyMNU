@@ -851,19 +851,34 @@ def normalize_nfr_check(raw: Mapping[str, Any]) -> dict:
     return c
 
 
-def calibrate_nfr_checks(checks: list[dict], reqs: list[Mapping[str, Any]]) -> None:
+_FUNCTIONAL_SECTION = re.compile(r"(?<![А-Яа-яЁё])функциональн", re.I)  # «Нефункциональные» сюда не попадает
+
+
+def section_at(view: Any, line: int | None) -> str:
+    """Раздел документа у строки — по заголовкам, которые считает код (docview), а не по метке нарезки."""
+    lines = view.get("lines") if isinstance(view, Mapping) else None
+    if not line or not isinstance(lines, list) or not 0 < line <= len(lines) or not isinstance(lines[line - 1], Mapping):
+        return ""
+    return _s(lines[line - 1].get("section"))
+
+
+def calibrate_nfr_checks(checks: list[dict], reqs: list[Mapping[str, Any]], view: Any = None) -> None:
     """Условия замера (доля, нагрузка) спрашиваются только у нефункционального требования и только если они не
     названы в нём же: (а) срок у функционального требования («блокировка вступает в силу не позднее 10 с после
     ответа») — жёсткий предел для каждого события, его проверяет функциональный тест (на чистой базе корпуса
     haiku без НФТ в нарезке взял такую фразу — ложное «нет доли и нагрузки»); (б) доля и нагрузка, названные в
     соседней фразе того же требования («не дольше 1 с для 95 % запросов при нагрузке до 300 запросов в
     секунду. Сведения учитывают платежи не позднее чем за 5 минут»), относятся ко всему требованию. Размытая
-    оценка и отсутствие числа — непроверяемость в любом случае."""
-    if not reqs:
+    оценка и отсутствие числа — непроверяемость в любом случае. (в) Требование стоит в разделе функциональных
+    требований документа (заголовок по docview) — это функциональный предел, даже если нарезка пометила его
+    нефункциональным: на корпусе haiku так размечал «блокировка вступает в силу не позднее 10 секунд» (БК-5)."""
+    if not reqs and not view:
         return
     index = _req_index(reqs)
 
     def kind(c: Mapping[str, Any]) -> str | None:
+        if _FUNCTIONAL_SECTION.search(section_at(view, c.get("line")).rsplit("›", 1)[-1]):
+            return "functional"
         r = index.get(c.get("requirement_id") or "")
         if r:
             return r.get("kind")
@@ -981,11 +996,48 @@ def nfr_candidate(checks: list[Mapping[str, Any]], index: Mapping[str, Mapping[s
     }
 
 
-def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[str, Any]] | None = None) -> dict:
+def _verified_line(view: Any, quote: str, line: int | None) -> int | None:
+    """Строка цитаты в документе (сверка кодом, как у этапа quotes); без документа или без находки — строка модели."""
+    if not view or not quote:
+        return line
+    try:
+        from .. import quotes
+        m = quotes.verify_quote(view, quote, line)
+    except Exception:  # noqa: BLE001 — уточнение строки не условие работы линзы
+        return line
+    return _int(m.get("line_start")) if m else line
+
+
+def mature_document(view: Any) -> bool:
+    """Вычитанный документ (термины, версия, явный пояс, нет заглушек — признаки линзы «Аналитик»)."""
+    if not view:
+        return False
+    from .lens_analyst import maturity
+    return bool(maturity(view).get("mature"))
+
+
+COVERAGE_MATURE_REASON = ("снято линзой тестировщика: документ вычитан (термины, версия, явный часовой пояс, нет "
+                          "заглушек) — таблица приёмки в нём сознательная выборка ключевых сценариев; непокрытые "
+                          "ветки — в черновике тест-кейсов отчёта, а не дефект требований")
+
+
+def drop_coverage_on_mature(cands: list[dict]) -> list[dict]:
+    """Замечание о покрытии приёмкой на вычитанном документе — в ``dropped``. На корпусе (8 чистых документов, haiku)
+    это было 8 из 11 ложных замечаний линзы; на официальном документе и ТЗ №18 (незрелые: заглушки, нет версии
+    и терминов) замечание остаётся — там покрытие входит в эталон (С18)."""
+    out = [c for c in cands if _other_rank(c) == 0 and c.get("kind") not in _CONFLICT_FAMILY]
+    gone = {id(c) for c in out}
+    cands[:] = [c for c in cands if id(c) not in gone]
+    return [{**c, "reason": COVERAGE_MATURE_REASON} for c in out]
+
+
+def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[str, Any]] | None = None,
+                view: Any = None) -> dict:
     """Ответ модели → ``{"candidates", "acceptance_checks", "test_cases", "warnings"}``.
 
     ``requirements`` — выход нарезки (нужны ``id``, ``source_id``, ``kind``). Без него линза работает,
-    но не знает исходных номеров и не может проверить, что исполнены все строки приёмки.
+    но не знает исходных номеров и не может проверить, что исполнены все строки приёмки. ``view`` — документ
+    (docview): по нему код уточняет строки цитат НФТ, раздел документа и зрелость; без него — как раньше.
     """
     data = data or {}
     reqs = list(requirements or [])
@@ -1021,7 +1073,9 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
             flagged.add(c["row_requirement_id"])
 
     nfr_checks = [normalize_nfr_check(x) for x in data.get("nfr_checks") or [] if isinstance(x, Mapping)]
-    calibrate_nfr_checks(nfr_checks, reqs)
+    for c in nfr_checks:
+        c["line"] = _verified_line(view, c["quote"], c["line"])
+    calibrate_nfr_checks(nfr_checks, reqs, view)
     nfr = nfr_candidate(nfr_checks, index)
     model_cands = [normalize_candidate(x) for x in data.get("candidates") or [] if isinstance(x, Mapping)]
     for c in model_cands:  # тексты для читателя: «L040» → «строка 40», ID нарезки → номер документа (рубрика, п. 7)
@@ -1049,6 +1103,8 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
 
     kept, dropped = limit_other_candidates(kept)
     calibrate_coverage(kept, checks, reqs, tests)
+    if mature_document(view):
+        dropped += drop_coverage_on_mature(kept)
     dropped += calibrate_verifiability(kept, reqs)
     dropped += calibrate_nfr_contradictions(kept, reqs)
     if len(kept) > MAX_MODEL_CANDIDATES:
@@ -1161,7 +1217,7 @@ def run(ctx: Any) -> dict:
     if missing:
         checks += _ask_rows(ctx, system, user, missing[:BATCH_ROWS], f"{STAGE}_retry", warnings)
     data["acceptance_checks"] = checks
-    out = postprocess(data, reqs)
+    out = postprocess(data, reqs, getattr(ctx, "view", None))
     out["warnings"] = warnings + out["warnings"]
     if missing_rows(out["acceptance_checks"], reqs):
         partial = True
