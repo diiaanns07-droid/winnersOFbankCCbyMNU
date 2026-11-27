@@ -258,6 +258,7 @@ def test_no_pymupdf_layout_advice_in_stdout():
     code = ("from bcc_review.v2 import docview as d; v = d.load(%r); print('строк', len(v['lines']))" % str(OFFICIAL_PDF))
     env = {k: v for k, v in os.environ.items() if k != "PYMUPDF_SUGGEST_LAYOUT_ANALYZER"}
     env["PYTHONIOENCODING"] = "utf-8"  # Windows без UTF-8: русский вывод дочернего процесса (просьба №16)
+    env["PYTHONUTF8"] = "1"  # и чтение дочернего Python — в UTF-8 на любой ОС (Max)
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, encoding="utf-8", env=env,
                          timeout=120)
     assert out.returncode == 0, out.stderr
