@@ -131,8 +131,11 @@ WIDE_OUTPUT_TOKENS = 32000
 
 
 BRANCH_TITLE = "Ветка логики без ответа"
-# Шаг, который сам называет исход: «вернуть …», «при …», «если …», «в случае …», «иначе …».
-NAMED_OUTCOME = re.compile(r"верн|\bпри\b|\bесли\b|в случае|иначе|отклон|отказ", re.I)
+# Условная ветка, которая сама велит что-то вернуть: «при отклонении … вернуть …», «если …, вернуть …».
+# Нужны оба признака: шаг основного пути («выполнить … и вернуть результат») описан ответом 200, а ветка,
+# которая задаёт исход словами («если …, возвращаются сведения …»), — с ответом (ложные на №18, волна 3).
+BRANCH_RETURN = re.compile(r"верн", re.I)
+BRANCH_CONDITION = re.compile(r"\bпри\b|\bесли\b|в случае|иначе|отклон|отказ", re.I)
 MAX_BRANCH_CANDIDATES = 2
 HTTP_CODE = re.compile(r"(?<!\d)[1-5]\d\d(?!\d)")  # шаг сам называет код ответа — исход задан
 
@@ -148,12 +151,14 @@ def branch_candidates(inventory: dict, view: Any, candidates: list[dict]) -> lis
     """Кандидаты на ветки логики без ответа, которые модель внесла в опись, но не оформила замечанием.
 
     Слабая модель (haiku с effort=low) верно отмечает ветку без ответа в `inventory.branches`, но потом
-    сливает её с соседним замечанием. Код добавляет замечание, только если шаг сам называет исход
-    («вернуть …», «при …», «если …») и ни один кандидат не цитирует эту строку как ветку логики.
+    сливает её с соседним замечанием. Код добавляет замечание, только если шаг — условная ветка, которая
+    велит что-то вернуть без кода («при отклонении … вернуть …»), и ни один кандидат не цитирует эту строку
+    как ветку логики
+    (заголовок со словом «ветка» — модель пишет и «Ветка «вернуть …» без поля …»).
     Цитата — дословный текст строки документа, поэтому сверка цитат пройдёт.
     """
     covered = {int(e.get("line") or 0) for c in candidates
-               if str(c.get("title") or "").startswith(BRANCH_TITLE) for e in c.get("evidence") or []}
+               if "ветк" in str(c.get("title") or "").lower() for e in c.get("evidence") or []}
     out: list[dict] = []
     for b in undefined_branches(inventory):
         try:
@@ -161,7 +166,8 @@ def branch_candidates(inventory: dict, view: Any, candidates: list[dict]) -> lis
         except (TypeError, ValueError):
             continue
         text = _line_text(view, n)
-        if not n or n in covered or not text or not NAMED_OUTCOME.search(text) or HTTP_CODE.search(text):
+        if (not n or n in covered or not text or not BRANCH_RETURN.search(text)
+                or not BRANCH_CONDITION.search(text) or HTTP_CODE.search(text)):
             continue
         covered.add(n)
         step = str(b.get("step") or "").strip().rstrip(".") or text
@@ -221,8 +227,38 @@ def _run_parts(ctx: Any) -> dict:
     return merge_lists(parts)
 
 
+EMPTY_RETRY = ("\n\nПредыдущий ответ на этот запрос пришёл пустым: ни одного элемента описи и ни одного кандидата. "
+               "Документ описывает интерфейс: заполни опись по тексту (операции, коды ответа, поля, шаги логики) "
+               "и выполни проверки шага 2.")
+# Признаки интерфейса в тексте документа: HTTP-метод, код ответа рядом со словом «код/статус/ответ», API.
+INTERFACE_HINT = re.compile(r"\b(GET|POST|PUT|PATCH|DELETE)\b|\bAPI\b|\bREST\b|endpoint|эндпоинт", re.I)
+
+
+def is_empty_answer(raw: Any) -> bool:
+    """Пустой ответ: ни кандидатов, ни одного элемента описи (схема пройдена, но модель ничего не проверила)."""
+    if not isinstance(raw, dict):
+        return True
+    if raw.get("candidates"):
+        return False
+    inv = raw.get("inventory") if isinstance(raw.get("inventory"), dict) else {}
+    return not any(inv.get(k) for k in ("operations", "promises", "codes", "fields", "branches"))
+
+
+def has_interface(ctx: Any) -> bool:
+    reqs = getattr(ctx, "requirements", None) or []
+    if any(isinstance(r, dict) and r.get("kind") in API_KINDS for r in reqs):
+        return True
+    lines = (getattr(ctx, "view", None) or {}).get("lines") or []
+    return any(INTERFACE_HINT.search(str(ln.get("text") or "")) for ln in lines)
+
+
 def _ask_whole(ctx: Any) -> dict:
-    """Один запрос на весь документ. При обрезке `LLMClient.ask` (№01) сам повторяет с удвоенным лимитом."""
+    """Один запрос на весь документ. При обрезке `LLMClient.ask` (№01) сам повторяет с удвоенным лимитом.
+
+    Пустой ответ (ни описи, ни кандидатов) на документе с интерфейсом — сбой модели, а не «дефектов нет»:
+    sonnet так ответил в 1 из 3 прогонов на официальном документе (13 с, 2 тыс. токенов). Тогда один повтор
+    с пометкой в запросе (другой ключ кэша, поэтому пустой ответ из кэша не вернётся).
+    """
     from . import lens  # каркас №01
 
     stage = f"lens_{NAME}"
@@ -230,7 +266,13 @@ def _ask_whole(ctx: Any) -> dict:
         ctx.warn(f"Линза «{NAME}»: нет промпта {stage}.md — этап пропущен")
         return {"candidates": []}
     system, user = ctx.prompt(stage)
-    return ctx.llm.ask(stage, system, user, lens.schema_for(NAME), max_output_tokens=output_limit(ctx))
+    schema = lens.schema_for(NAME)
+    raw = ctx.llm.ask(stage, system, user, schema, max_output_tokens=output_limit(ctx))
+    if is_empty_answer(raw) and has_interface(ctx):
+        if hasattr(ctx, "warn"):
+            ctx.warn("Линза «Архитектор»: модель вернула пустой ответ — один повтор")
+        raw = ctx.llm.ask(stage, system, user + EMPTY_RETRY, schema, max_output_tokens=output_limit(ctx))
+    return raw
 
 
 def output_limit(ctx: Any) -> int:

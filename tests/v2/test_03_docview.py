@@ -120,7 +120,7 @@ def test_pdf_view_pages_and_numbering(md):
     assert dv.line(v, 15)["text"].startswith("Дать клиенту возможность")
     assert dv.numbered(v, 25, 25).startswith("L025| [с.2] Ф-2. Месяц определяется")
     assert not dv.line(v, 24)["text"].startswith("•")
-    assert dv.place(v, 25) == "с. 2, строка 25"
+    assert dv.place(v, 25) == "строка 25, стр. 2"
 
 
 @needs_pdf

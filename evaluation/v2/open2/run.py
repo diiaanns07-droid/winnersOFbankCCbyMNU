@@ -86,6 +86,10 @@ def cmd_run(a: argparse.Namespace) -> int:
             rows.append(fu.result())
     rd = res_dir(a.label)
     rd.mkdir(parents=True, exist_ok=True)
+    if (rd / "runs.json").exists():  # дозапуск части кейсов под той же меткой: прежние строки сохраняются
+        done = {(r["case"], r["format"]) for r in rows}
+        rows += [r for r in json.loads((rd / "runs.json").read_text(encoding="utf-8"))["runs"]
+                 if (r["case"], r["format"]) not in done]
     meta = {"label": a.label, "provider": a.provider, "model": a.model, "extra": extra,
             "commit": subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True,
                                      text=True).stdout.strip(),

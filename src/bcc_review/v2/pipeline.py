@@ -35,6 +35,7 @@ DEFAULTS: dict[str, Any] = {
     "export": [], "html": True, "answers": None, "revise": False, "passes": 1, "parallel": 5,
     "mock_dir": None, "lenses": list(LENSES), "consistency": True, "clarify": True, "judge_check": True,
     "quiet": False, "stage_timeout": 480.0, "rpm": None, "effort": None, "fast_start": False,
+    "clarify_early": True,
 }
 # Темп запросов по умолчанию: бесплатный ключ Gemini — около 10 запросов в минуту на модель.
 DEFAULT_RPM = {"gemini": 10}
@@ -313,6 +314,14 @@ class Pipeline:
 
             # 3. линзы и набор — параллельно
             outs = self._parallel_reviewers(ctx)
+            # выходы, взятые из прогона с быстрым стартом (команда stage), ссылаются на таблицу эвристики
+            if any((o or {}).get("requirements_source") == HEURISTIC_TABLE for o in outs.values()):
+                try:
+                    from .stages import segment as _segment_mod
+                    heur_reqs = _segment_mod.heuristic_segment(view).get("requirements") or []
+                    self._remap_reviewers(outs, heur_reqs, ctx.requirements)
+                except Exception as exc:  # noqa: BLE001
+                    self.warnings.append(f"Ссылки рецензентов на таблицу эвристики не переведены: {exc}")
 
         # 4. сбор и сверка цитат
         cands, rejected, extras = self._collect(ctx, outs, rules_out)
@@ -322,7 +331,8 @@ class Pipeline:
         rejected += [self._rejected_entry(c, "no_quote", c.get("reason") or "цитата не найдена")
                      for c in q.get("rejected") or []]
 
-        # 5. судья
+        # 5. судья; вопросы владельцу (№11) стартуют параллельно с ним по сверенным кандидатам
+        early = self._clarify_start(ctx, kept)
         jd = self.stage("judge", lambda: self._judge(ctx, kept), inputs={"candidates": len(kept)},
                         empty={"findings": [], "rejected": [], "checklist": [], "verdict_summary": ""})
         findings = jd.get("findings") or []
@@ -336,9 +346,14 @@ class Pipeline:
         # 6. вопросы владельцу
         questions: list = []
         if opts.get("clarify", True):
-            cl = self.stage("clarify", lambda: self._clarify(ctx, findings), inputs={"findings": len(findings)},
-                            empty={"questions": []})
+            cl = self.stage("clarify", lambda: self._clarify(ctx, findings, early),
+                            inputs={"findings": len(findings), "early": early is not None}, empty={"questions": []})
             questions = cl.get("questions") or []
+            if early is not None and ctx.llm is not None and "clarify" in self.stage_stats:
+                # ранний вызов закончился до входа в этап: вызовы и время — из клиента модели
+                by = ctx.llm.stats["by_stage"].get("clarify") or {}
+                self.stage_stats["clarify"].update(calls=int(by.get("calls", 0)), early=True,
+                                                   model_seconds=round(float(by.get("seconds", 0.0)), 1))
         else:
             self.stages["clarify"] = "skipped"
 
@@ -488,8 +503,25 @@ class Pipeline:
         from .stages import judge
         return judge.run(ctx, kept)
 
-    def _clarify(self, ctx: Context, findings: list[dict]) -> dict:
+    def _clarify_start(self, ctx: Context, kept: list[dict]) -> Any:
+        """Ранний запуск вопросов (№11, ``clarify.start``): вызов модели в фоне, пока работает судья."""
+        if not self.opts.get("clarify", True) or not self.opts.get("clarify_early", True) or ctx.llm is None:
+            return None
+        if self.reuse is not None and "clarify" not in self.rerun:
+            return None  # вопросы берутся из готового прогона
+        try:
+            from .stages import clarify
+            start = getattr(clarify, "start", None)
+            return start(ctx, kept) if callable(start) else None
+        except Exception as exc:  # noqa: BLE001 — без раннего запуска вопросы идут после судьи
+            self.warnings.append(f"Ранний запуск вопросов не удался: {type(exc).__name__}: {exc}")
+            return None
+
+    def _clarify(self, ctx: Context, findings: list[dict], early: Any = None) -> dict:
         from .stages import clarify
+        finish = getattr(clarify, "finish", None)
+        if early is not None and callable(finish):
+            return finish(ctx, findings, early)
         return clarify.run(ctx, findings)
 
     @staticmethod
