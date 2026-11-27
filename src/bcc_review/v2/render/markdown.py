@@ -1025,6 +1025,23 @@ def _verdict_sentence(c: _Ctx) -> str:
         return ("Критичных дефектов нет" + (f"; существенных {total_major}, но работу они не останавливают — "
                                             "начинать можно, исправляя их параллельно." if total_major else
                                             " и существенных нет — начинать можно.")) + tail
+    if {d, t} <= {"yes", "conditional"}:
+        # разный вердикт по направлениям: по каждому — что именно разрешает начать
+        names = {"development": ("разработку", "ей"), "testing": ("тестирование", "ему")}
+        parts = []
+        for k in ("development", "testing"):
+            n = majors[k]
+            word, who = names[k]
+            dname = plural(n, "существенный дефект", "существенных дефекта", "существенных дефектов")
+            if v.get(k) == "conditional":
+                parts.append(f"{word} можно начинать с условием параллельно исправить {n} {dname}, "
+                             f"{'который' if plural(n, '1', '2', '5') == '1' else 'которые'} {who} "
+                             f"{'мешает' if plural(n, '1', '2', '5') == '1' else 'мешают'}")
+            else:
+                parts.append(f"{word} можно начинать — " + (f"существенных, мешающих {who}, нет" if not n else
+                                                             f"мешающих {who} существенных меньше трёх ({n})"))
+        text = "; ".join(parts)
+        return "Критичных дефектов нет. " + text[0].upper() + text[1:] + "." + tail
     names = {"development": "разработку", "testing": "тестирование"}
     parts = [f"{names[k]} — {READINESS_PLAIN.get(v.get(k), '—')}" for k in ("development", "testing")]
     return ("Критичных дефектов нет; " + ", ".join(parts) + " (существенных, мешающих разработке, — "

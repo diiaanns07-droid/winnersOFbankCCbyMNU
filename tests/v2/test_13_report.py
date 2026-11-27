@@ -828,3 +828,17 @@ def test_warning_counts_agree_with_number():
     assert markdown.warn_text("понизила 1 дефект(ов): критичный→существенный 1") == \
         "понизила 1 дефект: критичный→существенный 1"
     assert console.plain_warn("судья: 5 замечаний (пожелания)") == "судья: 5 дефектов (пожелания)"
+
+
+def test_mixed_verdict_sentence_reads_per_direction(sample):
+    r = copy.deepcopy(sample)
+    for f in r["findings"]:
+        if f["severity"] == "critical":
+            f["severity"] = "major"
+        if f["severity"] == "major":
+            f["blocks"] = "development"
+    r["verdict"].update(development="conditional", testing="yes")
+    text = markdown._verdict_sentence(markdown._Ctx(r))
+    assert text.startswith("Критичных дефектов нет. Разработку можно начинать с условием параллельно исправить ")
+    assert "; тестирование можно начинать — существенных, мешающих ему, нет." in text
+    assert "разработку —" not in text
