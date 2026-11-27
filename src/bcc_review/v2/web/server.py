@@ -204,6 +204,23 @@ def _margin_head(report: dict[str, Any]) -> str:
             f'<div class="b-legend">{legend}</div></div>')
 
 
+def _margin_questions(report: dict[str, Any], href: str, *, limit: int = 5) -> str:
+    """Вопросы владельцу на полях, под шапкой: чернилами, нажатие — место в листе в фокусе (первое замечание вопроса)."""
+    qs = [q for q in (report.get("questions") or []) if isinstance(q, dict) and str(q.get("question") or "").strip()]
+    if not qs:
+        return ""
+    items = []
+    for q in qs[:limit]:
+        fids = [f for f in (q.get("finding_ids") or []) if isinstance(f, str) and f]
+        label = " · ".join(x for x in (str(q.get("id") or ""), str(q.get("to") or "")) if x)
+        items.append(f'<button type="button" class="b-q" data-f="{e(fids[0] if fids else "")}">'
+                     f'<b>{e(label)}</b><span class="t">{e(str(q["question"]).strip())}</span></button>')
+    rest = len(qs) - limit
+    more = (f'<a class="b-q-more" href="{e(href)}#questions">ещё {rest} {plural(rest, "вопрос", "вопроса", "вопросов")}</a>'
+            if rest > 0 and href else "")
+    return f'<div class="b-margin-q"><div class="b-margin-sub">Вопросы владельцу</div>{"".join(items)}{more}</div>'
+
+
 def index_page(app: App, *, error: str = "", provider: str = "", model: str = "") -> str:
     provs = provider_status()
     ids = [p["id"] for p in provs]
@@ -262,7 +279,7 @@ def index_page(app: App, *, error: str = "", provider: str = "", model: str = ""
 <aside class="desk-stack" aria-label="Готовые листы">{stack}</aside>
 <aside class="desk-map" aria-label="Карта листа">{f'<div class="b-map" id="map">{sheet.map}<span class="b-map-view" id="mapview"></span></div>' if sheet else ''}</aside>
 <main class="desk-sheet">{sheet.html if sheet else ''}</main>
-<div class="desk-notes{' b-margin' if sheet and sheet.notes else ''}">{_margin_head(top["report"]) if top and sheet and sheet.notes else ''}</div>
+<div class="desk-notes{' b-margin' if sheet and sheet.notes else ''}">{_margin_head(top["report"]) + _margin_questions(top["report"], href) if top and sheet and sheet.notes else ''}</div>
 </div>
 <div class="veil" id="veil" hidden><div class="veil-sheet"><b>Отпустите файл</b>BCC AI сразу начнёт проверку<small>PDF, Word, Markdown, TXT, HTML · до 20 МБ</small></div></div>"""
     sub = (top or {}).get("name") or (f"Пример: {app.sample.name}" if app.sample else "")
