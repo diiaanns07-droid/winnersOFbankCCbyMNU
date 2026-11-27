@@ -208,3 +208,27 @@ def test_undefined_branches():
     inv = {"branches": [{"operation": "o", "step": "проверка не прошла", "line": 7, "outcome": ""},
                         {"operation": "o", "step": "успех", "line": 8, "outcome": "200 {ok}"}]}
     assert [b["line"] for b in la.undefined_branches(inv)] == [7]
+
+
+def test_line_marks_become_plain_line_numbers():
+    c = _cand(problem="Шаг L121 и пример L165 расходятся", scenario="см. L052", title="Код L163")
+    out = la.postprocess({"candidates": [c]})["candidates"][0]
+    assert out["problem"] == "Шаг стр. 121 и пример стр. 165 расходятся"
+    assert out["scenario"] == "см. стр. 52" and out["title"] == "Код стр. 163"
+    assert la.plain_line_refs("HTTP 400, L1 кэш") == "HTTP 400, L1 кэш"
+
+
+def test_critical_missing_operation_needs_explicit_interface_promise():
+    screen = {"quote": "После выдачи: Кредиты → кредит → «Страхование» → номер полиса и кнопка «Отказаться»", "line": 29}
+    partner = {"quote": "Сервис страхования получает номер полиса от страховой компании-партнёра", "line": 54}
+    promise = {"quote": "Приложение читает и сохраняет настройки через дочерний документ «X — REST API»", "line": 52}
+    by_method = {"quote": "Приложение читает лимит методом getLimit", "line": 35}
+    call = {"quote": "Приложение → сервис A: получить данные", "line": 45}
+    code = {"quote": "3. Если запись уже есть, вернуть 409.", "line": 73}
+    base = dict(severity="critical", kind="missing_element", scenario="s", impact="i", blocks="both")
+    assert la.postprocess({"candidates": [_cand(evidence=[screen, partner], **base)]})["candidates"][0]["severity"] == "major"
+    for ev in (promise, by_method, call, code):
+        out = la.postprocess({"candidates": [_cand(evidence=[screen, ev], **base)]})["candidates"][0]
+        assert out["severity"] == "critical", ev
+    other = dict(base, kind="status_conflict")
+    assert la.postprocess({"candidates": [_cand(evidence=[screen], **other)]})["candidates"][0]["severity"] == "critical"
