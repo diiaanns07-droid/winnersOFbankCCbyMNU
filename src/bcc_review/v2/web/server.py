@@ -352,7 +352,7 @@ def result_html(job: Job, f: dict, *, agent: bool = True) -> str:
     first = f["blockers"][0]["id"] if f["blockers"] else ""
     say = (f'Готово. {f["critical"]} {_plural(f["critical"], "блокер", "блокера", "блокеров")} — начните с {first}.'
            if first else "Готово. Блокеров нет.")
-    mood = "alert" if f["critical"] else "verified"
+    mood = "speak" if f["critical"] else "happy"  # AIshka (№40): говорит о блокерах или радуется, что их нет
     parent = (f'<p class="jb-parent jb-parent-done">Повторная проверка с ответами владельца — '
               f'<a href="/jobs/{e(job.parent)}">исходная правка</a>.</p>' if job.parent else "")
     # панель — раньше листа: Tab попадает сначала в панель, потом в лист
@@ -372,7 +372,7 @@ def job_page(job: Job, app: App | None = None) -> str:
         inner = f"""{parent}<section class="jb-scan" id="scan" aria-live="polite" aria-label="Проверка документа">
   <div class="jb-sheet" id="sheet"><div class="jb-beam" id="beam" aria-hidden="true"></div>{_sheet_html(job)}</div>
   <div class="jb-pilot" id="pilot">
-    <div class="jb-agent" id="agent-home"><div data-bcc-agent data-size="80" data-mood="scanning" id="agent"></div></div>
+    <div class="jb-agent" id="agent-home"><div data-bcc-agent data-size="96" data-mood="work" id="agent"></div></div>
     <div class="jb-say"><b id="stage">{"жду очереди" if job.state == "queued" else "читаю"}</b>
     <span id="pline"><span id="elapsed">0 с</span><span id="calls"></span> · {e(job.provider)}{(" · " + e(job.model)) if job.model else ""}</span></div>
   </div>

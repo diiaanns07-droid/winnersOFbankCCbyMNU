@@ -1,4 +1,4 @@
-"""№41: правка на листе — «белый лист на тёмном столе» (страница задания и HTML-отчёт CLI).
+"""№41: правка на листе — светлый лист с правкой агента (страница задания и HTML-отчёт CLI).
 
 Проверяем содержание, а не пиксели: лист документа со сканером во время проверки, правка на листе и одна
 стеклянная панель после; числа и блокеры — те же, что в Markdown; report.css/report.js без внешних ссылок;
@@ -91,8 +91,8 @@ def test_job_page_is_the_sheet_with_glass_dock(srv):
     exp = _expected()
     # лист с правкой — HTML-отчёт этого прогона в режиме встраивания
     assert f'data-src="/jobs/{jid}/files/report.html?inline=1"' in page
-    # BCC AI садится на край листа: режим и реплика — по блокерам, как в Markdown
-    assert 'data-mood="alert"' in page if exp["crit"] else 'data-mood="verified"' in page
+    # BCC AI (AIshka) стоит на краю листа: режим и реплика — по блокерам, как в Markdown
+    assert 'data-mood="speak"' in page if exp["crit"] else 'data-mood="happy"' in page
     say = re.search(r'data-say="([^"]+)"', page).group(1)
     assert str(len(exp["crit"])) in say and exp["crit"][0] in say
     # стеклянная панель: свой документ · правка · вопросы · исправленная редакция · выгрузить
@@ -120,13 +120,13 @@ def test_result_fragment_for_live_page(srv):
 
 
 def test_progress_is_the_document_sheet_with_scanner(tmp_path):
-    """Во время проверки на столе лежит сам документ: строки с номерами, луч сканера и BCC AI над листом."""
+    """Во время проверки на экране сам документ: строки с номерами, бледно-зелёный луч и BCC AI 96 px у листа."""
     store = R.JobStore(tmp_path)
     job = store.create("tz.md", "# Заголовок\n\nПервая строка требований\n".encode("utf-8"), "mock", "")
     page = S.job_page(job)
     assert 'id="sheet"' in page and 'id="beam"' in page and 'id="pilot"' in page
     assert '<span class="no">3</span><span class="tx">Первая строка требований</span>' in page
-    assert '<div data-bcc-agent data-size="80" data-mood="scanning" id="agent"></div>' in page
+    assert '<div data-bcc-agent data-size="96" data-mood="work" id="agent"></div>' in page
     assert 'id="errtext"' in page and "Что сделать" in (ROOT / "src/bcc_review/v2/web/assets/app.js").read_text(encoding="utf-8")
     assert "/assets/tokens.css" in page and 'class="b-root"' in page
 
@@ -157,28 +157,33 @@ def _root_vars(css: str) -> dict[str, str]:
     return {k: v.upper() for k, v in re.findall(r"--([a-z0-9-]+):\s*(#[0-9A-Fa-f]{6})", root)}
 
 
+BLUES = ("#1C446C", "#8DB6E2", "#9CC2EA", "#E8EFF6", "#0B1220")  # синий BCC и тёмный стол — больше не на экране
+
+
 def test_marks_on_the_sheet_follow_the_meaning_of_colour():
-    """Критичное — красная волна и бледно-красная подложка, существенное — золотой маркер BCC,
-    незначительное — синий пунктир; зелёная галочка «сверено» на полях; стол — тёмно-синий."""
+    """Светло и мягко: фон BCC, белый лист; один акцент — зелёный. Критичное — тонкая красная черта без заливки,
+    существенное — бледный золотой маркер #FBE1BA, незначительное — серый пунктир; синего и тёмного стола нет."""
     t = _tokens()
     css = REPORT_CSS.read_text(encoding="utf-8")
     v = _root_vars(css)
-    assert v["desk"] == "#0B1220" and v["paper"] == "#FFFFFF"
-    assert v["crit"] == t["b-red"] and v["major-acc"] == t["b-gold"] and v["minor"] == t["b-blue"]
-    assert v["accent"] == t["b-green"] and v["ink"] == t["b-ink"]
-    assert re.search(r"mark\.q\.sev-critical \{[^}]*text-decoration-style: wavy[^}]*var\(--crit\)", css)
-    assert re.search(r"--major-mark: rgba\(220, 162, 98, \.3[0-9]\)", css)  # маркер BCC Gold ~35 %
-    assert re.search(r"mark\.q\.sev-minor \{[^}]*text-decoration-style: dashed[^}]*var\(--minor\)", css)
-    assert re.search(r"\.ln\.hl \.no::after \{[^}]*var\(--accent\)", css)
-    assert "feTurbulence" in REPORT_JS.read_text(encoding="utf-8")  # печать с фактурой чернил, без картинок
+    assert v["canvas"] == t["b-canvas"] and v["paper"] == "#FFFFFF" and v["ink"] == t["b-ink"]
+    assert v["crit"] == t["b-red"] and v["major-mark"] == t["b-gold-soft"] and v["accent"] == t["b-green"]
+    assert re.search(r"mark\.q\.sev-critical \{[^}]*text-decoration-style: solid[^}]*var\(--crit\)", css)
+    assert re.search(r"mark\.q\.sev-major \{[^}]*var\(--major-mark\)", css)
+    assert re.search(r"mark\.q\.sev-minor \{[^}]*text-decoration-style: dashed[^}]*var\(--minor-acc\)", css)
+    assert re.search(r"\.ln\.hl \.no::after \{[^}]*var\(--accent\)", css)  # галочка «сверено» — зелёная
     job = JOB_CSS.read_text(encoding="utf-8")
-    assert "#0B1220" in job and "backdrop-filter: blur(24px)" in job
+    for text, name in ((css, "report.css"), (job, "job.css")):
+        assert not any(b.lower() in text.lower() for b in BLUES), name
+    assert "rgba(255, 255, 255, .76)" in job and "blur(24px)" in job  # стекло — по рецепту раздела 2
+    js = REPORT_JS.read_text(encoding="utf-8")
+    assert "verdict-line" in js and "feTurbulence" not in js  # вердикт — строкой, без печати
 
 
 def test_html_report_embeds_sheet_css_and_js():
     rep = json.loads(FIXTURE.read_text(encoding="utf-8"))
     html = H.render_html(rep, H.load_view(DOC))
-    assert "--desk: #0B1220" in html and ":root[data-embed]" in html and "stamp-ink" in html
+    assert "--canvas: #F3F6F5" in html and ":root[data-embed]" in html and "verdict-line" in html
     assert 'id="report-data"' in html and 'class="docpane"' in html and "Исправить первым" in html
 
 
@@ -199,5 +204,5 @@ def test_facts_follow_markdown_after_owner_answers(tmp_path):
     assert (f["quotes_ok"], f["quotes_total"]) == (exp["ok"], exp["total"])
     assert f["has"]["rewrites"] and f["has"]["clarify"]
     html = S.result_html(job, f)
-    assert "Блокеров нет" in html and 'data-mood="verified"' in html
+    assert "Блокеров нет" in html and 'data-mood="happy"' in html
     assert 'data-rt="rewrites"' in html and 'data-rtab="clarify"' in html

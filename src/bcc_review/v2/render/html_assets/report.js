@@ -324,8 +324,8 @@
   fromHash();
 })();
 
-/* ── лист на столе (№41): печать-вердикт, заметки на полях с линиями к строкам, карта листа,
- *    исправленная редакция «как у юриста», пометки рисуются пером. Содержание отчёта не меняется. ── */
+/* ── лист с правкой (№41): строка вердикта, заметки на полях с линиями к строкам, карта листа,
+ *    исправленная редакция «как у юриста», пометки рисуются по порядку чтения. Содержание отчёта не меняется. ── */
 (function () {
   "use strict";
   var $ = function (s, r) { return (r || document).querySelector(s); };
@@ -342,9 +342,10 @@
   function el(tag, cls, html) { var x = document.createElement(tag); if (cls) x.className = cls; if (html != null) x.innerHTML = html; return x; }
   function resolved(f) { return f.status === "resolved" || f.status_after_answers === "resolved"; }
 
-  /* печать: те же вердикт и блокеры, что в Markdown и в итоге терминала */
-  function stamp() {
-    if (!pane || $(".stamp-box", pane)) return;
+  /* вердикт — спокойная строка в шапке листа: те же вердикт и блокеры, что в Markdown и в итоге терминала */
+  function verdictLine() {
+    var head = pane && $(".dochead", pane);
+    if (!head || $(".verdict-line", head)) return;
     var run = data.run || {}, v = data.verdict || {}, s = data.summary || {};
     var offline = run.provider === "offline";
     var bl = (data.findings || []).filter(function (f) {
@@ -353,12 +354,6 @@
     });
     var failed = run.status === "failed";
     var dev = failed ? "" : (v.development || ""), test = failed ? "" : (v.testing || "");
-    var cls = { no: "v-no", conditional: "v-cond", yes: "v-yes" }[dev] || "v-none";
-    var head = dev === "no" ? "Нельзя в разработку" : dev === "yes" ? "Можно в разработку"
-      : dev === "conditional" ? "В разработку с условиями" : "Вердикт не вынесен";
-    var n = bl.length;
-    var small = [n ? n + " " + plural(n, "блокер", "блокера", "блокеров") : (dev === "yes" ? "блокеров нет" : ""),
-      test ? "тестирование: " + (LBL[test] || test) : ""].filter(Boolean).join(" · ");
     var ok = 0, total = 0;
     if (typeof s.quotes_verified === "number" && typeof s.quotes_total === "number" && s.quotes_verified % 1 === 0) {
       ok = s.quotes_verified; total = s.quotes_total;
@@ -367,23 +362,17 @@
         (f.evidence || []).forEach(function (e) { total++; if (["exact", "normalized", "fuzzy"].indexOf(e.verified) >= 0) ok++; });
       });
     }
-    var d = parseFloat(run.duration_s);
-    var dur = isFinite(d) ? (d >= 60 ? (d / 60).toFixed(1).replace(".", ",") + " мин" : Math.round(d) + " с") : "";
-    var meta = [total ? "цитат сверено " + ok + " из " + total : "", (run.models_used || []).join(", ") || run.model_requested || "", dur]
-      .filter(Boolean).join(" · ");
-    var b = el("div", "stamp-box");
-    b.innerHTML = '<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">' +
-      '<filter id="stamp-ink" x="-10%" y="-10%" width="120%" height="120%">' +
-      '<feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="4" result="n"/>' +
-      '<feDisplacementMap in="SourceGraphic" in2="n" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="d"/>' +
-      '<feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -2.6 0 0 0 2.2" result="m"/>' +
-      '<feComposite in="d" in2="m" operator="in"/></filter></svg>' +
-      '<div class="stamp ' + cls + '" role="img" aria-label="' + esc(head + (small ? ": " + small : "")) + '"><b>' + esc(head) + "</b>" +
-      (small ? "<small>" + esc(small) + "</small>" : "") + "</div>" + (meta ? '<div class="stamp-meta">' + esc(meta) + "</div>" : "");
-    pane.insertBefore(b, pane.firstChild);
+    var n = bl.length, cls = { no: "v-no", yes: "v-yes" }[dev] || "";
+    var parts = ['Разработка: <b class="' + cls + '">' + esc(LBL[dev] || "вердикт не вынесен") + "</b>"];
+    if (test && test !== dev) parts.push("тестирование: " + esc(LBL[test] || test));
+    parts.push(n ? n + " " + plural(n, "блокер", "блокера", "блокеров") : "блокеров нет");
+    if (total) parts.push("цитат сверено " + ok + " из " + total);
+    var line = el("div", "verdict-line", parts.join('<span class="sep">·</span>'));
+    line.setAttribute("role", "status");
+    head.appendChild(line);
   }
 
-  /* итог агента — на полях над заметками, рядом с печатью */
+  /* итог агента — на второй бумаге над заметками */
   function resolution() {
     var ht = $(".hero-text");
     if (!ht || !flist || $(".resolution", flist)) return;
@@ -538,7 +527,7 @@
   }
 
   if (!split || !doc || !$(".ln", doc)) { redline(); return; }
-  stamp();
+  verdictLine();
   resolution();
   redline();
   ink();

@@ -80,7 +80,6 @@
   var wrap = document.querySelector("main.jb[data-job]");
   if (!wrap) return;
   var id = wrap.dataset.job;
-  var SCAN = { docview: 1, segment: 1, rules: 1, lens_analyst: 1, lens_qa: 1, lens_architect: 1, lens_risk: 1, consistency: 1, quotes: 1 };
   var SAY = { docview: "читаю документ", segment: "нарезаю требования", rules: "проверяю правилами",
     lenses: "4 ревьюера читают", quotes: "сверяю цитаты", judge: "судья взвешивает", clarify: "готовлю вопросы",
     recheck: "перепроверяю по ответам", revise: "правлю текст", report: "собираю правку" };
@@ -138,13 +137,13 @@
     if (st && j.state !== "failed") st.textContent = j.state === "queued" ? "жду очереди" : j.state === "done" ? "готово" : SAY[cur ? cur.id : ""] || "читаю документ";
     moveBeam(frac);
     $("#log").textContent = (j.log || []).join("\n");
-    if (j.state === "running" || j.state === "queued") mood(cur && !SCAN[cur.id] && cur.id !== "lenses" ? "analyzing" : "scanning");
+    if (j.state === "running" || j.state === "queued") mood("work");  /* AIshka (№40): за работой, пока идёт проверка */
     if (j.state === "failed" && shown !== "failed") {
       $("#err").hidden = false;
       $("#errtext").textContent = j.error || "Проверка завершилась с ошибкой.";
       $("#todo").textContent = hint(j.error);
       if (st) st.textContent = "не получилось";
-      mood("alert");
+      mood("oops");
       wrap.classList.add("finished");
     }
     if (j.state === "done" && shown !== "done") showResult(j);
@@ -249,7 +248,7 @@
         var perch = d.createElement("div");
         perch.className = "perch";
         perch.setAttribute("data-bcc-agent", "");
-        perch.setAttribute("data-size", "80");
+        perch.setAttribute("data-size", "96");
         perch.setAttribute("data-mood", fr.dataset.mood || "idle");
         pane.appendChild(perch);
         var css = d.createElement("link"); css.rel = "stylesheet"; css.href = "/assets/agent.css"; d.head.appendChild(css);
@@ -257,7 +256,7 @@
         js.onload = function () {
           var a = perch.__bccAgent || (d.defaultView.BCCAgent && d.defaultView.BCCAgent.mount(perch));
           if (!a) return;
-          if (fr.dataset.mood === "alert") a.mood("alert", 1500); else a.mood("verified");
+          a.mood(fr.dataset.mood || "idle", fr.dataset.mood === "speak" ? 3200 : 0);
           if (fr.dataset.say && a.say) setTimeout(function () { a.say(fr.dataset.say); }, 700);
         };
         d.body.appendChild(js);
