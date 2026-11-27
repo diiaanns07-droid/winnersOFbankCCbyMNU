@@ -329,6 +329,7 @@ def test_test_cases_numbered_capped_and_undefined_marked():
     assert len(tests) == lens_qa.MAX_TEST_CASES and [t["id"] for t in tests[:3]] == ["T-01", "T-02", "T-03"]
     assert list(tests[0])[0] == "id"
     assert tests[1]["then"].startswith("Не определено требованиями") and not tests[1]["expected_defined"]
+    assert tests[1]["then"] == "Не определено требованиями однозначно. По тексту требований: код ответа"
     assert not tests[2]["expected_defined"]
     assert any(f"оставлено {lens_qa.MAX_TEST_CASES}" in w for w in out["warnings"])
 
@@ -622,3 +623,16 @@ def test_near_amount_conflict_is_rounding_not_conflict():
     assert "меньше 1 %" in c["assumptions"] and "1 000,05" in c["assumptions"]
     out = lens_qa.postprocess({"acceptance_checks": [raw]}, REQS)
     assert not [x for x in out["candidates"] if x.get("origin") == "acceptance_check"]
+
+
+def test_model_candidate_texts_without_internal_codes():
+    """В текстах противоречия модели нет «L040» и ID нарезки: строка документа и собственный номер правила."""
+    raw = {"title": "R-01 и R-02 дают разный итог", "kind": "contradiction", "criterion": "set_consistent",
+           "severity": "major", "requirement_ids": ["R-01", "R-02"],
+           "evidence": [{"quote": "a", "line": 10}, {"quote": "b", "line": 12}], "problem": "По R-01 (L010) — 5.",
+           "scenario": "По П-1 (L010) итог 5, по строке L012 — 6.", "impact": "i", "recommendation": "r",
+           "rewrite": "", "question": "", "blocks": "both"}
+    c = lens_qa.postprocess({"candidates": [raw]}, REQS)["candidates"][0]
+    assert c["title"] == "П-1 и R-02 дают разный итог"
+    assert c["problem"] == "По П-1 (строка 10) — 5." and "L0" not in c["scenario"]
+    assert "по строке 12" in c["scenario"]

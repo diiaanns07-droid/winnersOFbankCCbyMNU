@@ -363,8 +363,9 @@ def _line_refs(text: str) -> str:
         prep = m.group(1)
         word = _CASE_BY_PREP.get(prep.lower().strip(), "строка") if prep else "строка"
         return f"{prep or ''}{word} {int(m.group(2))}"
+    text = re.sub(r"\b(строк[а-я]{0,2}\s+)L0*(\d{1,4})\b", r"\1\2", text or "", flags=re.I)  # «строке L012»
     text = re.sub(r"\bL0*(\d{1,4})\s*[–-]\s*L?0*(\d{1,4})\b", lambda m: f"строки {m.group(1)}–{m.group(2)}",
-                  text or "")
+                  text)
     return re.sub(r"\b((?:по|в|на|из|до|от|у|для|с)\s+)?L0*(\d{1,4})\b", sub, text, flags=re.I)
 
 
@@ -550,7 +551,10 @@ def normalize_test_case(raw: Mapping[str, Any]) -> dict:
     if UNDEFINED_PREFIX.lower() in t["then"].lower():
         t["expected_defined"] = False
     elif not t["expected_defined"]:
-        t["then"] = f"{UNDEFINED_PREFIX}: {t['then']}" if t["then"] else f"{UNDEFINED_PREFIX}."
+        # Модель сняла признак, но написала вывод без оговорки («Январь 14 000 ₸ по Ф-2. Противоречит строке 64»):
+        # приставка «Не определено требованиями:» перед готовым выводом читается как «не определено: январь».
+        t["then"] = (f"{UNDEFINED_PREFIX} однозначно. По тексту требований: {_lower_first(t['then'])}"
+                     if t["then"] else f"{UNDEFINED_PREFIX}.")
     return t
 
 
@@ -656,7 +660,9 @@ def calibrate_coverage(cands: list[dict], checks: list[Mapping[str, Any]], reqs:
             tail = (f"Непокрытые ветки закрывают тест-кейсы {_id_span(gap_tests)} из черновика тестов отчёта — "
                     "их можно перенести в таблицу критериев приёмки.")
             if tail not in c["recommendation"]:
-                c["recommendation"] = f"{_sentence(c['recommendation'])} {tail}".strip()
+                # фраза модели о тест-кейсах («закрыв их тест-кейсами ниже») — заменяется номерами кейсов
+                own = [p for p in re.split(r"(?<=[.!?])\s+", c["recommendation"]) if p and "тест-кейс" not in p.lower()]
+                c["recommendation"] = " ".join([_sentence(p) for p in own] + [tail])
 
 
 # Норматив задан числом с единицей (время, доля, частота) — требование проверяемо, не хватает только условий
@@ -846,6 +852,9 @@ def postprocess(data: Mapping[str, Any] | None, requirements: Iterable[Mapping[s
     nfr_checks = [normalize_nfr_check(x) for x in data.get("nfr_checks") or [] if isinstance(x, Mapping)]
     nfr = nfr_candidate(nfr_checks, index)
     model_cands = [normalize_candidate(x) for x in data.get("candidates") or [] if isinstance(x, Mapping)]
+    for c in model_cands:  # тексты для читателя: «L040» → «строка 40», ID нарезки → номер документа (рубрика, п. 7)
+        for k in ("title", "problem", "scenario", "impact", "recommendation", "rewrite", "question"):
+            c[k] = humanize_ids(c[k], index)
     if nfr:  # вычисленное замечание о проверяемости — первым: модельное того же вида уйдёт в dropped
         model_cands.insert(0, nfr)
     kept = [c for c in model_cands if not _duplicates_check(c, flagged)]
