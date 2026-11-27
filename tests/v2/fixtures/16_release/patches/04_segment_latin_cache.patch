@@ -1,0 +1,13 @@
+diff --git a/src/bcc_review/v2/stages/segment.py b/src/bcc_review/v2/stages/segment.py
+index d2fd8e9c..3d69663a 100644
+--- a/src/bcc_review/v2/stages/segment.py
++++ b/src/bcc_review/v2/stages/segment.py
+@@ -356,7 +356,7 @@ def _doc_latin(view: dict | None) -> set[str]:
+     """Латинские слова документа (в нижнем регистре, и целиком, и частями camelCase)."""
+     if not view:
+         return set()
+-    lines = _lines(view)
++    lines = view.get("lines") or []  # сам список view, не копия: по нему узнаём, что кэш тот же
+     hit = _LAT_VOCAB_CACHE.get(id(view))
+     if hit and hit[0] is lines:
+         return hit[1]
