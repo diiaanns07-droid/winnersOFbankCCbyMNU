@@ -335,3 +335,45 @@ def test_period_check_folded_into_other_defect_is_kept_apart():
     fs2 = [finding("F01", ["C-002", "C-003"], title="Не определены часовой пояс и граница календарного месяца")]
     res2 = judge.run(Ctx(FakeLLM(response(fs2))), cs[1:])
     assert [tuple(f["candidate_ids"]) for f in res2["findings"]] == [("C-002", "C-003")]
+
+
+def test_pass_answers_are_recorded_in_pass_order_and_replayed_in_order(monkeypatch):
+    import threading
+    import time
+
+    class _LLM:
+        provider_name, model = "gemini", "gemini-3.6-flash"
+
+        def __init__(self):
+            self.responses, self.lock = {}, threading.Lock()
+
+    class _Ctx:
+        def __init__(self, llm):
+            self.llm, self.options = llm, {}
+
+        def prompt(self, stage):
+            return "s", "u"
+
+    def live(ctx, name):  # второй проход отвечает раньше первого
+        second = isinstance(ctx, lens_analyst._NotedContext)
+        time.sleep(0.01 if second else 0.2)
+        with ctx.llm.lock:
+            ctx.llm.responses.setdefault("lens_analyst", []).append({"pass": 2 if second else 1})
+        return {"candidates": [], "coverage": [], "pass": 2 if second else 1}
+
+    llm = _LLM()
+    outs, _ = lens_analyst._run_passes(_Ctx(llm), live, 2)
+    assert [o["pass"] for o in outs] == [1, 2]
+    assert llm.responses["lens_analyst"] == [{"pass": 1}, {"pass": 2}]  # порядок проходов, не прихода
+
+    replay = iter(llm.responses["lens_analyst"])
+    mock = _LLM()
+    mock.provider_name = "mock"
+    order = []
+
+    def mocked(ctx, name):  # mock: k-й ответ на k-й вызов
+        order.append("2" if isinstance(ctx, lens_analyst._NotedContext) else "1")
+        return {"candidates": [], "coverage": [], **next(replay)}
+
+    outs2, _ = lens_analyst._run_passes(_Ctx(mock), mocked, 2)
+    assert order == ["1", "2"] and [o["pass"] for o in outs2] == [1, 2]

@@ -49,6 +49,7 @@ from typing import Any
 
 from bcc_review.v2.types import CANDIDATE_SCHEMA, INT, STR, obj  # абсолютный: тесты №05 грузят модуль файлом
 
+STAGE = "lens_analyst"  # имя этапа у LLMClient (`stages/lens.py`: lens_<имя>)
 MAX_CANDIDATES = 16
 MAX_COVERAGE = 40
 COVERAGE_ITEM = obj({"topic": STR, "line": INT, "question": STR, "answer": STR})
@@ -501,21 +502,41 @@ def merge_passes(outs: list[dict]) -> dict:
 
 
 def _run_passes(ctx: Any, lens_run, n: int) -> tuple[list[dict], list[str]]:
-    """`n` проходов параллельно; упавший проход не роняет этап, если удался хотя бы один."""
+    """`n` проходов параллельно; упавший проход не роняет этап, если удался хотя бы один.
+
+    Сырые ответы клиент пишет в порядке прихода (`LLMClient.responses`), а mock отвечает k-м ответом на k-й вызов:
+    чтобы повтор по сохранённым ответам дал тот же итог, ответы переставляются в порядок проходов, а на mock
+    проходы идут по очереди."""
     if n <= 1:
         return [dict(lens_run(ctx, "analyst"))], []
     import concurrent.futures as cf
     contexts = [ctx] + [_NotedContext(ctx, SECOND_PASS_NOTE if i == 1 else SECOND_PASS_NOTE + f" Проход {i + 1}.")
                         for i in range(1, n)]
     results: list[Any] = [None] * n
-    with cf.ThreadPoolExecutor(max_workers=n) as ex:
-        futs = {ex.submit(lens_run, c, "analyst"): i for i, c in enumerate(contexts)}
-        for f in cf.as_completed(futs):
-            i = futs[f]
+    llm = getattr(ctx, "llm", None)
+    recorded = getattr(llm, "responses", None)
+    start = len(recorded.get(STAGE, [])) if isinstance(recorded, dict) else -1
+    if str(getattr(llm, "provider_name", "")) == "mock":
+        for i, c in enumerate(contexts):
             try:
-                results[i] = dict(f.result())
+                results[i] = dict(lens_run(c, "analyst"))
             except Exception as exc:  # noqa: BLE001 — разбирается ниже
                 results[i] = exc
+    else:
+        arrived: list[int] = []
+        with cf.ThreadPoolExecutor(max_workers=n) as ex:
+            futs = {ex.submit(lens_run, c, "analyst"): i for i, c in enumerate(contexts)}
+            for f in cf.as_completed(futs):
+                i = futs[f]
+                try:
+                    results[i] = dict(f.result())
+                    arrived.append(i)
+                except Exception as exc:  # noqa: BLE001 — разбирается ниже
+                    results[i] = exc
+        got = recorded.get(STAGE, [])[start:] if start >= 0 else []
+        if got and len(got) == len(arrived):  # по одному ответу на проход: порядок прихода → порядок проходов
+            by_pass = dict(zip(arrived, got))
+            recorded[STAGE][start:] = [by_pass[i] for i in sorted(by_pass)]
     ok = [r for r in results if isinstance(r, dict)]
     if not ok:
         raise next(r for r in results if isinstance(r, BaseException))
