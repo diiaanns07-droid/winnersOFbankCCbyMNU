@@ -268,9 +268,19 @@
     var fr = $("#rframe"), dock = $("#dock");
     if (!fr) return;
     var hdr = document.querySelector(".tb-wrap, header");
-    var setTop = function () { var t = hdr ? Math.round(hdr.getBoundingClientRect().bottom) : 64; document.documentElement.style.setProperty("--jb-top", Math.max(0, t) + "px"); };
+    if (dock && hdr && hdr.classList.contains("b-bar")) {  // одна панель (владелец 27.11): вкладки отчёта — в шапке
+      hdr.insertBefore(dock, hdr.querySelector(".b-bar-end"));
+      hdr.classList.add("b-bar-tabs");
+    }
+    var setTop = function () {  // лист — под шапкой; без шапки .b-bar панель стоит отдельно под ней
+      var root = document.documentElement.style, t = hdr ? Math.max(0, Math.round(hdr.getBoundingClientRect().bottom)) : 64;
+      root.setProperty("--jb-hdr", t + "px");
+      if (dock && !(hdr && hdr.contains(dock))) t = Math.round(dock.getBoundingClientRect().bottom) + 6;
+      root.setProperty("--jb-top", t + "px");
+    };
     setTop();
     window.addEventListener("resize", setTop);
+    if (hdr && window.ResizeObserver) new ResizeObserver(setTop).observe(hdr);  // шапка меняет высоту после шрифтов и AIshka
     var view = "findings";
     function rdoc() { try { return fr.contentDocument; } catch (_) { return null; } }
     function rtab(name) { var d = rdoc(), t = d && d.getElementById("t-" + name); if (t) { t.click(); return true; } return false; }
@@ -355,7 +365,13 @@
         ev.stopPropagation();
         var m = $("#menu-" + b.dataset.menu), open = m.hidden;
         closeMenus();
-        if (open) { m.hidden = false; b.setAttribute("aria-expanded", "true"); var f = m.querySelector("a, button"); if (f) f.focus(); }
+        if (open) {
+          m.hidden = false; b.setAttribute("aria-expanded", "true");
+          // меню — под своей кнопкой, правым краем к ней, не выходя за экран
+          var r = b.getBoundingClientRect(), w = m.offsetWidth, vw = document.documentElement.clientWidth;
+          m.style.left = Math.max(12, Math.min(vw - w - 12, r.right - w)) + "px"; m.style.transform = "none";
+          var f = m.querySelector("a, button"); if (f) f.focus();
+        }
       });
     });
     document.querySelectorAll("[data-rtab]").forEach(function (b) {
