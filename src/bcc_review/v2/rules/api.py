@@ -63,6 +63,17 @@ ERROR_JSON = re.compile(
     r'"(?:result|status|state)"\s*:\s*"(error|fail\w*|err|failure|declined|rejected)"|"error"\s*:|'
     r'"success"\s*:\s*false', re.I)
 ERROR_WORD = re.compile(r"\b(ERROR|FAIL(?:ED|URE)?)\b|ошибк\w*", re.I)
+
+
+def _has_error(text: str) -> re.Match | None:
+    """Признак ошибки в тексте; «не считается ошибкой» и «без ошибок» — не ошибка."""
+    for m in ERROR_WORD.finditer(text):
+        before = text[max(0, m.start() - 25):m.start()].lower()
+        if m.group(0)[0].islower() and re.search(r"\bне\s+(?:считается|является|будет|приводит\s+к)\s*$|\bбез\s*$",
+                                                  before):
+            continue
+        return m
+    return None
 NO_BODY = re.compile(
     r"тело\s+(?:запроса\s+)?не\s+(?:используется|передаётся|передается|требуется|предусмотрено)|"
     r"без\s+тела|тело\s+(?:запроса\s+)?отсутствует|тело\s+запроса\s*[:\-—–]\s*(?:нет|отсутствует|не используется)|"
@@ -398,6 +409,12 @@ def collect_statuses(doc: Doc) -> tuple[list[Status], list[tuple[int, Line, str]
                     if cm:
                         decls.append(Status(int(cm.group(0)), x, "list", seg))
             continue
+        if not DECL_LIST.match(x.text):  # PDF: перенос строки — объявления «422. Ответ …» с середины строки
+            for k in DECL_LIST_INLINE.finditer(x.text):
+                nxt = DECL_LIST_INLINE.search(x.text, k.end())
+                seg = x.text[k.start(1):nxt.start(1) if nxt else len(x.text)].strip()
+                if re.match(rf"{CODE}\.\s+(?:Ответ|Response|Статус)", seg, re.I):
+                    decls.append(Status(int(k.group(1)), x, "list", seg))
         m = DECL_OTVET.match(x.text)
         if m:
             decls.append(Status(int(m.group(1)), x, "otvet"))
@@ -484,15 +501,25 @@ def _rule_same_case_declared(doc: Doc, methods: list[Method], decls: list[Status
             continue
         if not re.search(r"возвра|верн", frag, re.I):
             continue
-        if 200 <= code < 300 and ERROR_WORD.search(frag):
+        if 200 <= code < 300 and _has_error(frag):
             continue  # «200 с ERROR» — это правило api.success_with_error
         # «Если C, вернуть X» — хватит двух общих основ; утверждение без «если» («Повторная операция … возвращает X»)
         # — только при сильном совпадении предмета (≥ 3 основы)
         need = 2 if COND_MARK.search(frag) else 3
-        other = _same_case_decl(frag, [d for d in decls if d.code != code and d.kind in ("table", "list")], code,
+        # условие бывает в предыдущем предложении шага («Проверить возраст… Если больше N, вернуть 200»)
+        k = line.joined.find(frag)
+        prev = line.joined[:k].rstrip() if k > 0 else ""
+        prev_sent = re.split(r"(?<=[.;])\s+", prev)[-1] if prev else ""
+        context = (prev_sent + " " + frag).strip()
+        other = _same_case_decl(context, [d for d in decls if d.code != code and d.kind in ("table", "list")], code,
                                 method_of(methods, line.n), methods, any_class=True, min_overlap=need)
         if other is None or (code, other.code) in done:
             continue
+        own = [d for d in decls if d.code == code and d.kind in ("table", "list")]
+        cst = _stems(re.sub(CODE, " ", context))
+        if any(len(cst & _stems(re.sub(CODE, " ", d.text))) >= len(cst & _stems(re.sub(CODE, " ", other.text)))
+               for d in own):
+            continue  # объявление самого кода X описывает этот случай не хуже — расхождения нет
         done.add((code, other.code))
         out["candidates"].append(candidate(
             f"api.same_case.{code}-{other.code}",
@@ -633,7 +660,7 @@ def rule_success_with_error(doc: Doc, methods: list[Method], out: dict) -> None:
                 hits.append((d.code, x, d.line))
                 break
     for code, line, frag in mentions:
-        if 200 <= code < 300 and ERROR_WORD.search(frag) and re.search(r"возвра|верн", frag, re.I):
+        if 200 <= code < 300 and _has_error(frag) and re.search(r"возвра|верн", frag, re.I):
             hits.append((code, line, None))
     seen: set[int] = set()
     for code, line, head in hits:
@@ -645,7 +672,7 @@ def rule_success_with_error(doc: Doc, methods: list[Method], out: dict) -> None:
             evidence.append(ev(head))
         evidence.append(ev(line))
         evidence.append(ev(validation.line))
-        err = ERROR_JSON.search(line.text) or ERROR_WORD.search(line.joined)
+        err = ERROR_JSON.search(line.text) or _has_error(line.joined)
         err_s = err.group(0) if err else "ошибка"
         out["candidates"].append(candidate(
             "api.success_with_error",

@@ -432,27 +432,33 @@ def rule_time_units(doc: Doc, out: dict) -> None:
 
 def rule_day_kinds(doc: Doc, out: dict) -> None:
     """Календарные и рабочие дни для одной и той же величины (общий предмет в обеих фразах)."""
-    found: dict[str, list[tuple[Line, str]]] = {}
+    found: dict[str, list[tuple[Line, str, str]]] = {}
     for x in doc.lines:
         if not x.text or x.is_code:
             continue
-        for m in DAY_KIND.finditer(x.joined):
-            found.setdefault(m.group(1).lower()[:5], []).append((x, m.group(0)))
+        t = x.joined
+        for m in DAY_KIND.finditer(t):
+            # предмет срока — только своя клауза: от границы предложения или ячейки до следующей
+            a = max(t.rfind(".", 0, m.start()), t.rfind(";", 0, m.start()), t.rfind("|", 0, m.start())) + 1
+            ends = [p for p in (t.find(".", m.end()), t.find(";", m.end()), t.find("|", m.end())) if p != -1]
+            clause = t[a:min(ends) if ends else len(t)]
+            found.setdefault(m.group(1).lower()[:5], []).append((x, m.group(0), clause))
     kinds = list(found)
     if len(kinds) < 2:
         return
-    generic = {"сумма", "сумму", "клиен", "карты", "карта", "банка", "течен", "дней", "сутки", "срока"}
+    generic = {"сумма", "сумму", "клиен", "карты", "карта", "банка", "течен", "дней", "сутки", "срока", "колич",
+               "числа", "число", "сколь"}
 
     def stems(t: str) -> set[str]:
         return {w.lower()[:5] for w in re.findall(r"[А-Яа-яЁё]{5,}", t)} - generic - {k for k in kinds}
 
     for i, ka in enumerate(kinds):
         for kb in kinds[i + 1:]:
-            for xa, qa in found[ka]:
-                for xb, qb in found[kb]:
-                    if xa is xb:
+            for xa, qa, ca in found[ka]:
+                for xb, qb, cb in found[kb]:
+                    if xa is xb and ca == cb:
                         continue
-                    common = stems(xa.joined) & stems(xb.joined)
+                    common = stems(ca) & stems(cb)
                     if not common:
                         continue
                     out["candidates"].append(candidate(
