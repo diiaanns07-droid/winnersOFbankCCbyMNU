@@ -233,7 +233,12 @@ def parse_answers_json(data: Any) -> dict:
             answers.append({"id": _qid(qid), "topic_hint": "", **_parse_value(str(val))})
 
     if isinstance(data, dict):
-        decisions = [str(x) for x in data.get("decisions") or [] if str(x).strip()]
+        raw_dec = data.get("decisions") or []
+        if isinstance(raw_dec, (str, dict)):  # «"decisions": "одно решение"» — не разбивать строку на буквы
+            raw_dec = [raw_dec]
+        decisions = [str(x.get("text") or x.get("decision") or "") if isinstance(x, dict) else str(x)
+                     for x in raw_dec]
+        decisions = [x for x in decisions if x.strip()]
         body = data.get("answers", data)
         if isinstance(body, dict):
             for k, v in body.items():

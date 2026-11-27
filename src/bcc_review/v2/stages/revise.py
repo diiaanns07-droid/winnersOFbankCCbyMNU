@@ -657,7 +657,15 @@ def run_modes(ctx: Any, report: dict, *, answers: Any = None, do_revise: bool = 
         out.update(clarification=clar, findings_after=a["findings_after"], rejected_after=a["rejected_after"])
         out["markdown_sections"].append(recheck.render_markdown(clar, a["findings_after"]))
     if do_revise:
-        r = run(ctx, list(report.get("findings") or []), clar)
+        try:
+            r = run(ctx, list(report.get("findings") or []), clar)
+        except Exception as exc:  # noqa: BLE001 — сбой редакции не должен стирать уже готовый пересмотр по ответам
+            if not answers:
+                raise
+            msg = f"revise: редакция не построена ({type(exc).__name__}: {str(exc)[:200]}); пересмотр по ответам сохранён"
+            _cl._warn(ctx, msg)
+            out["revise_stats"] = {"status": "failed", "error": msg}
+            return out
         path = write(report_path, r) if report_path else None
         out.update(rewrites=flat_rewrites(r), revise_stats=r.get("stats", {}),
                    revised_file=str(path) if path else "", revised_markdown=r.get("revised_markdown", ""))

@@ -324,3 +324,18 @@ def test_answers_json_file_in_utf16(tmp_path):
     p = tmp_path / "answers.json"
     p.write_bytes('{"Q-01": "B"}'.encode("utf-16"))
     assert recheck.load_answers(str(p))["answers"][0]["choice"] == 1
+
+
+@pytest.mark.parametrize("dec", ["Квитанцию можно скачать 12 дней.", ["Квитанцию можно скачать 12 дней."],
+                                 [{"text": "Квитанцию можно скачать 12 дней."}]])
+def test_json_decisions_forms(dec):
+    assert recheck.load_answers({"Q-01": "B", "decisions": dec})["decisions"] == ["Квитанцию можно скачать 12 дней."]
+
+
+def test_revise_crash_keeps_recheck(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("сломалась редакция")
+    monkeypatch.setattr(revise, "run", boom)
+    resp = _resp([{"finding_id": "D-01", "conflicting_answers": ["Q-01"], "reason": "ответы расходятся"}])
+    out = revise.run_modes(FakeCtx(FakeLLM(resp)), _report(), answers=TWO, do_revise=True)
+    assert out["clarification"]["answer_conflicts"] and out["revise_stats"]["status"] == "failed"
