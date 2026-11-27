@@ -1,0 +1,146 @@
+/* Страница задания: прогресс и отчёт (№41). Токены и базовые классы .b-* — из tokens.css (№39);
+ * здесь только раскладка этой страницы, префикс .jb-. Встраивается в job_page: отдельный маршрут не нужен. */
+.jb{padding-top:var(--b-gap);padding-bottom:calc(var(--b-gap)*2);display:flex;flex-direction:column;gap:var(--b-gap)}
+.jb [hidden]{display:none !important}
+
+/* ── BCC AI: плитка-слот (сам маскот рисует agent.js №40; до него — тихая плитка) ── */
+.jb-agent{flex:none;width:96px;height:96px;border-radius:27px;position:relative;overflow:hidden;
+  background:radial-gradient(120% 120% at 30% 20%,#20395A 0%,#0F2841 55%,#070B16 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),var(--b-shadow-2)}
+.jb-agent>[data-bcc-agent]{width:100%;height:100%}
+.jb-agent canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+
+/* ── прогресс ── */
+.jb-prog{max-width:760px;width:100%;margin:0 auto;padding:calc(var(--b-pad) + 4px)}
+.jb-phead{display:flex;align-items:center;gap:20px}
+.jb-ptitle{margin:0;font-size:28px;line-height:1.15;font-weight:700;letter-spacing:-.025em;overflow-wrap:anywhere}
+.jb-pline{margin:6px 0 0;font-size:15px;color:var(--b-ink-2);font-variant-numeric:tabular-nums}
+.jb-pline b{font-weight:600;color:var(--b-ink)}
+.jb-stages{list-style:none;margin:22px 0 0;padding:0}
+.jb-stg{display:flex;align-items:center;gap:14px;min-height:52px;padding:10px 4px;color:var(--b-ink-3);
+  transition:color var(--b-base) var(--b-ease)}
+.jb-stg+.jb-stg{box-shadow:0 -1px 0 var(--b-hair)}
+.jb-ic{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;position:relative;
+  box-shadow:inset 0 0 0 1.5px var(--b-hair-2);transition:background var(--b-base) var(--b-ease),box-shadow var(--b-base) var(--b-ease)}
+.jb-nm{flex:1;min-width:0;font-size:17px}
+.jb-tm{flex:none;font-size:15px;color:var(--b-ink-3);font-variant-numeric:tabular-nums}
+.jb-subs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.jb-sub{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:999px;font-size:15px;
+  color:var(--b-ink-3);background:rgba(15,40,65,.04);transition:background var(--b-base) var(--b-ease),color var(--b-base) var(--b-ease)}
+.jb-sub.running{color:var(--b-ink);background:var(--b-green-wash);box-shadow:inset 0 0 0 1px rgba(0,185,117,.28)}
+.jb-sub.done{color:var(--b-green-ink);background:var(--b-green-wash)}
+.jb-sub.done::before{content:"";width:9px;height:5px;border:solid var(--b-green);border-width:0 0 2px 2px;transform:translateY(-1px) rotate(-45deg)}
+.jb-sub.failed{color:var(--b-red);background:var(--b-red-tint)}
+.jb-stg.done{color:var(--b-ink)}
+.jb-stg.done .jb-ic{background:var(--b-green);box-shadow:none}
+.jb-stg.done .jb-ic::before{content:"";width:10px;height:6px;border:solid #fff;border-width:0 0 2.5px 2.5px;transform:translateY(-1px) rotate(-45deg)}
+.jb-stg.running{color:var(--b-ink)}
+.jb-stg.running .jb-nm{font-weight:600}
+.jb-stg.running .jb-ic{box-shadow:inset 0 0 0 1.5px rgba(0,185,117,.45)}
+.jb-stg.running .jb-ic::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--b-green);animation:jb-pulse 1.6s var(--b-ease) infinite}
+.jb-stg.failed{color:var(--b-red)}
+.jb-stg.failed .jb-ic{background:var(--b-red);box-shadow:none}
+.jb-stg.failed .jb-ic::before{content:"!";color:#fff;font-size:14px;font-weight:800;line-height:1}
+.jb-stg.skipped{color:var(--b-ink-3)}
+.jb-stg.skipped .jb-ic::before{content:"";width:10px;height:2px;border-radius:1px;background:var(--b-hair-2)}
+@keyframes jb-pulse{0%,100%{transform:scale(.7);opacity:.55;box-shadow:0 0 0 0 rgba(0,185,117,.35)}
+  50%{transform:scale(1);opacity:1;box-shadow:0 0 0 6px rgba(0,185,117,0)}}
+.jb-err{margin-top:18px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.jb-todo{margin:0;font-size:15px;color:var(--b-ink-2)}
+.jb-log{margin-top:18px;font-size:15px;color:var(--b-ink-3)}
+.jb-log summary{cursor:pointer;width:max-content;border-radius:999px;padding:2px 0}
+.jb-log pre{margin:10px 0 0;max-height:260px;overflow:auto;padding:14px 16px;border-radius:var(--b-r-md);
+  background:var(--b-canvas);font:13px/1.55 var(--b-mono);color:var(--b-ink-2);white-space:pre-wrap;word-break:break-word}
+.jb-parent{margin:0;font-size:15px;color:var(--b-ink-2)}
+
+/* ── отчёт: вердикт ── */
+.jb-result{display:flex;flex-direction:column;gap:var(--b-gap)}
+.jb-hero{display:flex;align-items:center;gap:24px}
+.jb-hmain{flex:1;min-width:0}
+.jb-verdict{margin:0;font-size:clamp(30px,3.2vw,44px);line-height:1.12;font-weight:700;letter-spacing:-.035em;color:var(--b-ink)}
+.jb-verdict .v{white-space:nowrap}
+.jb-verdict .sep{color:var(--b-ink-3);font-weight:400;margin:0 .18em}
+.jb-verdict .v-no b{color:var(--b-red)}
+.jb-verdict .v-cond b{color:var(--b-gold-ink)}
+.jb-verdict .v-yes b{color:var(--b-green-ink)}
+.jb-verdict .v-none b{color:var(--b-ink-2)}
+.jb-verdict b{font-weight:700}
+.jb-meta{margin:8px 0 0;font-size:15px;color:var(--b-ink-3);overflow-wrap:anywhere}
+.jb-hero .b-status{margin-top:8px}
+.jb-hact{flex:none;display:flex;gap:8px;align-self:flex-start}
+
+/* полоса из четырёх чисел — .b-strip (№39); тут только подписи чуть плотнее */
+.jb-strip .b-metric>span{line-height:1.3}
+
+/* ── блокеры: одна поверхность, строки через тонкую линию ── */
+.jb-block{padding:0}
+.jb-bhead{display:flex;align-items:baseline;gap:12px;padding:20px var(--b-pad) 6px}
+.jb-bhead .b-note{margin:0}
+.jb-block .b-list{padding-bottom:6px}
+.jb-row{cursor:pointer;border-radius:12px}
+.jb-row .jb-id{flex:none;font:600 15px/1 var(--b-mono);color:var(--b-red);min-width:48px}
+.jb-row .jb-t{flex:1;min-width:0;font-weight:600;color:var(--b-ink)}
+.jb-row .jb-where{flex:none;max-width:42%;text-align:right;font-size:15px;color:var(--b-ink-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jb-row .jb-only{flex:none}
+.jb-row .jb-go{flex:none;width:8px;height:8px;border:solid var(--b-ink-3);border-width:2px 2px 0 0;transform:rotate(45deg);
+  opacity:.5;transition:transform var(--b-fast) var(--b-ease),opacity var(--b-fast) var(--b-ease)}
+a.jb-row:hover .jb-t{color:var(--b-green-ink)}
+a.jb-row:hover .jb-go{opacity:1;transform:translateX(2px) rotate(45deg)}
+.jb-row.ok .jb-id{color:var(--b-green-ink)}
+.jb-more-b{font-size:15px;color:var(--b-ink-2)}
+
+/* ── вкладки и рамка отчёта ── */
+.jb-tabbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:12px;z-index:5}
+.jb-tabs{max-width:100%;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+.jb-tabs::-webkit-scrollbar{display:none}
+.jb-tabs>button{flex:none}
+.jb-tabs.b-glass{background:rgba(234,240,238,.86)}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .jb-tabs.b-glass{background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(236,242,240,.56))}
+}
+.jb-cnt{font-size:14px;font-weight:600;color:var(--b-ink-3);font-variant-numeric:tabular-nums}
+.jb-extra{position:relative;margin-left:auto}
+.jb-extra>summary{list-style:none}
+.jb-extra>summary::-webkit-details-marker{display:none}
+.jb-extra-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:20;min-width:240px;padding:8px;border-radius:var(--b-r-md);
+  display:flex;flex-direction:column;animation:b-rise var(--b-base) var(--b-ease) both}
+.jb-extra-menu button{display:flex;justify-content:space-between;gap:16px;min-height:44px;padding:0 14px;border:0;border-radius:10px;
+  background:transparent;font:inherit;font-size:16px;color:var(--b-ink);cursor:pointer;text-align:left}
+.jb-extra-menu button:hover{background:rgba(15,40,65,.05)}
+.jb-qbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.jb-qbar .b-note{flex:1 1 320px;margin:0}
+.jb-qbar label.b-button{position:relative}
+.jb-qbar input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.jb-frame{padding:0;overflow:hidden;height:calc(100vh - 96px);min-height:560px;position:relative}
+.jb-frame iframe{display:block;width:100%;height:100%;border:0;background:transparent;opacity:0;
+  transition:opacity var(--b-slow) var(--b-ease)}
+.jb-frame iframe.ready{opacity:1}
+.jb-empty{display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.jb-empty p{margin:0;color:var(--b-ink-2);max-width:62ch}
+.jb-files .jb-fmt{flex:1;min-width:0;font-weight:600}
+.jb-files .jb-fnote{font-size:15px;color:var(--b-ink-3);font-weight:400;margin-left:8px}
+.jb-files .b-row{flex-wrap:wrap}
+
+/* ── телефон ── */
+@media (max-width:720px){
+  .jb{padding-top:20px;gap:20px}
+  .jb-prog{padding:20px}
+  .jb-phead{gap:14px}
+  .jb-ptitle{font-size:22px}
+  .jb-hero{flex-wrap:wrap;gap:16px}
+  .jb-hero .jb-agent{width:64px;height:64px;border-radius:18px}
+  .jb-hmain{flex-basis:calc(100% - 80px)}
+  .jb-verdict{font-size:26px}
+  .jb-verdict .sep{display:none}
+  .jb-verdict .v{display:block}
+  .jb-hact{width:100%}
+  .jb-row{flex-wrap:wrap;gap:4px 12px}
+  .jb-row .jb-t{flex-basis:calc(100% - 64px)}
+  .jb-row .jb-where{max-width:none;text-align:left;margin-left:62px}
+  .jb-row .jb-go{display:none}
+  .jb-tabbar{top:8px}
+  .jb-extra{margin-left:0}
+  .jb-frame{height:calc(100svh - 80px);min-height:480px;border-radius:var(--b-r-md)}
+}
+@media (prefers-reduced-motion:reduce){.jb-stg.running .jb-ic::before{animation:none}}

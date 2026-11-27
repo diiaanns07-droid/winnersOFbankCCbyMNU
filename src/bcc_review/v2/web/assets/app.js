@@ -67,73 +67,92 @@
     });
   }
 
-  /* ── страница задания ── */
+  /* ── страница задания (№41): прогресс, вердикт, вкладки, боковое окно с документом ── */
   var wrap = document.querySelector("[data-job]");
   if (!wrap) return;
   var id = wrap.dataset.job;
-  var STATE = { queued: "в очереди", running: "идёт анализ", done: "готово", failed: "ошибка" };
-  var VERD = { no: "нельзя", conditional: "с условиями", yes: "можно" };
+  var STATE = { queued: "в очереди", running: "идёт проверка", done: "готово", failed: "ошибка" };
+  var SCAN = { docview: 1, segment: 1, rules: 1, lens_analyst: 1, lens_qa: 1, lens_architect: 1, lens_risk: 1, consistency: 1, quotes: 1 };
   function fmt(s) {
     s = Math.max(0, Math.round(s));
     return s < 60 ? s + " с" : Math.floor(s / 60) + " мин " + String(s % 60).padStart(2, "0") + " с";
   }
-  function li(cls, inner) { var x = document.createElement("li"); x.className = "stg " + cls; x.innerHTML = inner; return x; }
-  function esc(t) { var d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+  function esc(t) { var d = document.createElement("div"); d.textContent = t == null ? "" : t; return d.innerHTML; }
+  function plural(n, a, b, c) { n = Math.abs(n) % 100; var k = n % 10; return n > 10 && n < 20 ? c : k === 1 ? a : k > 1 && k < 5 ? b : c; }
+
+  /* BCC AI (№40): режим меняем через экземпляр, если он есть, и всегда — через data-mood */
+  function agentEl() { return document.querySelector("[data-bcc-agent]"); }
+  function mood(m) {
+    var el = agentEl();
+    if (!el || el.dataset.mood === m) return;
+    el.dataset.mood = m;
+    var a = el.bccAgent || el._bccAgent || el.agent || null;
+    if (!a && window.BCCAgent && typeof window.BCCAgent.get === "function") { try { a = window.BCCAgent.get(el); } catch (_) { a = null; } }
+    if (a && typeof a.mood === "function") { try { a.mood(m); } catch (_) {} }
+  }
+  function finalMood(alert) {
+    mood(alert ? "alert" : "verified");
+    if (alert) setTimeout(function () { mood("idle"); }, 1500);
+  }
+
+  /* ── прогресс: строки создаём один раз и дальше только меняем классы — точка пульсирует без рывков ── */
+  var rows = {};
+  function row(key, label) {
+    if (rows[key]) return rows[key];
+    var x = document.createElement("li");
+    x.className = "jb-stg pending";
+    x.innerHTML = '<span class="jb-ic" aria-hidden="true"></span><div class="jb-nm">' + esc(label) +
+      '<div class="jb-subs"></div></div><span class="jb-tm"></span>';
+    $("#stages").appendChild(x);
+    rows[key] = x;
+    return x;
+  }
+  function setState(x, st) { var c = "jb-stg " + st; if (x.className !== c) x.className = c; }
+  function hint(err) {
+    err = (err || "").toLowerCase();
+    if (/ключ|api|401|403|quota|квот|лимит|модел/.test(err)) return "Что сделать: проверьте ключ модели в файле .env или выберите «Демо без модели» и запустите проверку снова.";
+    if (/прочитать|скан|текст|пуст/.test(err)) return "Что сделать: загрузите файл с текстом (не скан страниц) — PDF с текстовым слоем, Word или Markdown.";
+    if (/перезапущен/.test(err)) return "Что сделать: запустите проверку ещё раз — документ не потерян.";
+    return "Что сделать: запустите проверку ещё раз; подробности — в журнале запуска ниже.";
+  }
+  var shownState = "";
   function render(j) {
     $("#elapsed").textContent = fmt(j.elapsed);
     $("#pstate").textContent = STATE[j.state] || j.state;
-    var box = $("#stages");
-    box.innerHTML = "";
+    $("#calls").textContent = j.calls ? " · " + j.calls + " " + plural(j.calls, "вызов", "вызова", "вызовов") + " модели" : "";
     var par = j.stage_list.filter(function (s) { return s.parallel; });
-    var parDone = false;
+    var running = null;
     j.stage_list.forEach(function (s) {
+      if (s.state === "running" && !running) running = s.id;
       if (s.parallel) {
-        if (parDone) return;
-        parDone = true;
-        var st = par.every(function (x) { return x.state === "done"; }) ? "done"
-          : par.some(function (x) { return x.state === "failed"; }) ? "failed"
-          : par.some(function (x) { return x.state === "running" || x.state === "done"; }) ? "running" : "pending";
-        var subs = par.map(function (x) { return '<span class="sub ' + x.state + '">' + esc(x.label) + "</span>"; }).join("");
-        box.appendChild(li(st, '<span class="ic"></span><span class="nm">Ревьюеры параллельно</span><span class="subs">' + subs + "</span>"));
+        if (s !== par[0]) return;
+        var x = row("lenses", "Ревьюеры параллельно");
+        var st = par.every(function (p) { return p.state === "done" || p.state === "skipped"; }) ? "done"
+          : par.some(function (p) { return p.state === "failed"; }) ? "failed"
+          : par.some(function (p) { return p.state === "running" || p.state === "done"; }) ? "running" : "pending";
+        setState(x, st);
+        var subs = x.querySelector(".jb-subs");
+        if (!subs.children.length) subs.innerHTML = par.map(function (p) { return '<span class="jb-sub" data-id="' + esc(p.id) + '">' + esc(p.label) + "</span>"; }).join("");
+        par.forEach(function (p) { var e2 = subs.querySelector('[data-id="' + p.id + '"]'); if (e2) e2.className = "jb-sub " + p.state; });
+        var tl = Math.max.apply(null, par.map(function (p) { return j.stage_times[p.id] || 0; }));
+        x.querySelector(".jb-tm").textContent = st === "done" && tl ? fmt(tl) : "";
         return;
       }
+      var y = row(s.id, s.label);
+      setState(y, s.state);
       var t = j.stage_times[s.id];
-      box.appendChild(li(s.state, '<span class="ic"></span><span class="nm">' + esc(s.label) + '</span><span class="tm">' + (t ? fmt(t) : "") + "</span>"));
+      y.querySelector(".jb-tm").textContent = t ? fmt(t) : "";
     });
     $("#log").textContent = (j.log || []).join("\n");
-    var err = $("#err");
-    if (j.state === "failed") { err.hidden = false; err.textContent = j.error || "Анализ завершился с ошибкой."; }
-    var nt = $("#notice");
-    if (nt && j.state === "done" && j.notice) { nt.hidden = false; nt.textContent = j.notice; }
-    if (j.state === "done") {
-      var af = $("#answers");
-      if (af && af.hidden && !j.answers_path) {
-        af.hidden = false;
-        var inp = af.querySelector("input[type=file]");
-        inp.addEventListener("change", function () {
-          if (!inp.files.length) return;
-          var lbl = af.querySelector("label");
-          lbl.firstChild.textContent = "Пересчитываем… ";
-          fetch("/api/jobs/" + id + "/answers", { method: "POST", body: new FormData(af), headers: { Accept: "application/json" } })
-            .then(function (r) { return r.json().then(function (x) { return { ok: r.ok, x: x }; }); })
-            .then(function (res) { if (res.ok) location.href = res.x.url; else throw new Error(res.x.error); })
-            .catch(function (err) {
-              lbl.firstChild.textContent = "Загрузить ответы ↻";
-              inp.value = "";
-              var e2 = $("#err"); e2.hidden = false; e2.textContent = err.message;
-            });
-        });
-      }
-      $("#prog").classList.add("compact");
-      $("#result").hidden = false;
-      document.querySelectorAll(".dl[data-key]").forEach(function (a) { a.hidden = !(a.dataset.key in j.files); });
-      $("#dll").hidden = false; $("#newtab").hidden = false;
-      var s = j.summary || {};
-      $("#vsum").innerHTML = " · разработка: <b>" + esc(VERD[s.development] || "—") + "</b> · замечаний: <b>" +
-        ((s.critical || 0) + (s.major || 0) + (s.minor || 0)) + "</b>, критичных <b>" + (s.critical || 0) + "</b>";
-      var fr = $("#frame");
-      if (!fr.src) fr.src = "/jobs/" + id + "/files/report.html?inline=1";
+    if (j.state === "running" || j.state === "queued") mood(running && !SCAN[running] ? "analyzing" : "scanning");
+    if (j.state === "failed" && shownState !== "failed") {
+      $("#err").hidden = false;
+      $("#errtext").textContent = j.error || "Проверка завершилась с ошибкой.";
+      $("#todo").textContent = hint(j.error);
+      mood("alert");
     }
+    if (j.state === "done" && shownState !== "done") showResult(j);
+    shownState = j.state;
     return j.state === "done" || j.state === "failed";
   }
   function poll() {
@@ -142,5 +161,125 @@
       .then(function (j) { if (!render(j)) setTimeout(poll, 1000); })
       .catch(function () { setTimeout(poll, 3000); });
   }
-  poll();
+
+  /* ── прогон закончился при открытой странице: подгружаем отчёт и переносим BCC AI к вердикту ── */
+  function showResult(j) {
+    var res = $("#result");
+    if (!res.hidden && res.children.length) return;
+    fetch("/jobs/" + id + "?part=result").then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (html) {
+        res.innerHTML = html;
+        var ag = $("#agent-home > [data-bcc-agent]"), slot = $("#agent-slot");
+        if (ag && slot) slot.appendChild(ag);
+        $("#prog").hidden = true;
+        res.hidden = false;
+        initResult();
+        var s = j.summary || {};
+        finalMood((s.critical || 0) > 0);
+        window.scrollTo({ top: 0 });
+      })
+      .catch(function () { location.reload(); });
+  }
+
+  /* ── отчёт: вкладки-капсулы над рамкой с HTML-отчётом ── */
+  function initResult() {
+    var fr = $("#rframe"), box = $("#framebox");
+    if (!fr) return;
+    var view = "findings", fdoc = null;
+    function rdoc() { try { return fr.contentDocument; } catch (_) { return null; } }
+    function rtab(name) { var d = rdoc(), t = d && d.getElementById("t-" + name); if (t) t.click(); return !!t; }
+    function closeDrawer() { var d = rdoc(); if (d && d.body) d.body.dispatchEvent(new d.defaultView.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); }
+    function setView(v, rt) {
+      view = v;
+      document.querySelectorAll("#tabs [data-view]").forEach(function (b) { b.setAttribute("aria-selected", b.dataset.view === v ? "true" : "false"); });
+      var revisedReady = $("#revised-empty").hasAttribute("data-ready");
+      $("#qbar").hidden = v !== "questions";
+      $("#exports").hidden = v !== "exports";
+      $("#revised-empty").hidden = !(v === "revised" && !revisedReady);
+      box.hidden = v === "exports" || (v === "revised" && !revisedReady);
+      var d = rdoc();
+      if (d && d.documentElement) {
+        d.documentElement.setAttribute("data-view", v);
+        if (v === "doc") closeDrawer();
+        rtab(rt || { questions: "questions", revised: "rewrites" }[v] || "findings");
+      }
+    }
+    function embed() {
+      var d = rdoc();
+      if (!d || !d.documentElement || fdoc === d) return;
+      fdoc = d;
+      var root = d.documentElement;
+      root.setAttribute("data-embed", "");
+      root.dataset.theme = "light";
+      var head = d.querySelector(".dochead");
+      if (head && !d.getElementById("jbclose")) {
+        var x = d.createElement("button");
+        x.type = "button"; x.id = "jbclose"; x.className = "dclose"; x.setAttribute("aria-label", "Закрыть документ"); x.title = "Закрыть (Esc)";
+        x.addEventListener("click", closeDrawer);
+        head.appendChild(x);
+      }
+      var sync = function () {
+        var open = !!d.querySelector(".card.active, .ln.rqsel");
+        if (open !== root.hasAttribute("data-drawer")) { if (open) root.setAttribute("data-drawer", ""); else root.removeAttribute("data-drawer"); }
+      };
+      var target = d.getElementById("p-findings");
+      if (target && window.MutationObserver) new MutationObserver(sync).observe(target, { subtree: true, attributes: true, attributeFilter: ["class"] });
+      setView(view);
+      setTimeout(function () { fr.classList.add("ready"); }, 30);
+    }
+    fr.addEventListener("load", embed);
+    if (!fr.getAttribute("src")) fr.src = fr.dataset.src;
+    document.querySelectorAll("[data-view]").forEach(function (b) {
+      if (b.closest("#tabs") || b.closest("#revised-empty")) b.addEventListener("click", function () { setView(b.dataset.view); });
+    });
+    var tabs = Array.prototype.slice.call(document.querySelectorAll("#tabs [data-view]"));
+    tabs.forEach(function (b, i) {
+      b.addEventListener("keydown", function (ev) {
+        var dd = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
+        if (!dd) return;
+        ev.preventDefault();
+        var n = tabs[(i + dd + tabs.length) % tabs.length]; n.focus(); setView(n.dataset.view);
+      });
+    });
+    var extra = $(".jb-extra");
+    document.querySelectorAll("[data-rtab]").forEach(function (b) {
+      b.addEventListener("click", function () { setView("more", b.dataset.rtab); if (extra) extra.open = false; });
+    });
+    document.addEventListener("click", function (ev) { if (extra && extra.open && !ev.target.closest(".jb-extra")) extra.open = false; });
+    /* блокер → замечание в рамке, документ открывается сбоку с подсвеченными строками */
+    document.querySelectorAll("[data-goto]").forEach(function (a) {
+      a.addEventListener("click", function (ev) {
+        var d = rdoc();
+        if (!d) return;
+        ev.preventDefault();
+        setView("findings");
+        box.scrollIntoView({ behavior: "smooth", block: "start" });
+        var c = d.getElementById(a.dataset.goto);
+        if (c) { c.click(); c.scrollIntoView({ behavior: "smooth", block: "start" }); }
+      });
+    });
+    /* ответы владельца: скачать (из отчёта в рамке) и загрузить → повторная проверка */
+    var dl = $("#dlanswers");
+    if (dl) dl.addEventListener("click", function () { var d = rdoc(), b = d && d.getElementById("dlanswers"); if (b) b.click(); });
+    var qbar = $("#qbar"), inp = qbar && qbar.querySelector("input[type=file]");
+    if (inp) inp.addEventListener("change", function () {
+      if (!inp.files.length) return;
+      var lbl = inp.parentNode.querySelector("span"), note = qbar.querySelector(".b-note");
+      lbl.textContent = "Пересчитываем…";
+      fetch("/api/jobs/" + id + "/answers", { method: "POST", body: new FormData(qbar), headers: { Accept: "application/json" } })
+        .then(function (r) { return r.json().then(function (x) { return { ok: r.ok, x: x }; }); })
+        .then(function (res) { if (res.ok) location.href = res.x.url; else throw new Error(res.x.error); })
+        .catch(function (err) {
+          lbl.textContent = "Загрузить ответы ↻"; inp.value = "";
+          note.className = "b-status error"; note.textContent = err.message;
+        });
+    });
+  }
+
+  if (wrap.dataset.state === "done" && !$("#result").hidden) {
+    initResult();
+    finalMood(!!document.querySelector(".jb-row:not(.ok)"));
+  } else {
+    poll();
+  }
 })();
