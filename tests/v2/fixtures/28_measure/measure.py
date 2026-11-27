@@ -55,8 +55,9 @@ def cases(sets: list[str], only: list[str] | None = None) -> list[dict]:
     return out
 
 
-def _py(*args: str, timeout: int = 900) -> subprocess.CompletedProcess:
+def _py(*args: str, timeout: int = 900, extra_env: dict | None = None) -> subprocess.CompletedProcess:
     env = dict(os.environ, PYTHONPATH=str(ROOT / "src") + os.pathsep + os.environ.get("PYTHONPATH", ""))
+    env.update(extra_env or {})
     return subprocess.run([sys.executable, "-m", "bcc_review", *args], cwd=str(ROOT), capture_output=True,
                           text=True, timeout=timeout, env=env)
 
@@ -96,7 +97,7 @@ def base_run(c: dict) -> Path:
     return runs / base_id
 
 
-def run_case(c: dict, lens: str, label: str, rep: str, model: str, effort: str | None) -> dict:
+def run_case(c: dict, lens: str, label: str, rep: str, model: str, effort: str | None, views: str = "") -> dict:
     stage = f"lens_{lens}"
     base = base_run(c)
     rid = f"{lens}_{label}_{rep}_{c['id']}"
@@ -106,7 +107,7 @@ def run_case(c: dict, lens: str, label: str, rep: str, model: str, effort: str |
     if effort:
         args += ["--effort", effort]
     t0 = time.monotonic()
-    r = _py(*args)
+    r = _py(*args, extra_env={"BCC_ANALYST_VIEWS": views} if views else None)
     sf = OUT / "runs" / rid / "stages" / f"{stage}.json"
     st = json.loads(sf.read_text(encoding="utf-8")) if sf.exists() else {}
     out = st.get("output") or {}
@@ -114,6 +115,7 @@ def run_case(c: dict, lens: str, label: str, rep: str, model: str, effort: str |
            "wall": round(time.monotonic() - t0, 1), "calls": st.get("calls"), "status": st.get("status"),
            "error": st.get("error"), "warnings": st.get("warnings"), "candidates": out.get("candidates") or [],
            "dropped": out.get("dropped") or [], "acceptance_checks": out.get("acceptance_checks") or [],
+           "views": out.get("views"), "view_candidates": out.get("view_candidates"),
            "tail": (r.stderr or "")[-600:] if r.returncode else ""}
     w = OUT / lens / f"{label}_{rep}"
     w.mkdir(parents=True, exist_ok=True)
@@ -244,6 +246,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--sets", default="official,open2c")
     ap.add_argument("--cases", default="")
     ap.add_argument("--jobs", type=int, default=5)
+    ap.add_argument("--views", default="", help="аналитик: 1 или 2 просмотра (переменная BCC_ANALYST_VIEWS)")
     a = ap.parse_args(argv)
     if a.cmd == "union":
         print(union([x for x in a.labels.split(",") if x]))
@@ -253,7 +256,7 @@ def main(argv: list[str] | None = None) -> int:
         for c in cs:  # базовые mock-прогоны — последовательно (быстро, без модели)
             base_run(c)
         with cf.ThreadPoolExecutor(max_workers=a.jobs) as ex:
-            futs = {ex.submit(run_case, c, a.lens, a.label, a.rep, a.model, a.effort): c["id"] for c in cs}
+            futs = {ex.submit(run_case, c, a.lens, a.label, a.rep, a.model, a.effort, a.views): c["id"] for c in cs}
             for f in cf.as_completed(futs):
                 r = f.result()
                 print(f"{r['id']}: {r['status']} вызовов {r['calls']} {r['seconds']} с, кандидатов "

@@ -29,6 +29,7 @@
 """
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
@@ -242,6 +243,7 @@ def postprocess(candidates: list[dict[str, Any]], *, mature: bool = False, max_c
 # у мест, которые нашли оба просмотра, найденное одним — minor с `severity_hint`. На вычитанном документе строгий
 # режим и так точен — второй просмотр не делается.
 TWO_VIEWS = False  # выключено до замера (WIP прошлого чата №28, живой замер не закончен); код и тесты — для v2.1
+VIEWS_ENV = "BCC_ANALYST_VIEWS"  # «1» или «2» — число просмотров для замера (стенд №28); иначе — TWO_VIEWS
 SECOND_VIEW = ("\n\n### Второй просмотр\nЭтот документ уже просмотрел другой аналитик, начиная с первых разделов. "
                "Пройди его в обратном порядке — от последних разделов бизнес-части к первым — с тем же фильтром, той же "
                "шкалой серьёзности и теми же правилами оформления.")
@@ -304,7 +306,8 @@ def run(ctx, lens_run=None) -> dict:
     m = maturity(view)
     api = api_lines(view)
     options = getattr(ctx, "options", None) or {}
-    two = TWO_VIEWS and not m["mature"] and int(options.get("passes", 1) or 1) < 2 and getattr(ctx, "llm", None)
+    enabled = TWO_VIEWS if os.environ.get(VIEWS_ENV, "") not in ("1", "2") else os.environ[VIEWS_ENV] == "2"
+    two = enabled and not m["mature"] and int(options.get("passes", 1) or 1) < 2 and getattr(ctx, "llm", None)
 
     def one(c) -> tuple[dict, list[dict]]:
         res = dict(lens_run(c, "analyst"))
@@ -341,6 +344,7 @@ def run(ctx, lens_run=None) -> dict:
     else:
         (out, a), (_, b) = ok
         out["candidates"] = merge_views(a, b, evidence_lines(view, a), evidence_lines(view, b))
+        out["view_candidates"] = {"first": a, "second": b}  # для замера: один просмотр против двух на тех же ответах
         out["views"] = {"first": len(a), "second": len(b), "agreed": sum(1 for c in out["candidates"]
                                                                          if c.get("views") == 2)}
     out["document_maturity"] = m

@@ -164,3 +164,20 @@ def test_second_view_changes_prompt_and_passes_attributes():
     v = A._SecondView(LLM())
     assert v.ask("lens_analyst", "s", "задание", {})["user"].endswith(A.SECOND_VIEW)
     assert v.stats == {"calls": 0}
+
+
+def test_views_env_switch(monkeypatch):
+    """Число просмотров для замера задаёт переменная окружения; без неё — `TWO_VIEWS` из кода."""
+    view = docview.load(OFFICIAL)
+    seen = []
+
+    def run(ctx, name):
+        seen.append(isinstance(ctx.llm, A._SecondView))
+        return {"candidates": []}
+    monkeypatch.setenv(A.VIEWS_ENV, "2")
+    out = A.run(_Ctx(view), lens_run=run)
+    assert sorted(seen) == [False, True] and out["view_candidates"] == {"first": [], "second": []}
+    seen.clear()
+    monkeypatch.setenv(A.VIEWS_ENV, "1")
+    A.run(_Ctx(view), lens_run=run)
+    assert seen == [False]
