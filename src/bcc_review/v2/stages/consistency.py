@@ -518,7 +518,7 @@ MAJOR_CONFLICT_KINDS = ("unit_mismatch",)
 
 # ---------------------------------------------------------------- тексты для читателя
 
-MAX_TITLE_WORDS = 14
+MAX_TITLE_WORDS = 12  # рубрика понятности WAVE3: заголовок до 12 слов
 # Место без номера пункта в документе называем по виду требования и строке.
 _KIND_PLACE = {"goal": "цель", "architecture": "схема архитектуры", "process": "описание процесса",
                "ui": "описание экрана", "nonfunctional": "нефункциональное требование", "data": "требования к данным",
@@ -608,6 +608,28 @@ def _clean_title(t: str) -> str:
     return re.sub(r"\s{2,}", " ", t).strip(" ,;")
 
 
+def _fit_title(t: str, n: int = MAX_TITLE_WORDS) -> str:
+    """Заголовок до n слов: лишнее отрезается по слову, без «…» (суть — в тексте проблемы)."""
+    w = _s(t).split()
+    return " ".join(w[:n]).rstrip(" ,;:—-") if len(w) > n else _s(t)
+
+
+_IMPERATIVE = re.compile(r"^(?:добавить|указать|зафиксировать|определить|уточнить|описать|задать|выбрать|"
+                         r"записать|установить)(?:\s+(?:правило|явно|одно правило|в документе))?\s*[:,—-]?\s*", re.I)
+
+
+def question_from_recommendation(rec: str) -> str:
+    """Рекомендация с вариантами («… сразу или не отправляется до следующего месяца») — готовый вопрос владельцу:
+    «Push отправляется сразу или не отправляется до следующего месяца?». Без «или» вопроса из неё нет."""
+    r = _s(rec).strip().rstrip(".")
+    if not _has_variants(r):
+        return ""
+    r = _IMPERATIVE.sub("", r).strip()
+    if len(r.split()) < 4:
+        return ""
+    return _cap(r) + "?"
+
+
 def _has_variants(q: str) -> bool:
     """Вопрос уже предлагает варианты («… или …»)."""
     return bool(re.search(r"(?<![а-яё])или(?![а-яё])", q or "", re.I))
@@ -686,7 +708,7 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         fallback = f"{qa_} и {qb_} не определяют результат: {_short(subject, 8)}"
         problem = (f"{_cap(qa_)} и {qb_} касаются одного случая — {subject}, — но результат по ним "
                    f"не определить: документ не говорит, что делать.")
-    title = model_title if model_title and _words(model_title) <= MAX_TITLE_WORDS else fallback
+    title = model_title if model_title and _words(model_title) <= MAX_TITLE_WORDS else _fit_title(fallback)
     scenario = _sentence(human(pair["scenario"]))
     if oa and ob:
         scenario = " ".join(x for x in (scenario, f"{_cap(a_lbl)}: {oa}.", f"{_cap(b_lbl)}: {ob}.") if x)
@@ -702,6 +724,8 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         question = f"Что верно: «{oa}» (как в {qa_}) или «{ob}» (как в {qb_})?"
     elif pair["verdict"] == "undefined" and _check_order(pair, kind) and oa and ob and not _has_variants(question):
         question = f"Какая проверка идёт первой: по {qa_} («{oa}») или по {qb_} («{ob}»)?"
+    if not question:
+        question = question_from_recommendation(rec) or f"Какое правило верно в этом случае: {_short(subject, 10)}?"
     return {
         "title": title, "kind": kind, "criterion": criterion, "severity": severity,
         "requirement_ids": ids, "evidence": [{k: v for k, v in e.items()} for e in evidence],
@@ -837,8 +861,7 @@ def glossary_to_candidate(g: dict) -> dict | None:
     else:
         impact = "Документ труднее читать и искать по нему; растёт риск ошибки при изменениях."
     return {
-        "title": f"Разные названия {what}: " + ", ".join(f"«{t}»" for t in terms[:3])
-                 + (" и др." if len(terms) > 3 else ""),
+        "title": _names_title(f"Разные названия {what}:", terms),
         "kind": "terminology", "criterion": "conforming", "severity": severity, "requirement_ids": [],
         "evidence": [{"quote": t["term"], "line": t["line"], "verified": t["verified"]} for t in found[:4]],
         "problem": f"{problem} Названия: {names}.",
@@ -846,9 +869,32 @@ def glossary_to_candidate(g: dict) -> dict | None:
         "impact": impact,
         "recommendation": (f"Выбрать одно название (например, «{first}»), заменить им остальные во всех частях "
                            f"документа и добавить его в глоссарий с определением."),
-        "rewrite": "", "question": "", "blocks": "development" if severity == "major" else "none",
+        "rewrite": "",
+        "question": (f"«{terms[0]}» и «{terms[1]}» — одно лицо или разные? Если разные, кому дано право и чью "
+                     f"сессию проверять?") if person and len(terms) >= 2 else _names_question(terms),
+        "blocks": "development" if severity == "major" else "none",
         "source": SOURCE, "origin": "glossary", "glossary_ids": [g["id"]] if g.get("id") else [],
     }
+
+
+def _names_title(head: str, names: list[str], n: int = MAX_TITLE_WORDS) -> str:
+    """«Разные названия компонента: «A», «B» и др.» — столько названий, сколько помещается в n слов (не меньше двух)."""
+    shown: list[str] = []
+    for name in names:
+        cand = shown + [name]
+        if len(shown) >= 2 and _words(head) + sum(_words(x) for x in cand) + (2 if len(cand) < len(names) else 0) > n:
+            break
+        shown = cand
+    rest = len(names) > len(shown)
+    return f"{head} " + ", ".join(f"«{x}»" for x in shown) + (" и др." if rest else "")
+
+
+def _names_question(names: list[str]) -> str:
+    uniq = list(dict.fromkeys(names))[:3]
+    if len(uniq) < 2:
+        return ""
+    return "Какое название оставить во всём документе: " + ", ".join(f"«{x}»" for x in uniq[:-1]) + \
+        f" или «{uniq[-1]}»?"
 
 
 def merge_glossary(cands: list[dict]) -> list[dict]:
@@ -865,13 +911,20 @@ def merge_glossary(cands: list[dict]) -> list[dict]:
                                 if not any(e["line"] == h["line"] and e["quote"] == h["quote"] for h in host["evidence"]))
         host["glossary_ids"] = host.get("glossary_ids", []) + [x for x in c.get("glossary_ids", [])
                                                                if x not in host.get("glossary_ids", [])]
-        host["problem"] += f" Также: {c['title']}."
         host.setdefault("merged_titles", []).append(c["title"])
+        host.setdefault("_groups", [[e["quote"] for e in host["evidence"]][:3]]).append(
+            [e["quote"] for e in c["evidence"]][:3])
     for c in out:
+        groups = c.pop("_groups", None)
         if c.get("merged_titles"):
-            names = list(dict.fromkeys(e["quote"] for e in c["evidence"]))
-            c["title"] = ("Компоненты и участники названы по-разному: " + ", ".join(f"«{n}»" for n in names[:4])
-                          + (" и др." if len(names) > 4 else ""))
+            c["problem"] += " Также: " + "; ".join(c["merged_titles"]) + "."
+            # в заголовке — сначала по одному названию каждого понятия, чтобы были видны все
+            firsts = [g[0] for g in groups or [] if g]
+            names = list(dict.fromkeys(firsts + [e["quote"] for e in c["evidence"]]))
+            c["title"] = _names_title("Компоненты и участники названы по-разному:", names)
+            parts = ["«" + "» или «".join(list(dict.fromkeys(g))[:2]) + "»" for g in groups or [] if len(set(g)) >= 2]
+            c["question"] = ("Какое одно название оставить для каждого: " + "; ".join(parts) + "?") if parts else \
+                _names_question(names)
     return out
 
 
@@ -997,6 +1050,8 @@ def normalize_candidate(c: dict, view: Any, known: dict[str, dict], requirements
     }
     if not cand["requirement_ids"]:
         cand["requirement_ids"] = _requirement_ids_for_lines(evidence, requirements)
+    if not cand["question"] and not cand["rewrite"]:
+        cand["question"] = question_from_recommendation(cand["recommendation"])
     # critical без сценария, последствий или блокировки по шкале не бывает.
     if cand["severity"] == "critical" and (not cand["scenario"] or not cand["impact"] or cand["blocks"] == "none"):
         cand["severity"] = "major"

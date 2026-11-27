@@ -229,3 +229,24 @@ def test_degenerate_answer_gives_warning():
     ctx.requirements = reqs
     C.run(ctx)
     assert any("неполный" in w for w in ctx.warnings)
+
+
+def test_texts_pass_clarity_rubric_title_and_fix():
+    # заголовок пары ≤ 12 слов, у неопределённости — вопрос; у глоссария — вопрос с вариантами
+    p = pair(a="R-01", b="R-02", quote_a=DOC[1][10:], line_a=2, quote_b=DOC[2][3:], line_b=3, verdict="undefined",
+             basis="none", kind="incomplete", one_condition=True, outcome_a="второй раз — отказ",
+             outcome_b="код не назван", title="", question="",
+             subject="повторная оплата кода, который уже оплачен первым переводом, и код ответа для такого случая",
+             recommendation="Добавить правило: повторная оплата возвращает 410 или результат первого перевода.")
+    [c] = run(p)["candidates"]
+    assert len(c["title"].split()) <= 12
+    assert c["question"] == "Повторная оплата возвращает 410 или результат первого перевода?"
+    g = {"concept": "участник", "terms": [{"term": "Клиент", "line": 15}, {"term": "держатель счёта", "line": 15}],
+         "problem": "Неясно, одно ли это лицо.", "severity": "major"}
+    [gc] = run(glossary=[g])["candidates"]
+    assert "одно лицо или разные" in gc["question"] and gc["title"].startswith("Разные названия участника")
+    g2 = {"concept": "компонент", "terms": [{"term": "Сервис настроек", "line": 16},
+                                            {"term": "хранилище настроек", "line": 16}],
+          "problem": "Неясно, один ли это компонент.", "severity": "major"}
+    [gc2] = run(glossary=[g2])["candidates"]
+    assert gc2["question"].startswith("Какое название оставить") and "компонента" in gc2["title"]
