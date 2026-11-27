@@ -519,3 +519,21 @@ def test_viewdiff_same_commit_builds_view_from_exported_code():
     res = vd.check("HEAD", "HEAD", docs=["release/input/requirements.md"])
     assert res["docs"] == 1 and res["same"] == ["release/input/requirements.md"] and not res["errors"]
     assert res["prompts_changed"] == [] and res["stage_code_changed"] == [] and vd.same_input(res)
+
+
+def test_gate_official_rows_show_spread_on_same_code(monkeypatch):
+    """Вердикт — по последнему прогону; в скобках — разброс той же модели на том же коде (по деревьям git), без
+    повторов из кэша (calls 0) и без прогонов на другом коде."""
+    trees = {"aaa1111": "T1", "bbb2222": "T1", "ccc3333": "T2"}
+    monkeypatch.setattr(gate, "code_tree", lambda c: trees.get(c))
+    row = lambda commit, C, calls=9, model="sonnet", d=150.0: {  # noqa: E731
+        "commit": commit, "C": C, "calls": calls, "model": model, "provider": "claude_cli", "duration_s": d}
+    rows = [row("aaa1111", 19), row("ccc3333", 14), row("bbb2222", 19, calls=0), row("aaa1111", 17, model="haiku"),
+            row("bbb2222", 18, d=170.0)]
+    peers = gate.same_code_rows(rows, "sonnet", rows[-1])
+    assert [r["C"] for r in peers] == [19, 18]  # другой код (14), повтор из кэша и haiku — мимо
+    assert gate.spread(peers, "C") == " (на этом коде 18–19 в 2 прогонах)"
+    assert gate.spread(peers, "duration_s", minutes=True) == " (на этом коде 2.5–2.8 в 2 прогонах)"
+    assert gate.spread(peers[:1], "C") == "" and gate.spread([rows[0], rows[0]], "C") == " (на этом коде так во всех 2)"
+    trees.clear()  # код не сверить (коммита нет в git) — только сам последний прогон
+    assert gate.same_code_rows(rows, "sonnet", rows[-1]) == [rows[-1]]

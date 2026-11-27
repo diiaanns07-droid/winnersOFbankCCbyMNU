@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -138,7 +139,56 @@ def _check(name: str, target: str, fact: str, ok: bool | None, owners: str = "")
     return {"name": name, "target": target, "fact": fact, "ok": ok, "owners": "" if ok else owners}
 
 
-def official_gates(kind: str, row: dict | None, gold: dict) -> list[dict]:
+_TREES: dict[str, str | None] = {}
+
+
+def code_tree(commit: str | None) -> str | None:
+    """Код прогона по git: деревья `src/` и `pyproject.toml` коммита (коммиты №15 с правками вне `src/` — тот же код).
+    Коммита нет в репозитории — None."""
+    if not commit:
+        return None
+    if commit not in _TREES:
+        try:
+            r = subprocess.run(["git", "rev-parse", f"{commit}:src", f"{commit}:pyproject.toml"], cwd=str(ROOT),
+                               capture_output=True, text=True, timeout=20)
+            _TREES[commit] = r.stdout.strip().replace("\n", ":") if r.returncode == 0 else None
+        except (OSError, subprocess.SubprocessError):
+            _TREES[commit] = None
+    return _TREES[commit]
+
+
+def same_code_rows(rows: list[dict], kind: str, last: dict | None) -> list[dict]:
+    """Прогоны той же модели на том же коде, что последний (по деревьям git), без повторов ответов из кэша
+    (`calls` = 0: та же выборка, что у исходного прогона). Код не сверить — только сам последний."""
+    if not last:
+        return []
+    tree = code_tree(last.get("commit"))
+    if not tree:
+        return [last]
+    out = [r for r in rows if r is last or (model_kind(r.get("provider"), r.get("model")) == kind
+                                            and str(r.get("calls")) not in ("0", "None")
+                                            and code_tree(r.get("commit")) == tree)]
+    return out if any(r is last for r in out) else out + [last]
+
+
+def spread(peers: list[dict] | None, key: str, minutes: bool = False) -> str:
+    """« (на этом коде 17–19 в 3 прогонах)» — разброс показателя по прогонам на том же коде; прогон один — пусто."""
+    vals = []
+    for r in peers or []:
+        v = r.get(key)
+        try:
+            vals.append(round(float(v) / 60, 1) if minutes else int(float(v)))
+        except (TypeError, ValueError):
+            continue
+    if len(vals) < 2:
+        return ""
+    lo, hi = min(vals), max(vals)
+    if lo == hi:
+        return f" (на этом коде так во всех {len(vals)})"
+    return f" (на этом коде {lo}–{hi} в {len(vals)} прогонах)"
+
+
+def official_gates(kind: str, row: dict | None, gold: dict, peers: list[dict] | None = None) -> list[dict]:
     t = OFFICIAL[kind]
     title = {"opus": "Официальный, Opus", "sonnet": "Официальный, sonnet",
              "haiku": "Официальный, haiku (замена Gemini)", "gemini": "Официальный, Gemini"}[kind]
@@ -153,17 +203,18 @@ def official_gates(kind: str, row: dict | None, gold: dict) -> list[dict]:
     k_missed = [g for g in ("К1", "К2", "К3", "К4", "К5")
                 if score and g not in score["recall"]["critical"]["found"]]
     if "K" in t:
-        out.append(_check(f"{title}: К1–К5", f"≥ {t['K']}/5", f"{row['K']}/5", row["K"] >= t["K"],
+        out.append(_check(f"{title}: К1–К5", f"≥ {t['K']}/5", f"{row['K']}/5" + spread(peers, "K"), row["K"] >= t["K"],
                           _owners_of(k_missed, score, gold)))
     if "K_crit" in t:
         not_crit = [g for g in (score or {}).get("recall", {}).get("critical", {}).get("found", [])
                     if g not in score["recall"]["critical"]["as_critical"]]
-        out.append(_check(f"{title}: К критичными", f"≥ {t['K_crit']}", str(row["K_as_critical"]),
+        out.append(_check(f"{title}: К критичными", f"≥ {t['K_crit']}",
+                          str(row["K_as_critical"]) + spread(peers, "K_as_critical"),
                           row["K_as_critical"] >= t["K_crit"],
                           "№10 (серьёзность): " + ", ".join(not_crit) if not_crit else "№10"))
     if "C" in t:
         c_missed = [m["gold"] for m in (score or {}).get("misses") or [] if m.get("level") == "major"]
-        out.append(_check(f"{title}: С1–С20", f"≥ {t['C']}/20", f"{row['C']}/20", row["C"] >= t["C"],
+        out.append(_check(f"{title}: С1–С20", f"≥ {t['C']}/20", f"{row['C']}/20" + spread(peers, "C"), row["C"] >= t["C"],
                           _owners_of(c_missed, score, gold)))
     if "crit_false" in t:
         cf = [x.get("finding") or x.get("id") for x in (score or {}).get("severity", {}).get("critical_false") or []]
@@ -171,12 +222,12 @@ def official_gates(kind: str, row: dict | None, gold: dict) -> list[dict]:
                           "№10: " + ", ".join(map(str, cf))))
     if "dups" in t:
         d = row.get("duplicates")
-        out.append(_check(f"{title}: дубли", f"{t['dups']}", "—" if d is None else str(d),
+        out.append(_check(f"{title}: дубли", f"{t['dups']}", "—" if d is None else str(d) + spread(peers, "duplicates"),
                           None if d is None else d <= t["dups"], "№10 (слияние дублей)"))
     if "findings" in t:
         lo, hi = t["findings"]
         n = row["findings"]
-        out.append(_check(f"{title}: замечаний", f"{lo}–{hi}", str(n), lo <= n <= hi,
+        out.append(_check(f"{title}: замечаний", f"{lo}–{hi}", str(n) + spread(peers, "findings"), lo <= n <= hi,
                           "№10 (слияние дублей)" if n > hi else "№10, линзы №05–№09"))
     if "md_lines" in t:
         ml = row.get("report_md_lines")
@@ -184,7 +235,8 @@ def official_gates(kind: str, row: dict | None, gold: dict) -> list[dict]:
                           None if ml is None else ml <= t["md_lines"], "№13"))
     if "minutes" in t:
         d = row.get("duration_s")
-        out.append(_check(f"{title}: время", f"≤ {t['minutes']} мин", "—" if d is None else f"{d / 60:.1f} мин",
+        out.append(_check(f"{title}: время", f"≤ {t['minutes']} мин",
+                          "—" if d is None else f"{d / 60:.1f} мин" + spread(peers, "duration_s", minutes=True),
                           None if d is None else d <= t["minutes"] * 60, _stage_owners(score, slow=True)))
     if "calls" in t:
         c = row.get("calls")
@@ -500,7 +552,7 @@ def collect(runs: list[str] | None = None, with_tests: bool = False) -> list[dic
             checks.append(_check("Официальный, Gemini: замер", "есть", "нет замера — ворота Gemini меряются на haiku",
                                  None, "№02, №17 (живой Gemini)"))
             continue
-        checks += official_gates(kind, latest.get(kind), gold)
+        checks += official_gates(kind, latest.get(kind), gold, same_code_rows(rows, kind, latest.get(kind)))
     checks += stability_gates(gold)
     checks += corpus_gates("Корпус, haiku", _latest_summary(V2 / "corpus_results", "haiku"), CORPUS, "№15",
                            _latest_summary(V2 / "corpus_results", "haiku", with_defects=True))
@@ -529,6 +581,8 @@ def render(checks: list[dict]) -> str:
     L = [f"# Ворота третьей волны — {sc.astana_now()} (Астана)", "",
          f"Зелёных {sum(1 for c in checks if c['ok'])}, красных {len(red)}, без замера {len(wait)}. "
          "Цели — `docs/plan-v2/WAVE3.md` («Ворота к 16:00»); пересчитать: `python -m evaluation.v2.gate`.", "",
+         "Официальный документ: вердикт — по последнему прогону модели; в скобках — разброс по прогонам этой модели "
+         "на том же коде (`src/` и `pyproject.toml` по git, без повторов ответов из кэша).", "",
          "| | Ворота | Цель | Факт | Замер | Владелец красного |", "| :---: | :--- | :--- | :--- | :--- | :--- |"]
     for c in checks:
         m = "⚠️" if c.get("info") and c["ok"] is False else mark[c["ok"]]
