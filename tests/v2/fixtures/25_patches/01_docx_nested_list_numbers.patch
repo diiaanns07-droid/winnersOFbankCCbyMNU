@@ -1,0 +1,15 @@
+diff --git a/src/bcc_review/readers/docx.py b/src/bcc_review/readers/docx.py
+index 0b857558..47313c9e 100644
+--- a/src/bcc_review/readers/docx.py
++++ b/src/bcc_review/readers/docx.py
+@@ -563,7 +563,9 @@ class _Numbering:
+         lvl = levels.get(ilvl)
+         if lvl is None:
+             return None
+-        counters = self.counters.setdefault(aid, [None] * 9)
++        # w:num со своими startOverride — отдельный экземпляр списка (так нумеруют Word и LibreOffice): вложенный
++        # список pandoc/Google Docs (свой w:num на тот же abstractNum) не сбрасывает счётчик внешнего уровня
++        counters = self.counters.setdefault(("num", num_id) if overrides else aid, [None] * 9)
+         if num_id not in self.seen_nums:
+             self.seen_nums.add(num_id)
+             for k, v in overrides.items():

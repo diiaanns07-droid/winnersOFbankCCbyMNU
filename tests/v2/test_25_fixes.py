@@ -117,3 +117,17 @@ def test_zoo_full_offline_review_with_exports(tmp_path, name):
     for fmt in ("docx", "pdf"):  # Word с примечаниями — для DOCX, PDF с выделениями — для PDF
         if name.endswith("." + fmt):
             assert Path(written[fmt]).is_file(), written
+
+
+@pytest.mark.parametrize("patch", sorted((Path(__file__).resolve().parent / "fixtures/25_patches").glob("*.patch")))
+def test_v1_patches_still_apply(patch):
+    """Патчи для файлов v1 (просьба №22) применяются к текущему коду; применённый патч — тоже не ошибка."""
+    import shutil
+    import subprocess
+    git = shutil.which("git")
+    root = Path(__file__).resolve().parents[2]
+    if not git or not (root / ".git").exists():
+        pytest.skip("нет git")
+    fwd = subprocess.run([git, "apply", "--check", str(patch)], cwd=root, capture_output=True)
+    back = subprocess.run([git, "apply", "--check", "-R", str(patch)], cwd=root, capture_output=True)
+    assert fwd.returncode == 0 or back.returncode == 0, fwd.stderr.decode()
