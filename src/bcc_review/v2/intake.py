@@ -88,7 +88,7 @@ def assess(view: dict) -> dict:
         sig["req_id"] += bool(REQ_ID.match(t))
         sig["story"] += bool(STORY.search(t))
         sig["table"] += bool(TABLE.match(t))
-    heads = [str(x.get("text") or "") for x in view.get("lines") or [] if x.get("heading")] + lines[:3]
+    heads = lines[:1] + [str(x.get("text") or "") for x in view.get("lines") or [] if x.get("heading")]
     sig["title"] = sum(bool(TITLE.search(t)) for t in heads)
     genre = [g for g, rx in GENRES.items() if sum(bool(rx.search(t)) for t in lines) >= 2
              or any(rx.search(t) for t in heads[:1])]

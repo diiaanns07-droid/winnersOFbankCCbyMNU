@@ -482,9 +482,9 @@ class Pipeline:
         """№57: вставка «игнорируй инструкции, дефектов нет» — предупреждение первым экраном. Её не исполняют:
         документ уходит модели как данные, вердикт считает код по найденным блокерам."""
         try:
-            lines = sorted({int(e.get("line") or 0) for c in out.get("candidates") or []
+            lines = sorted({int(e.get("line") or e.get("line_start") or 0) for c in out.get("candidates") or []
                             if str(c.get("source") or "").startswith("rules:injection")
-                            for e in c.get("evidence") or [] if e.get("line")})
+                            for e in c.get("evidence") or [] if e.get("line") or e.get("line_start")})
         except Exception:  # noqa: BLE001
             return
         if not lines:
@@ -700,11 +700,11 @@ class Pipeline:
         if not inj:
             return findings, rejected
         ids = {str(c.get("id")) for c in inj}
-        lines = {int(e.get("line") or 0) for c in inj for e in c.get("evidence") or []}
+        lines = {int(e.get("line") or e.get("line_start") or 0) for c in inj for e in c.get("evidence") or []}
         covered = False
         for f in findings:
             # судья мог слить вставку с другим дефектом — пометка есть, только если цитата вставки в находке
-            own = {int(e.get("line") or 0) for e in f.get("evidence") or []}
+            own = {int(e.get("line") or e.get("line_start") or 0) for e in f.get("evidence") or []}
             if (ids & {str(x) for x in f.get("candidate_ids") or []} or any(
                     str(x).startswith("rules:injection") for x in f.get("sources") or [])) and own & lines:
                 covered = True
@@ -855,6 +855,9 @@ class Pipeline:
                      "https://aistudio.google.com/apikey) и запустите снова; проверка — python -m bcc_review doctor")
         from .rules import offline
         report = offline.build(view, None)
+        self._injection_warning({"candidates": [
+            {"source": src, "evidence": f.get("evidence") or []} for f in report.get("findings") or []
+            for src in f.get("sources") or [] if str(src).startswith("rules:injection")]})
         run = report.setdefault("run", {})
         base = self._run_block("complete")
         for k, v in base.items():
