@@ -1,0 +1,20 @@
+Документ: /home/user/winnersOFbankCCbyMNU/docs/plan-v2/f4/answers_exam_v3/grace/source.md
+  segment: взят из baseline_run
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 9
+  consistency: взят из baseline_run
+  lens_architect: взят из baseline_run
+  lens_analyst: взят из baseline_run
+  lens_risk: взят из baseline_run
+  lens_qa: взят из baseline_run
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 46
+  judge: взят из baseline_run
+  clarify: взят из baseline_run
+BCC Review: «Льготный период по кредитной карте» — 43 требования, 18 дефектов (критичных 2, существенных 4, незначительных 12), вопросов 8
+Предварительная оценка по ответам владельца. Готовность новой редакции подтверждает отдельная проверка исправленного текста.
+Разработка: нельзя · тестирование: нельзя — блокеров 2, каждый останавливает разработку и тестирование:
+  D-04 Особое правило прогноза процентов расходится с Ф-3
+  D-05 Не определено, какое событие считается «внесением» платежа
+Прогон завершён полностью: 2 мин 7 с, 4 вызова модели, claude-sonnet-5-5; цитат сверено 39 из 39
+Отчёт: docs/plan-v2/f4/answers_exam_v3/runs/r3_12133005/grace/answered.md и docs/plan-v2/f4/answers_exam_v3/runs/r3_12133005/grace/answered.json

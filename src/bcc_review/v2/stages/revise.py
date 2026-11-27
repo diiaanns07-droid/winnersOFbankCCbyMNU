@@ -401,10 +401,23 @@ def _answers_block(answers: Any) -> tuple[str, dict[str, list[str]]]:
     # несколько реплик на вопрос — согласованное правило, только если пересмотр снял по ним дефект без конфликта
     agreed = {c.get("finding_id") for c in answers.get("changes") or []
               if c.get("status") in ("resolved", "changed") and not c.get("answer_conflict")}
+    # стороны конфликта, который признал пересмотр («Q-01» против «Решение-1»): ни одна не согласованное правило
+    against: dict[str, set[str]] = {}
+    for c in answers.get("answer_conflicts") or []:
+        sides = {str(x) for x in c.get("answers") or []}
+        for x in sides:
+            against.setdefault(x, set()).update(sides - {x})
+            against.setdefault(x.split(".")[0], set()).update(y for y in sides if y.split(".")[0] != x.split(".")[0])
     for a in answered:
         fids = a.get("finding_ids", [])
         replies = a.get("replies") or []
         head = f"{a.get('question_id')} ({a.get('topic', '')}) → {', '.join(fids)}: "
+        rivals = sorted(against.get(str(a.get("question_id")), set()))
+        if rivals and len(replies) <= 1:
+            rows.append(head + f"ответ спорит с {', '.join(rivals)}, владелец не выбрал одно правило — значение не "
+                               f"вписывай ни по ответу, ни по {', '.join(rivals)}; поставь маркер <уточнить: …> с обоими "
+                               f"вариантами: {a.get('answer', '')}")
+            continue
         if len(replies) > 1 and not agreed & set(fids):
             # ответы адресатов расходятся: правило не согласовано, значение не выбирать — маркер <уточнить: …>
             rows.append(head + "ответы расходятся, владелец не выбрал одно правило — значение не вписывай, "
@@ -418,7 +431,13 @@ def _answers_block(answers: Any) -> tuple[str, dict[str, list[str]]]:
             continue  # несогласованные реплики — не источник значения правки
         for fid in a.get("finding_ids", []):
             by_finding.setdefault(fid, []).append(a.get("question_id"))
-    rows += [f"Общее решение владельца: {d}" for d in decisions]
+    for i, d in enumerate(decisions, 1):
+        rivals = sorted(against.get(f"Решение-{i}", set()))
+        if rivals:
+            rows.append(f"Общее решение владельца Решение-{i} спорит с {', '.join(rivals)} — не согласованное правило: "
+                        f"не вписывай его значение, поставь маркер <уточнить: …> с обоими вариантами: {d}")
+        else:
+            rows.append(f"Общее решение владельца: {d}")
     return ("\n".join(rows) or "—"), by_finding
 
 

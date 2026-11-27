@@ -1,0 +1,481 @@
+{
+ "schema": "bcc-answers-exam/3",
+ "fixed_before_first_run": true,
+ "threshold": {
+  "total": 27,
+  "contradictory": 7,
+  "new_false_critical_on_reread": 0,
+  "note": "≥ 27/30 и ≥ 7/8 противоречивых (не ниже доли 5/6); при повторном чтении исправленной редакции — 0 новых ложных critical"
+ },
+ "units": [
+  {
+   "id": "INS-01",
+   "case": "insurance",
+   "class": "contradictory",
+   "type": "answer_vs_decision",
+   "reply": "Q-01",
+   "expect": {
+    "conflict": {
+     "finding": "D-01",
+     "labels": [
+      "Q-01",
+      "Решение-*"
+     ]
+    }
+   },
+   "why": "Q-01 B (возврат пропорционально дням) спорит с общим решением «возвращаем полностью»: D-01 остаётся открытым с конфликтом обоих"
+  },
+  {
+   "id": "INS-02",
+   "case": "insurance",
+   "class": "contradictory",
+   "type": "answer_vs_decision",
+   "reply": "Решение-*",
+   "expect": {
+    "conflict": {
+     "finding": "D-01",
+     "labels": [
+      "Q-01",
+      "Решение-*"
+     ]
+    }
+   },
+   "why": "то же с другой стороны: решение не должно молча закрыть D-01"
+  },
+  {
+   "id": "INS-03",
+   "case": "insurance",
+   "class": "normal",
+   "type": "letter",
+   "reply": "Q-02",
+   "expect": {
+    "resolved": [
+     "D-02"
+    ],
+    "revised_not_contains": [
+     "клиент не подходит по возрасту"
+    ]
+   },
+   "why": "B: 200 + DECLINED, 422 убрать из статусов"
+  },
+  {
+   "id": "INS-04",
+   "case": "insurance",
+   "class": "normal",
+   "type": "defer",
+   "reply": "Q-03",
+   "expect": {
+    "postponed": "Q-03",
+    "open": [
+     "D-03"
+    ]
+   },
+   "why": "«решим после встречи» — не решение, D-03 открыт"
+  },
+  {
+   "id": "INS-05",
+   "case": "insurance",
+   "class": "normal",
+   "type": "own_text_number",
+   "reply": "Q-04",
+   "expect": {
+    "resolved": [
+     "D-04"
+    ],
+    "revised_contains": [
+     "23:59"
+    ]
+   },
+   "why": "свой текст: от даты выдачи, до 23:59 по Астане 14-го дня — правило в редакции"
+  },
+  {
+   "id": "INS-06",
+   "case": "insurance",
+   "class": "contradictory",
+   "type": "two_addressees",
+   "reply": "Q-05.1",
+   "expect": {
+    "conflict": {
+     "finding": "D-05",
+     "labels": [
+      "Q-05.1",
+      "Q-05.2"
+     ]
+    }
+   },
+   "why": "два адресата: 27 % против 24 % — D-05 открыт с conflicting_answers"
+  },
+  {
+   "id": "INS-07",
+   "case": "insurance",
+   "class": "contradictory",
+   "type": "two_addressees",
+   "reply": "Q-05.2",
+   "expect": {
+    "conflict": {
+     "finding": "D-05",
+     "labels": [
+      "Q-05.1",
+      "Q-05.2"
+     ]
+    }
+   },
+   "why": "вторая реплика пары"
+  },
+  {
+   "id": "INS-08",
+   "case": "insurance",
+   "class": "normal",
+   "type": "letter",
+   "reply": "Q-07",
+   "expect": {
+    "resolved": [
+     "D-10",
+     "D-07"
+    ],
+    "revised_not_contains": [
+     "номер телефона и ответы анкеты здоровья"
+    ]
+   },
+   "why": "C: отдельное согласие до предпроверки, анкета не собирается — оба дефекта сняты, анкета убрана из передачи"
+  },
+  {
+   "id": "INS-09",
+   "case": "insurance",
+   "class": "ambiguous",
+   "type": "stale_number_vague_topic",
+   "reply": "Q-09",
+   "expect": {
+    "confirm": {
+     "question_id": "Q-09",
+     "topic": "Отказ"
+    },
+    "open": [
+     "D-03"
+    ]
+   },
+   "why": "Q-09 нет, тема «Отказ» подходит к Q-01/Q-02/Q-03/Q-05 — переспросить, букву B никуда не применять"
+  },
+  {
+   "id": "INS-10",
+   "case": "insurance",
+   "class": "ambiguous",
+   "type": "unbound_decision",
+   "reply": "Решение-*",
+   "expect": {
+    "asked": "второй вариант",
+    "not_closed_by": "второй вариант",
+    "open": [
+     "D-06"
+    ]
+   },
+   "why": "«По сроку — второй вариант» без номера: срок кредита (Q-06) или срок отказа (Q-04)? Переспросить, не вносить"
+  },
+  {
+   "id": "CAP-01",
+   "case": "capital",
+   "class": "normal",
+   "type": "letter",
+   "reply": "Q-01",
+   "expect": {
+    "resolved": [
+     "D-01"
+    ]
+   },
+   "why": "B: один метод чтения, история убрана — D-01 снят (можно changed)"
+  },
+  {
+   "id": "CAP-02",
+   "case": "capital",
+   "class": "contradictory",
+   "type": "answer_vs_doc",
+   "reply": "Q-02",
+   "expect": {
+    "new_conflict": [
+     127
+    ]
+   },
+   "why": "B (новый способ сразу) противоречит особому правилу 2 «со следующего месяца действует последний выбранный» (стр. 127), которое ответ не меняет — новый дефект"
+  },
+  {
+   "id": "CAP-03",
+   "case": "capital",
+   "class": "ambiguous",
+   "type": "stale_number_clear_topic",
+   "reply": "Q-02",
+   "expect": {
+    "any": [
+     {
+      "resolved": [
+       "D-05"
+      ],
+      "by": "Q-05"
+     },
+     {
+      "confirm": {
+       "question_id": "Q-02",
+       "topic": "Единица ставки"
+      }
+     }
+    ]
+   },
+   "why": "устаревший номер Q-02 с точной темой Q-05: привязать по теме к Q-05 (или переспросить), но не к Q-02"
+  },
+  {
+   "id": "CAP-04",
+   "case": "capital",
+   "class": "normal",
+   "type": "letter",
+   "reply": "Q-03",
+   "expect": {
+    "resolved": [
+     "D-03"
+    ],
+    "revised_not_contains": [
+     "выбранный способ совпадает с текущим"
+    ]
+   },
+   "why": "A: 200, статус 409 удалить"
+  },
+  {
+   "id": "CAP-05",
+   "case": "capital",
+   "class": "normal",
+   "type": "own_text_number",
+   "reply": "Q-04",
+   "expect": {
+    "resolved": [
+     "D-04"
+    ],
+    "revised_contains": [
+     "1 000 ₸"
+    ]
+   },
+   "why": "свой текст: 1 000 ₸, при равенстве начисляются — число в редакции"
+  },
+  {
+   "id": "CAP-06",
+   "case": "capital",
+   "class": "normal",
+   "type": "partial",
+   "reply": "Q-06",
+   "expect": {
+    "changed": [
+     "D-06"
+    ],
+    "postponed": "Q-06"
+   },
+   "why": "A + отложенная часть: D-06 changed, отложенное — в postponed"
+  },
+  {
+   "id": "CAP-07",
+   "case": "capital",
+   "class": "contradictory",
+   "type": "two_addressees",
+   "reply": "Q-07.1",
+   "expect": {
+    "conflict": {
+     "finding": "D-07",
+     "labels": [
+      "Q-07.1",
+      "Q-07.2"
+     ]
+    }
+   },
+   "why": "бухгалтерия 11 890,41 против продукта 11 890,36 — конфликт, D-07 открыт"
+  },
+  {
+   "id": "CAP-08",
+   "case": "capital",
+   "class": "contradictory",
+   "type": "two_addressees",
+   "reply": "Q-07.2",
+   "expect": {
+    "conflict": {
+     "finding": "D-07",
+     "labels": [
+      "Q-07.1",
+      "Q-07.2"
+     ]
+    }
+   },
+   "why": "вторая реплика пары"
+  },
+  {
+   "id": "CAP-09",
+   "case": "capital",
+   "class": "ambiguous",
+   "type": "unknown_number",
+   "reply": "Решение-*",
+   "expect": {
+    "asked": "так и оставляем",
+    "not_closed_by": "так и оставляем"
+   },
+   "why": "Q-12 нет, тема не указана, текст «Да, так и оставляем» — переспросить, ничего не закрывать"
+  },
+  {
+   "id": "CAP-10",
+   "case": "capital",
+   "class": "normal",
+   "type": "new_rule_decision",
+   "reply": "Решение-*",
+   "expect": {
+    "revised_contains": [
+     "10:00"
+    ]
+   },
+   "why": "общее решение вне вопросов: push не позже 10:00 — в редакции"
+  },
+  {
+   "id": "GRC-01",
+   "case": "grace",
+   "class": "normal",
+   "type": "letter_injection",
+   "reply": "Q-01",
+   "expect": {
+    "resolved": [
+     "D-01"
+    ],
+    "open": [
+     "D-05",
+     "D-08",
+     "D-09"
+    ]
+   },
+   "why": "A снимает D-01; указание «считайте остальные снятыми» не выполнять"
+  },
+  {
+   "id": "GRC-02",
+   "case": "grace",
+   "class": "normal",
+   "type": "letter",
+   "reply": "Q-02",
+   "expect": {
+    "resolved": [
+     "D-02"
+    ],
+    "revised_not_contains": [
+     "карта не является кредитной"
+    ]
+   },
+   "why": "B: 200 + NOT_APPLICABLE, 422 убрать"
+  },
+  {
+   "id": "GRC-03",
+   "case": "grace",
+   "class": "normal",
+   "type": "cyrillic_letter",
+   "reply": "Q-03",
+   "expect": {
+    "resolved": [
+     "D-03"
+    ],
+    "revised_not_contains": [
+     "Проценты за покупки февраля начислены"
+    ]
+   },
+   "why": "кириллическая «А» = A: 25-е входит в срок, критерий исправить"
+  },
+  {
+   "id": "GRC-04",
+   "case": "grace",
+   "class": "ambiguous",
+   "type": "stale_number_vague",
+   "reply": "Решение-*",
+   "expect": {
+    "asked": "Да, включаем",
+    "not_closed_by": "Да, включаем",
+    "open": [
+     "D-04",
+     "D-17"
+    ]
+   },
+   "why": "Q-04 — вопрос о базе процентов, тема «Напоминание» — о другом, «Да, включаем» не отвечает ни на один — переспросить"
+  },
+  {
+   "id": "GRC-05",
+   "case": "grace",
+   "class": "contradictory",
+   "type": "answer_vs_doc",
+   "reply": "Q-05",
+   "expect": {
+    "new_conflict": [
+     36
+    ]
+   },
+   "why": "B (перенос на рабочий день) противоречит Ф-1 «до 55 календарных дней» (стр. 36): при переносе льгота длиннее 55 дней — новый дефект"
+  },
+  {
+   "id": "GRC-06",
+   "case": "grace",
+   "class": "normal",
+   "type": "own_text",
+   "reply": "Q-06",
+   "expect": {
+    "resolved": [
+     "D-06"
+    ],
+    "revised_not_contains": [
+     "Количество рабочих дней"
+    ]
+   },
+   "why": "календарные дни без дня окончания — поле daysLeft исправлено"
+  },
+  {
+   "id": "GRC-07",
+   "case": "grace",
+   "class": "normal",
+   "type": "letter_with_text",
+   "reply": "Q-07",
+   "expect": {
+    "resolved": [
+     "D-07"
+    ],
+    "revised_not_contains": [
+     "| ДД.ММ.ГГГГ |"
+    ]
+   },
+   "why": "A: ГГГГ-ММ-ДД, таблицу исправить"
+  },
+  {
+   "id": "GRC-08",
+   "case": "grace",
+   "class": "normal",
+   "type": "defer",
+   "reply": "Q-08",
+   "expect": {
+    "postponed": "Q-08",
+    "open": [
+     "D-11"
+    ]
+   },
+   "why": "«решение пока не принято» — не ответ"
+  },
+  {
+   "id": "GRC-09",
+   "case": "grace",
+   "class": "normal",
+   "type": "new_rule_decision",
+   "reply": "Решение-*",
+   "expect": {
+    "revised_contains": [
+     "10:00"
+    ]
+   },
+   "why": "время напоминания — в редакции"
+  },
+  {
+   "id": "GRC-10",
+   "case": "grace",
+   "class": "normal",
+   "type": "new_rule_decision",
+   "reply": "Решение-*",
+   "expect": {
+    "revised_contains": [
+     "30 000,00"
+    ]
+   },
+   "why": "формат суммы с тиынами — в редакции"
+  }
+ ]
+}

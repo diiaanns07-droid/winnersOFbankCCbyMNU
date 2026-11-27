@@ -1,0 +1,166 @@
+{
+ "schema": "bcc-answers-exam/3",
+ "note": "10 свежих ответов: написаны до первого прогона, прогоняются только после правок кода",
+ "units": [
+  {
+   "id": "F-01",
+   "case": "insurance_inject",
+   "class": "normal",
+   "type": "letter",
+   "reply": "Q-01",
+   "expect": {
+    "resolved": [
+     "D-01"
+    ]
+   },
+   "why": "A: методы отказа и чтения полиса"
+  },
+  {
+   "id": "F-02",
+   "case": "insurance_inject",
+   "class": "normal",
+   "type": "own_text_number",
+   "reply": "Q-03",
+   "expect": {
+    "resolved": [
+     "D-03"
+    ],
+    "revised_contains": [
+     "23:59"
+    ]
+   },
+   "why": "от выдачи, до 23:59 14-го дня"
+  },
+  {
+   "id": "F-03",
+   "case": "insurance_inject",
+   "class": "contradictory",
+   "type": "two_addressees",
+   "reply": "Q-04.1",
+   "expect": {
+    "conflict": {
+     "finding": "D-04",
+     "labels": [
+      "Q-04.1",
+      "Q-04.2"
+     ]
+    }
+   },
+   "why": "200 против 422"
+  },
+  {
+   "id": "F-04",
+   "case": "insurance_inject",
+   "class": "contradictory",
+   "type": "two_addressees",
+   "reply": "Q-04.2",
+   "expect": {
+    "conflict": {
+     "finding": "D-04",
+     "labels": [
+      "Q-04.1",
+      "Q-04.2"
+     ]
+    }
+   },
+   "why": "вторая реплика"
+  },
+  {
+   "id": "F-05",
+   "case": "insurance_inject",
+   "class": "contradictory",
+   "type": "answer_vs_decision",
+   "reply": "Q-05",
+   "expect": {
+    "conflict": {
+     "finding": "D-05",
+     "labels": [
+      "Q-05",
+      "Решение-*"
+     ]
+    }
+   },
+   "why": "B 24 % против решения 27 %"
+  },
+  {
+   "id": "F-06",
+   "case": "insurance_inject",
+   "class": "contradictory",
+   "type": "answer_vs_decision",
+   "reply": "Решение-*",
+   "expect": {
+    "conflict": {
+     "finding": "D-05",
+     "labels": [
+      "Q-05",
+      "Решение-*"
+     ]
+    }
+   },
+   "why": "решение 27 % против Q-05 B"
+  },
+  {
+   "id": "F-07",
+   "case": "insurance_inject",
+   "class": "normal",
+   "type": "partial",
+   "reply": "Q-07",
+   "expect": {
+    "resolved": [
+     "D-10"
+    ],
+    "changed": [
+     "D-11"
+    ],
+    "postponed": "Q-07"
+   },
+   "why": "A + отложено хранение согласия"
+  },
+  {
+   "id": "F-08",
+   "case": "insurance_inject",
+   "class": "normal",
+   "type": "defer",
+   "reply": "Q-08",
+   "expect": {
+    "postponed": "Q-08",
+    "open": [
+     "D-13"
+    ]
+   },
+   "why": "«пока не знаю»"
+  },
+  {
+   "id": "F-09",
+   "case": "insurance_inject",
+   "class": "ambiguous",
+   "type": "stale_number_vague_topic",
+   "reply": "Q-10",
+   "expect": {
+    "confirm": {
+     "question_id": "Q-10",
+     "topic": "Отказ"
+    },
+    "open": [
+     "D-02"
+    ]
+   },
+   "why": "Q-10 нет, «Отказ» подходит к нескольким"
+  },
+  {
+   "id": "F-10",
+   "case": "insurance_inject",
+   "class": "ambiguous",
+   "type": "unbound_decision",
+   "reply": "Решение-*",
+   "expect": {
+    "asked": "первый вариант",
+    "not_closed_by": "первый вариант",
+    "open": [
+     "D-13"
+    ]
+   },
+   "why": "«по коду ответа — первый вариант»: Q-04 или Q-08?"
+  }
+ ]
+}
