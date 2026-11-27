@@ -123,7 +123,7 @@ def _resp(decisions, candidates=()):
 CAND = {"title": "Ответ противоречит примеру ответа API", "kind": "contradiction", "criterion": "set_consistent",
         "severity": "major", "requirement_ids": ["R-41"],
         "evidence": [{"quote": '{"result":"ERROR","message":"Проверьте сумму"}', "line": 171}],
-        "problem": "По ответу Q-04 ошибка суммы — 400, а пример 200 содержит ERROR.", "scenario": "amount=500",
+        "problem": "По ответу Q-01 ошибка суммы — 400, а пример 200 содержит ERROR.", "scenario": "amount=500",
         "impact": "Тест", "recommendation": "Убрать пример", "rewrite": "", "question": "", "blocks": "testing"}
 FAKE = dict(CAND, title="Выдуманная цитата", evidence=[{"quote": "нет такой строки в документе", "line": 3}])
 
@@ -404,3 +404,51 @@ def test_answer_clash_from_reason_only(findings, questions, stub_judge):
     resp2 = _resp([{"finding_id": fid, "status": "open", "by": [], "reason": f"{q1['id']} противоречит пункту документа."}])
     clar2 = recheck.apply_answers(FakeCtx(FakeLLM(resp2)), report, f"{q1['id']}: A\n")["clarification"]
     assert clar2["answer_conflicts"] == []
+
+
+def test_new_conflict_must_name_an_answer(findings, questions):
+    """Новый конфликт от ответа — ответ против места документа: без названного ответа он не проверяем."""
+    q1 = questions[0]
+    anon = dict(CAND, title="Пример успешного ответа не совпадает с описанием полей", scenario="amount=500",
+                problem="Пример расходится с таблицей полей.",
+                evidence=[{"quote": '{"result":"OK","amount":"50000","enabled":"1"}', "line": 167}])
+    res = recheck.run(FakeCtx(FakeLLM(_resp([], [anon, CAND]))), findings, f"{q1['id']}: A\n", questions)
+    assert [c["title"] for c in res["new_candidates"]] == [CAND["title"]]
+    assert any(r["reason"] == "не назван ответ, с которым расходится документ" for r in res["rejected"])
+    assert res["new_candidates"][0]["answer_refs"][0]["id"] == q1["id"]
+    assert res["new_candidates"][0]["answer_refs"][0]["text"] == q1["options"][0]
+
+
+def test_judge_sees_owner_answer_of_new_conflict(findings, questions, monkeypatch):
+    """Судья новых конфликтов видит текст ответа (вторую сторону), а дефект — какой ответ его породил."""
+    from bcc_review.v2.stages import judge
+    seen: list[dict] = []
+
+    def spy(ctx, candidates):
+        seen.extend(candidates)
+        return _stub_judge(ctx, candidates)
+    monkeypatch.setattr(judge, "run", spy)
+    q1 = questions[0]
+    report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
+    out = recheck.apply_answers(FakeCtx(FakeLLM(_resp([], [CAND]))), report, f"{q1['id']}: A")
+    assert seen and seen[0]["problem"].startswith("Решение владельца, которое будет вписано в документ:")
+    assert q1["options"][0][:40] in seen[0]["problem"]
+    new = [f for f in out["findings_after"] if f.get("status_after_answers") == "new"]
+    assert new and new[0]["answer_ids"] == [q1["id"]]
+    assert not new[0]["problem"].startswith("Решение владельца")  # служебная подсказка судье не идёт в отчёт
+
+
+def test_judge_tail_about_missing_quote_is_dropped(findings, questions, monkeypatch):
+    from bcc_review.v2.stages import judge
+
+    def tail(ctx, candidates):
+        res = _stub_judge(ctx, candidates)
+        res["findings"][0]["problem"] = ("После ответа Q-01: стр. 180 даёт тело 400 без поля result, а стр. 155 его "
+                                         "требует. Ссылка на «» в кандидате в документе не найдена, поэтому опора "
+                                         "только на стр. 155.")
+        return res
+    monkeypatch.setattr(judge, "run", tail)
+    report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
+    out = recheck.apply_answers(FakeCtx(FakeLLM(_resp([], [CAND]))), report, f"{questions[0]['id']}: A")
+    new = [f for f in out["findings_after"] if f.get("status_after_answers") == "new"][0]
+    assert new["problem"] == "После ответа Q-01: стр. 180 даёт тело 400 без поля result, а стр. 155 его требует."
