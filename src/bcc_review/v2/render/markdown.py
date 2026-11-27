@@ -1292,6 +1292,14 @@ def _before_after(c: _Ctx) -> list[str]:
     decisions = cl.get("decisions") or []
     out = [f"**До и после ответов владельца** — ответов {len(answers)}, общих решений {len(decisions)}, "
            f"без ответа {len(cl.get('unanswered') or [])}", ""]
+    pending = cl.get("needs_confirmation") or []
+    if pending:
+        out += [f"**Нужно подтвердить привязку ответов ({len(pending)})**", ""]
+        for item in pending:
+            options = ", ".join(item.get("possible_questions") or []) or "уточните текущий вопрос"
+            out.append(f"- {prose(item['question_id'])} [{prose(item['topic'])}] — "
+                       f"«{prose(item['text'])}». {prose(options)}.")
+        out.append("")
     rows = [["Разработка", READINESS.get(bv.get("development"), "—"), READINESS.get(av.get("development"), "—")],
             ["Тестирование", READINESS.get(bv.get("testing"), "—"), READINESS.get(av.get("testing"), "—")]]
     for k in ("critical", "major", "minor"):

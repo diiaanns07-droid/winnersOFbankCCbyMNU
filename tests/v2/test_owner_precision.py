@@ -1,4 +1,6 @@
 """Регрессии пересмотра на двух независимых основаниях: ответ владельца и строка ТЗ."""
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 from bcc_review.v2.stages import judge, recheck
@@ -17,6 +19,7 @@ def test_same_lines_can_describe_unrelated_changes():
 def test_judge_receives_complete_owner_decision_separately_from_tz(monkeypatch):
     proposal = "Уточнение по расписанию. " * 22 + "По выходным расчёт остаётся ручным."
     recorded = []
+
     def ask(ctx, system, user, schema):
         recorded.append((system, user))
         return {}
@@ -37,9 +40,6 @@ def test_judge_receives_complete_owner_decision_separately_from_tz(monkeypatch):
 
 
 def test_answered_report_distinguishes_revision_from_an_independent_read():
-    from pathlib import Path
-    import json
-
     from bcc_review.v2.render import markdown
 
     demo = Path(__file__).resolve().parents[2] / "reports/demo_answers/qr"
@@ -51,3 +51,29 @@ def test_answered_report_distinguishes_revision_from_an_independent_read():
     blocker_line = next(line for line in markdown.render(answered).splitlines() if line.startswith("- 🔴") and "D-01" in line)
     assert "Q-01" in blocker_line and "стр. 54" in blocker_line and "Приложения" in blocker_line
     assert "Предварительная оценка по ответам владельца" not in markdown.render(reread)
+
+
+def test_same_topic_in_two_questions_waits_for_an_owner_choice():
+    questions = [
+        {"id": "Q-01", "topic": "Срок действия согласия", "question": "Каков срок в первом канале?",
+         "options": ["Тридцать дней", "Девяносто дней"], "finding_ids": ["D-01"]},
+        {"id": "Q-02", "topic": "Срок действия согласия", "question": "Каков срок во втором канале?",
+         "options": ["Один год", "Пять лет"], "finding_ids": ["D-02"]},
+    ]
+    for answer in ["Q-01 [Срок действия согласия]: B",
+                   "Q-08 [Срок действия согласия]: Срок действия согласия 42 дня"]:
+        resolved = recheck.resolve_answers(questions, recheck.parse_answers_text(answer))
+        assert resolved["answered"] == [] and resolved["decisions"] == []
+        waiting, = resolved["needs_confirmation"]
+        assert waiting["possible_questions"] == ["Q-01", "Q-02"]
+        assert waiting["text"] and resolved["unanswered"] == ["Q-01", "Q-02"]
+
+
+def test_letter_on_missing_topic_is_not_applied_to_a_reused_number():
+    questions = [{"id": "Q-01", "topic": "Выбор склада", "question": "Где хранить архив?",
+                  "options": ["Городской склад", "Областной склад"]}]
+    resolved = recheck.resolve_answers(questions, recheck.parse_answers_text("Q-01 [Начисление баллов]: B"))
+    assert resolved["answered"] == [] and resolved["decisions"] == []
+    assert resolved["needs_confirmation"][0]["text"] == "B"
+    control = recheck.resolve_answers(questions, recheck.parse_answers_text("Q-01: B"))
+    assert control["answered"][0]["answer"] == "Областной склад"

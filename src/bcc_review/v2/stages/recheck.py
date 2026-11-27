@@ -535,9 +535,12 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
             groups.setdefault((a.get("id"), " ".join(sorted(_tokens(hint)))), []).append(k)
     bound: dict[int, dict | None] = {}
     pairs = []
+    ambiguous: dict[int, list[str]] = {}
+    pending: list[dict] = []
     for gk, members in groups.items():
         hint = entries[members[0]].get("topic_hint") or ""
         text = " ".join(entries[k].get("text") or "" for k in members).strip()
+        options = []
         for x in questions:
             # свой текст ответа — такой же признак, как тема: «возвраты и повторный push» по теме ближе к вопросу
             # о повторном push, а по тексту ответа — к вопросу о возвратах. Ответ буквой — только по теме.
@@ -546,7 +549,18 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
             else:
                 sc, need = _topic_score(hint, x), 0.4
             xid = _qid(str(x["id"]))
-            pairs.append((sc + (0.01 if xid == gk[0] else 0), need, gk, xid))
+            if sc >= need:
+                options.append((sc, need, gk, xid))
+        if not options:
+            continue
+        best = max(row[0] for row in options)
+        tied = sorted(qid for score, _, _, qid in options if abs(score - best) < 1e-9)
+        if len(tied) > 1:
+            # Номер от предыдущего прогона не выбирает между одинаково подходящими вопросами.
+            for k in members:
+                ambiguous[k] = tied
+        else:
+            pairs.extend(options)
     taken: dict[str, str] = {}  # вопрос → номер, с которым к нему пришла привязанная единица
     done: set[tuple] = set()
     ranked = sorted(pairs, key=lambda t: -t[0])
@@ -569,6 +583,15 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
     for k, a in enumerate(entries):
         hint = a.get("topic_hint") or ""
         q = by_id.get(a["id"])
+        if k in ambiguous or (hint and k not in bound and a.get("choice") is not None):
+            text = str(a.get("text") or "").strip()
+            if a.get("choice") is not None:
+                text = " ".join(filter(None, [_cl.option_label(a["choice"]), text, a.get("comment")])).strip()
+            possible = ambiguous.get(k, [])
+            pending.append({"question_id": a["id"], "topic": hint, "text": text, "possible_questions": possible})
+            warnings.append(f"recheck: {a['id']} [{hint}] — подтвердите, к какому вопросу относится ответ"
+                            + (f" ({', '.join(possible)})" if possible else ""))
+            continue
         if hint:
             if k in bound:
                 if q is None or bound[k]["id"] != q["id"]:
@@ -659,6 +682,8 @@ def resolve_answers(questions: list[dict], parsed: dict, warnings: list[str] | N
         [{"question_id": a["question_id"], "text": x, "partial": True} for a in answered.values()
          for x in a.get("deferred") or []]
     out = {"answered": list(answered.values()), "unanswered": unanswered, "decisions": extra, "postponed": postponed}
+    if pending:
+        out["needs_confirmation"] = pending
     clashes = decision_clashes(orphans)
     for c in clashes:
         warnings.append(f"recheck: {c['question_id']} [{c['topic']}]: ответы адресатов расходятся в значениях "
@@ -1299,6 +1324,8 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
         "warnings": warnings,
         "status": rc.get("status", "ok"),
     }
+    if rc["answers"].get("needs_confirmation"):
+        clar["needs_confirmation"] = rc["answers"]["needs_confirmation"]
     clar["answer_conflicts"] = _orphan_conflicts(rc["answers"], clar["answer_conflicts"])
     return {"clarification": clar, "findings_after": after,
             "rejected_after": list(rc.get("rejected") or []) + new_rejected}
