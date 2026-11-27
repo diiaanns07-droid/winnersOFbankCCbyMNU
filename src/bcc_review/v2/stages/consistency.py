@@ -102,17 +102,72 @@ SCHEMA: dict = _obj({
 
 # ---------------------------------------------------------------- запуск этапа
 
-def run(ctx: Any) -> dict:
-    """Этап набора: один вызов модели и разбор ответа кодом (CONTRACT 3)."""
-    system, user = ctx.prompt(STAGE)
+def _ask(ctx: Any, system: str, user: str, schema: dict) -> dict:
     try:
-        data = ctx.llm.ask(STAGE, system, user, SCHEMA, max_output_tokens=MAX_OUTPUT_TOKENS)
+        return ctx.llm.ask(STAGE, system, user, schema, max_output_tokens=MAX_OUTPUT_TOKENS)
     except Exception as exc:  # noqa: BLE001 — повторяем только обрезанный ответ
         if type(exc).__name__ != "Truncated":
             raise
         if hasattr(ctx, "warn"):
             ctx.warn("Проверка набора: ответ модели обрезан, повтор в кратком режиме.")
-        data = ctx.llm.ask(STAGE, system, user + SHORT_MODE, SCHEMA, max_output_tokens=MAX_OUTPUT_TOKENS)
+        return ctx.llm.ask(STAGE, system, user + SHORT_MODE, schema, max_output_tokens=MAX_OUTPUT_TOKENS)
+
+
+# Деление этапа на два параллельных вызова (опция `consistency_split`, по умолчанию выключено): время этапа задаёт
+# рассуждение модели (≈ 80 % токенов вывода), а оно растёт с числом шагов. (А) предметы и попарная сверка с граничными
+# строками, (Б) глоссарий, трассировка и дефекты набора. Цена — +1 вызов на прогон.
+SPLIT_OPTION = "consistency_split"
+PART_A = ("subjects", "pair_checks")
+PART_B = ("glossary", "trace", "candidates")
+_PART_NOTE = {
+    PART_A: ("\n\n### Твоя часть\nВыполни только шаги 1, 2 и 2б: ответ — `subjects` и `pair_checks`. Глоссарий, "
+             "трассировку и дефекты набора проверяет другой ревьюер."),
+    PART_B: ("\n\n### Твоя часть\nВыполни только шаги 3, 4 и 5: ответ — `glossary`, `trace` и `candidates`. Предметы и "
+             "попарную сверку (шаги 1, 2, 2б) выполняет другой ревьюер: противоречия пар в candidates не пиши."),
+}
+
+
+def _split_wanted(ctx: Any) -> bool:
+    opts = getattr(ctx, "options", None) or {}
+    return bool(opts.get(SPLIT_OPTION))
+
+
+def _part_task(user: str, part: tuple) -> str:
+    """Задание одной части: общий вход (документ, таблица требований), вводный абзац и только свои шаги."""
+    i = user.rfind("## Задача: проверка набора")
+    if i < 0:
+        return user + _PART_NOTE[part]
+    head, task = user[:i], user[i:]
+    blocks = re.split(r"(?m)^(?=### Шаг )", task)
+    keep = ("### Шаг 1", "### Шаг 2") if part == PART_A else ("### Шаг 3", "### Шаг 4", "### Шаг 5")
+    body = [blocks[0]] + [b for b in blocks[1:] if b.startswith(keep)]
+    return head + "".join(body).rstrip() + _PART_NOTE[part]
+
+
+def _run_split(ctx: Any, system: str, user: str) -> dict:
+    import concurrent.futures as cf
+    schemas = {part: _obj({k: SCHEMA["properties"][k] for k in part}) for part in (PART_A, PART_B)}
+    with cf.ThreadPoolExecutor(max_workers=2) as ex:
+        futs = {part: ex.submit(_ask, ctx, system, _part_task(user, part), schemas[part]) for part in schemas}
+    data: dict = {}
+    errors = []
+    for part, fut in futs.items():
+        try:
+            data.update(fut.result() or {})
+        except Exception as exc:  # noqa: BLE001 — одна часть не роняет другую
+            errors.append(exc)
+            if hasattr(ctx, "warn"):
+                what = "попарная сверка" if part == PART_A else "глоссарий, трассировка и дефекты набора"
+                ctx.warn(f"Проверка набора: часть «{what}» не получена ({type(exc).__name__}).")
+    if len(errors) == 2:
+        raise errors[0]
+    return data
+
+
+def run(ctx: Any) -> dict:
+    """Этап набора: один вызов модели (или два параллельных — опция) и разбор ответа кодом (CONTRACT 3)."""
+    system, user = ctx.prompt(STAGE)
+    data = _run_split(ctx, system, user) if _split_wanted(ctx) else _ask(ctx, system, user, SCHEMA)
     return postprocess(data, ctx.view, getattr(ctx, "requirements", None) or [])
 
 
@@ -302,6 +357,20 @@ def normalize_pair(p: dict, view: Any, known: dict[str, dict]) -> dict:
     elif (pair["verdict"] == "undefined" and pair["same_subject"] and pair["one_condition"] and _found(ev_a) and _found(ev_b)
           and not _overlap(ev_a, ev_b) and _removes_limit(pair["quote_a"], pair["quote_b"])):
         pair.update(verdict="conflict", basis="limit_removed", kind="event_conflict")
+    # Явное правило документа снимает противоречие (сначала ищем его, потом спорим об исходах):
+    # (1) повтор с тем же ключом возвращает сохранённый результат первого запроса — это ответ из памяти, а не новая
+    #     проверка: шаги логики к нему не применяются, двух исходов нет;
+    # (2) строка приёмки — пример с конкретным входом: «момент» или «единица», которых в самой строке нет, добавил
+    #     сценарий модели, а не документ (дата и время для момента, отображаемые ₸ для единицы — норма приёмки).
+    if pair["verdict"] in ("conflict", "undefined") and pair["same_subject"]:
+        acc_texts = [_line_text(view, ev) for ev in (ev_a, ev_b) if _in_acceptance(ev, known)]
+        if _replay_only(pair["quote_a"], pair["quote_b"]):
+            pair.update(verdict="compatible", basis="none", resolved_by="replay")
+        elif acc_texts and pair["kind"] == "unit_mismatch":
+            pair.update(verdict="compatible", basis="none", resolved_by="acceptance_units")
+        elif (acc_texts and pair["kind"] == "event_conflict"
+              and not any(_MOMENT.search(t) for t in acc_texts)):
+            pair.update(verdict="compatible", basis="none", resolved_by="acceptance_no_moment")
     if pair["verdict"] == "conflict" and pair["kind"] == "status_conflict":
         ex = status_example_evidence(view, pair)
         if ex:
@@ -368,6 +437,41 @@ def _same_codes(qa: str, qb: str) -> bool:
 _LIMIT_REMOVED = re.compile(r"независимо от|вне зависимости от|без ограничени|в любом случае", re.I)
 _LIMIT = re.compile(r"\b(не более|не больше|не чаще|максимум|не свыше|только один|только одн|один раз|"
                     r"не превыша\w*|не может превышать)\b", re.I)
+
+
+_REPLAY = re.compile(r"повтор\w*[^.;]{0,60}?(?:с\s+(?:тем|таким)\s+же|с\s+одинаков\w*)[^.;]{0,60}?"
+                     r"(?:возвраща\w*|верн\w*|отда\w*|получа\w*)[^.;]{0,30}?(?:результат|ответ)\w*[^.;]{0,20}?"
+                     r"(?:перв|исходн|предыдущ|прежн)", re.I)
+_REPEAT = re.compile(r"повтор|с\s+тем\s+же|с\s+таким\s+же|дубл", re.I)
+
+
+def _replay_only(qa: str, qb: str) -> bool:
+    """Одна сторона — правило идемпотентности («повторный запрос с тем же ключом возвращает результат первого»),
+    другая — проверка, которая о повторе не говорит."""
+    return any(_REPLAY.search(x) and not _REPEAT.search(y) for x, y in ((qa, qb), (qb, qa)))
+
+
+_MONTHS = r"январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр"
+# Момент или порядок событий в строке приёмки: дата, время, число месяца, «на следующий день», «сразу после».
+_MOMENT = re.compile(rf"\d{{1,2}}[:.]\d{{2}}|\d{{1,2}}\s*(?:{_MONTHS})|\d{{1,2}}-?(?:го|е)\b|\d{{4}}-\d{{2}}-\d{{2}}|"
+                     r"(?<![а-яё])(?:сразу|немедленно|после|через|следующ\w*|накануне|в\s+тот\s+же|полноч\w*|"
+                     r"последн\w*\s+(?:день|дн|минут|секунд|час)|перв\w*\s+(?:день|числ)|"
+                     r"за\s+(?:[\wё]+\s+){0,2}(?:час|сутк|сутки|день|дня|дней|недел|месяц|квартал|год))", re.I)
+
+
+def _in_acceptance(ev: dict, known: dict[str, dict] | None) -> bool:
+    """Цитата стоит в строке критериев приёмки (по строкам нарезки, а не по ID, который назвала модель)."""
+    if not _found(ev):
+        return False
+    a, b = _span(ev)
+    return any(r.get("kind") == "acceptance" and (r.get("line_start") or 0) <= a
+               and b <= (r.get("line_end") or r.get("line_start") or 0) for r in (known or {}).values())
+
+
+def _line_text(view: Any, ev: dict) -> str:
+    """Полный текст строк, где найдена цитата."""
+    a, b = _span(ev)
+    return " ".join(_s(x.get("text")) for x in _lines(view) if a <= (x.get("n") or 0) <= b)
 
 
 def _removes_limit(qa: str, qb: str) -> bool:
@@ -502,13 +606,20 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         # спор о смысле кода, а не два исхода — major.
         if kind == "status_conflict" and _same_codes(pair["quote_a"], pair["quote_b"]):
             severity = "major"
+        # «Один вход — два кода» держится на цитатах: каждая сторона называет код или значение статуса (или найдена
+        # строка примера второго кода). Иначе второй исход — догадка модели по соседним примерам — major.
+        if kind == "status_conflict" and not pair.get("example_line") and not all(
+                _CODE.search(q) or _TOKEN.search(q) for q in (pair["quote_a"], pair["quote_b"])):
+            severity = "major"
     else:  # undefined
         # Строка приёмки сверяется только на противоречие (шаг 2б); её неполноту проверяет линза тестировщика.
         if any((known or {}).get(x, {}).get("kind") == "acceptance" for x in (pair["a"], pair["b"])):
             return None
         if kind in ("event_conflict", "status_conflict", "boundary_conflict", "contradiction"):
             kind = "ambiguity"
-        severity = "major"
+        # Два разных условия в одном запросе (неверный параметр и неподходящее состояние) — вопрос порядка
+        # проверок: реализации разойдутся только кодом ошибки, основной процесс не страдает — minor.
+        severity = "major" if pair["one_condition"] else "minor"
     criterion = "unambiguous" if kind in ("boundary_conflict", "unit_mismatch", "ambiguity") else "set_consistent"
     if pair["verdict"] == "undefined" and kind == "incomplete":
         criterion = "set_complete"
@@ -526,6 +637,10 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
         fallback = f"{qa_} и {qb_} дают разный результат: {_short(subject, 8)}"
         problem = (f"{_cap(qa_)} и {qb_} по-разному решают один случай — {subject}. "
                    f"Ни одно из мест не объявлено исключением из другого.")
+    elif not pair["one_condition"]:
+        fallback = f"Порядок проверок не задан: {qa_} или {qb_} — {_short(subject, 6)}"
+        problem = (f"{_cap(qa_)} и {qb_} задают разные проверки, а один запрос может нарушить обе — {subject}. "
+                   f"Порядок проверок не задан, поэтому неясно, какой результат вернуть.")
     else:
         fallback = f"{qa_} и {qb_} не определяют результат: {_short(subject, 8)}"
         problem = (f"{_cap(qa_)} и {qb_} касаются одного случая — {subject}, — но результат по ним "
@@ -543,6 +658,8 @@ def pair_to_candidate(pair: dict, known: dict[str, dict] | None = None) -> dict 
     if pair["verdict"] == "conflict" and oa and ob and not _has_variants(question):
         # Вопрос владельцу с двумя вариантами: какой из двух исходов сценария верный.
         question = f"{_cap(_short(subject, 12))}: какой результат верный — «{oa}» (как в {qa_}) или «{ob}» (как в {qb_})?"
+    elif pair["verdict"] == "undefined" and not pair["one_condition"] and oa and ob and not _has_variants(question):
+        question = f"Какая проверка идёт первой: по {qa_} («{oa}») или по {qb_} («{ob}»)?"
     return {
         "title": title, "kind": kind, "criterion": criterion, "severity": severity,
         "requirement_ids": ids, "evidence": [{k: v for k, v in e.items()} for e in evidence],
@@ -623,10 +740,38 @@ def normalize_glossary(g: dict, view: Any) -> dict | None:
     # major только если разных названий словами (не идентификаторов) хотя бы два.
     if sev == "major" and len({_norm(t["term"]) for t in terms if _CYR.search(t["term"])}) < 2:
         sev = "minor"
+    # Разные системы и участники («банк», «приложение», «сервис переводов» и «сервис QR-кодов») — не одно понятие
+    # под разными именами. Major — только если хотя бы два русских названия делят значимую основу
+    # («сервис настроек» / «хранилище настроек», «держатель карты» / «владелец карты»).
+    if sev == "major" and not _names_share_stem([t["term"] for t in terms]):
+        sev = "minor"
     return {"concept": _s(g.get("concept")), "terms": terms, "problem": _s(g.get("problem")), "severity": sev}
 
 
 _CYR = re.compile(r"[а-яё]", re.I)
+# Родовые слова названий компонентов и участников: общая основа «сервис» или «банк» не делает две системы одной.
+_GENERIC_ROOTS = ("серв", "систем", "модул", "компонент", "банк", "приложен", "контрол", "платформ", "интерфейс",
+                  "метод")
+
+
+def _generic(stem: str) -> bool:
+    return any(stem.startswith(r) or r.startswith(stem) for r in _GENERIC_ROOTS)
+
+
+# Роли людей: «клиент» и «держатель счёта» без общей основы — всё равно возможная путаница прав (кто вправе и кого
+# проверяют), это major по шкале глоссария.
+_PERSON = re.compile(r"(?<![а-яё])(?:клиент|держател|владел|пользовател|заявител|заёмщик|заемщик|получател|"
+                     r"отправител|плательщик|доверенн|представител|вкладчик|абонент|сотрудник|оператор)", re.I)
+
+
+def _names_share_stem(terms: list[str]) -> bool:
+    """Два русских названия делят значимую основу или оба называют роль человека."""
+    cyr = [t for t in terms if _CYR.search(t)]
+    if sum(1 for t in cyr if _PERSON.search(t)) >= 2:
+        return True
+    stems = [{st for w in _WORD.findall(t) if len(w) >= 4 and _CYR.search(w) and not _generic(st := _stem(w))}
+             for t in cyr]
+    return any(stems[i] & stems[j] for i in range(len(stems)) for j in range(i + 1, len(stems)))
 
 
 def glossary_to_candidate(g: dict) -> dict | None:
