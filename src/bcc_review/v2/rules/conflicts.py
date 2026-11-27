@@ -123,6 +123,11 @@ TTL_AFTER = re.compile(r"^\s*(?:в\s+течение\s+)?(?:\d+|од(?:ин|ну|
                        r"пятнадцат\w*|тридцат\w*)\s+(?:секунд|минут|час|сут|дн|недел|месяц|год|лет)\w*", re.I)
 
 
+def _cond_text(body: str) -> str:
+    m = COND.match(body)
+    return m.group(1).strip() if m else body
+
+
 def rule_events(doc: Doc, out: dict) -> None:
     sents = sentences(doc)
     done: set[tuple[int, int]] = set()
@@ -173,8 +178,9 @@ def rule_events(doc: Doc, out: dict) -> None:
                           title="Одно и то же условие ведёт к противоположным исходам",
                           problem=(f"Условие одно и то же, а исходы противоположны: {quoted(na.body)} и "
                                    f"{quoted(nb.body)}."),
-                          scenario="Условие выполняется: по одному месту действие не происходит, по другому — "
-                                   "происходит, причём с другими последствиями для клиента.",
+                          scenario=(f"Выполняется условие {quoted(_cond_text(na.body))}: по одному месту "
+                                    f"{quoted(neg_txt.strip())}, по другому — {quoted(pos_txt.strip())}; "
+                                    "реализация и тест выберут разные исходы."),
                           recommendation="Выбрать один исход для этого условия, второе правило удалить или "
                                          "сделать отдельным случаем с явным отличающим условием.",
                           question="Какой исход верный при этом условии?")
