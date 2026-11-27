@@ -7,6 +7,9 @@ $ErrorActionPreference = "Continue"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 $env:PYTHONUTF8 = "1"
 $env:PYMUPDF_SUGGEST_LAYOUT_ANALYZER = "0"
+# код агента — из этой копии, даже если активно окружение другой копии (editable-установка другого каталога)
+$src = Join-Path (Get-Location) "src"
+if ($env:PYTHONPATH) { $env:PYTHONPATH = "$src;$($env:PYTHONPATH)" } else { $env:PYTHONPATH = $src }
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }
 
 function Test-PythonVersion([string[]]$Command) {

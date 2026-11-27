@@ -51,7 +51,7 @@ jobs:
 
       # UTF-8 только для pytest: вспомогательные скрипты тестов №02, №03, №15 печатают русский текст в конвейер, а на
       # Windows без UTF-8 его кодировка — cp1252 (UnicodeEncodeError). Сам агент от этого не зависит: его кодировки
-      # проверяет test_16_windows_encoding (задаёт cp1252 и C-локаль сам), а шаги ниже идут без PYTHONUTF8.
+      # проверяет test_16_windows_encoding (задаёт cp1252 и C-локаль сам), а прогоны mock и verify ниже — без PYTHONUTF8.
       - name: Тесты tests/v2
         run: python -m pytest tests/v2 -q
         env:
