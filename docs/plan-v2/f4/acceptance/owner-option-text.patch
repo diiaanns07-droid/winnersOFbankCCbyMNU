@@ -1,0 +1,80 @@
+diff --git a/src/bcc_review/v2/render/html_assets/report.js b/src/bcc_review/v2/render/html_assets/report.js
+index 092396ae..6e8dc710 100644
+--- a/src/bcc_review/v2/render/html_assets/report.js
++++ b/src/bcc_review/v2/render/html_assets/report.js
+@@ -295,14 +295,20 @@
+       var data = JSON.parse($("#report-data").textContent);
+       var LET = "ABCDEFGH";
+       var md = ["# Ответы владельца на вопросы ревью: «" + ((data.document || {}).title || "") + "»", "",
+-        "> Формат строки: `Q-01: B` (буква варианта) или `Q-01 [тема]: свой ответ`.",
++        "> Формат строки: `Q-01: B` (буква варианта) или `Q-01 [тема]: свой ответ`. При выборе кнопкой сохраняется текст показанного варианта.",
+         "> Передайте файл агенту: python -m bcc_review ДОКУМЕНТ ОТЧЁТ.md --answers этот_файл.md", ""];
+       var n = 0;
+       (data.questions || []).forEach(function (qq) {
+         var pick = $('input[name="' + qq.id + '"]:checked');
+         var own = $('textarea[data-own="' + qq.id + '"]');
+         var text = own && own.value.trim() ? own.value.trim().replace(/\s*\n\s*/g, " ") : "";
+-        var val = text || (pick ? (LET.charAt(+pick.value) || String(+pick.value + 1)) : "");
++        var val = text;
++        if (!val && pick) {
++          var index = Number(pick.value);
++          var label = LET.charAt(index) || String(index + 1);
++          var selected = String(qq.options[index]).replace(/\s*\n\s*/g, " ").trim();
++          val = "[вариант " + label + "] " + selected;
++        }
+         if (!val) return;
+         n++;
+         md.push(qq.id + (qq.topic ? " [" + qq.topic + "]" : "") + ": " + val);
+diff --git a/src/bcc_review/v2/stages/recheck.py b/src/bcc_review/v2/stages/recheck.py
+index bc8f5355..c1648ef5 100644
+--- a/src/bcc_review/v2/stages/recheck.py
++++ b/src/bcc_review/v2/stages/recheck.py
+@@ -9,7 +9,8 @@
+   (``- …``) — общие решения владельца; они вносятся и в исправленную редакцию. Буквы вариантов — латинские A–D;
+   кириллические А, В, С читаются как A, B, C, Б как B, Г как D; цифры 1–4 — номер варианта. Текст варианта вместо
+   буквы — тоже выбор варианта; ``B — текст варианта`` сверяется по тексту, если вопросы перегенерированы и варианты
+-  переставились. ``Q-03: ?`` или пустое значение — «нет ответа». Строки ``#`` и ``>`` — комментарии; строка с
++  переставились. Экспорт HTML сохраняет исходный текст в форме ``[вариант A] текст``.
++  ``Q-03: ?`` или пустое значение — «нет ответа». Строки ``#`` и ``>`` — комментарии; строка с
+   номером вопроса, которую не удалось разобрать, — предупреждение.
+ * JSON: ``{"Q-01": "B"}``, ``{"answers": {"Q-01": "B"}}``, ``[{"id": "Q-01", "answer": "B"}]``,
+   ``{"Q-01": {"choice": "B", "comment": "…"}}``, ``{"Q-02": ["…", "…"]}`` (реплики разных адресатов),
+@@ -246,6 +247,10 @@ def _parse_value(value: str) -> dict:
+     value = str(value or "").strip()
+     if not value or _NO_ANSWER.match(value):
+         return {"choice": None, "text": "", "comment": ""}
++    selected = re.fullmatch(r"\[вариант (?:[A-H]|[0-9]+)\]\s+(.+)", value, re.I | re.S)
++    if selected:
++        # The HTML report records the wording the owner actually saw.
++        return {"choice": None, "text": selected.group(1), "comment": ""}
+     m = _CHOICE.match(value)
+     if m:
+         letter = m.group(1).upper()
+diff --git a/tests/v2/test_11_f4_answers.py b/tests/v2/test_11_f4_answers.py
+index 829865fa..a14dfead 100644
+--- a/tests/v2/test_11_f4_answers.py
++++ b/tests/v2/test_11_f4_answers.py
+@@ -300,6 +300,23 @@ def test_html_export_with_parenthesis_topic_binds():
+     assert r["answered"][0]["choice"] == "B"
+ 
+ 
++def test_exported_option_keeps_owner_wording_after_regeneration():
++    text = "Ровно пять дней допускаются."
++    original = recheck.load_answers("Q-01 [Срок выплаты]: [вариант A] " + text)
++    question = dict(QS[0], topic="Срок выплаты", options=["Нужно шесть дней.", text])
++    same = recheck.resolve_answers([question], original)["answered"][0]
++    assert (same["choice"], same["answer"]) == ("B", text)
++    question["options"] = ["При пяти днях вернуть отказ.", "При пяти днях принять."]
++    changed = recheck.resolve_answers([question], original)["answered"][0]
++    assert (changed["choice"], changed["answer"]) == ("", text)
++
++
++def test_exported_option_can_start_like_a_letter_answer():
++    result = recheck.parse_answers_text("Q-01: [вариант B] А — решение владельца.")
++    assert result["answers"][0]["text"] == "А — решение владельца."
++    assert result["answers"][0]["choice"] is None
++
++
+ def test_table_header_and_empty_answer_are_skipped():
+     text = "| Вопрос | Тема | Ответ |\n| :--- | :--- | :--- |\n| Q-01 | Тема | |\n| Q-02 | Маршрут | Через шлюз |\n"
+     a = recheck.parse_answers_text(text)["answers"]

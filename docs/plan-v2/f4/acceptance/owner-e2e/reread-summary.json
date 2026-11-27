@@ -1,0 +1,44 @@
+[
+  {
+    "case": "official",
+    "verdict": {
+      "development": "no",
+      "testing": "no"
+    },
+    "verified": 59,
+    "total": 59,
+    "findings": 22,
+    "model": [
+      "claude-sonnet-5-5"
+    ],
+    "cached": 0
+  },
+  {
+    "case": "qr",
+    "verdict": {
+      "development": "no",
+      "testing": "no"
+    },
+    "verified": 59,
+    "total": 59,
+    "findings": 24,
+    "model": [
+      "claude-sonnet-5-5"
+    ],
+    "cached": 0
+  },
+  {
+    "case": "car-loan",
+    "verdict": {
+      "development": "yes",
+      "testing": "yes"
+    },
+    "verified": 31,
+    "total": 31,
+    "findings": 11,
+    "model": [
+      "claude-sonnet-5-5"
+    ],
+    "cached": 0
+  }
+]
