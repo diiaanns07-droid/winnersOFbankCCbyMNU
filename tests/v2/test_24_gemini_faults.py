@@ -30,6 +30,14 @@ MARK = next(m for m, s in fake_gemini._markers() if s == "clarify")
 MESSAGES = [{"role": "system", "content": "Система"}, {"role": "user", "content": f"{MARK}\nДокумент."}]
 
 
+@pytest.fixture(autouse=True)
+def fresh_shared_state():
+    """Окно и отключённые модели общие для ключа в процессе: каждому тесту — чистое состояние."""
+    gemini._SHARED.clear()
+    yield
+    gemini._SHARED.clear()
+
+
 @pytest.fixture
 def server(monkeypatch):
     holder = {}

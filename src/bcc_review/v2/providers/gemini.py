@@ -279,17 +279,16 @@ def _new_state() -> dict[str, Any]:
 
 
 def _shared_state(api_key: str | None, shared: bool = True) -> dict[str, Any]:
-    """Окно запросов в минуту, «остывающие» и отключённые модели — общие для ключа и адреса API в процессе.
+    """Окно запросов в минуту, «остывающие» и отключённые модели — общие для ключа в процессе.
 
     Квоты Google считаются на проект ключа, а не на экземпляр провайдера: проходы ``--runs N`` (новый конвейер —
     новый провайдер) иначе начинали с пустым окном и получали 429 на стыке проходов. Сам ключ не хранится — только
-    его отпечаток.
+    его отпечаток. Тесты с поддельным сервером сбрасывают общее состояние сами (``_SHARED.clear()``).
     """
     if not shared or not api_key:
         return _new_state()
     import hashlib
-    base = os.environ.get("GOOGLE_GEMINI_BASE_URL", "")
-    tag = hashlib.sha256(f"{api_key}|{base}".encode("utf-8")).hexdigest()[:16]
+    tag = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
     with _SHARED_LOCK:
         return _SHARED.setdefault(tag, _new_state())
 
