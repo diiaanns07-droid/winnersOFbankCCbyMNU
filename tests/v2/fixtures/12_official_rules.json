@@ -692,7 +692,7 @@
    "rule_conflict": false
   },
   {
-   "title": "Content-Type указан метода saveLimit, хотя тела запроса нет",
+   "title": "Заголовок Content-Type указан у метода saveLimit, хотя тела запроса нет",
    "kind": "api_contract",
    "criterion": "set_consistent",
    "severity": "minor",

@@ -21,6 +21,9 @@ READ_PROMISE = re.compile(
     r"получени\w+\s+(?:данных|настро\w*|значени\w*|сведени\w*|информаци\w*|статус\w*|остатк\w*|"
     r"сумм\w*|истори\w*)|получа(?:ет|ют)\s+(?:данн\w*|сведени\w*|информаци\w*|настро\w*|статус\w*|состояни\w*|"
     r"список\w*|истори\w*|остат\w*)|на\s+экране\s+видн\w*)", re.I)
+# «показывается сообщение «PIN-код изменён»», «выводит подсказку» — отклик интерфейса, а не показ данных
+UI_FEEDBACK = re.compile(r"^\s*(?:\w+\s+){0,2}?(?:сообщени|надпис|подсказк|уведомлени|ошибк|предупреждени|"
+                         r"окн[оа]\b|диалог|баннер|анимаци|индикатор|кнопк|экран\w*\s+(?:успех|ошибк|подтвержд))", re.I)
 INTEGRATION_CTX = re.compile(r"дочерн\w+\s+документ\w*|через\s+api|rest\s+api|метод\w*", re.I)
 ACTOR = re.compile(r"приложени\w*|экран\w*|интерфейс\w*|клиент\w*|пользовател\w*|фронт\w*|ui\b|api|"
                    r"документ\w*|функциональн\w+\s+требовани\w*", re.I)
@@ -34,6 +37,12 @@ def _defined_names(doc: Doc, methods: list[Method]) -> set[str]:
                 if seg and not seg.startswith("{"):
                     names.add(seg.lower())
     return names
+
+
+# слово «метод / вызов / операция» прямо перед именем; между ними — только другие имена списка («Методы X и Y»)
+METHOD_BEFORE = re.compile(r"(?:\bметод\w*|\bвызов\w*|\bendpoint\w*|\bоперац\w*)\s*[«\"`']?"
+                           r"(?:\s*[A-Za-z_]\w*[»\"`']?\s*(?:,|\bи\b)\s*[«\"`']?)*\s*$", re.I)
+ID_NAME = re.compile(r"(?<!By)(?:Id|ID|Ids|IDs)$")  # transferId, payoutCardId — поле; getCardById — метод
 
 
 def rule_named_methods(doc: Doc, methods: list[Method], out: dict) -> set[str]:
@@ -54,10 +63,10 @@ def rule_named_methods(doc: Doc, methods: list[Method], out: dict) -> set[str]:
             toks = split_camel(name)
             if len(toks) < 2 or name.lower() in defined:
                 continue
-            # имя метода, а не поле: «методом X», «Методы X и Y», «вызов X» рядом или глагол в начале имени
-            before = " ".join(re.findall(r"[\wА-Яа-яЁё]+", t[:mm.start()])[-3:])
-            if not (re.search(r"метод\w*|вызов\w*|endpoint|операци\w*", before, re.I)
-                    or toks[0] in READ_TOKENS or toks[0] in MUTATING_TOKENS):
+            # имя метода, а не поле: «методом X», «Методы X и Y», «вызов X» прямо перед именем или глагол в начале
+            # имени. «Метод возвращает currentMode», «вызов с qrId» — поле или параметр, а не метод
+            verb_first = toks[0] in READ_TOKENS or toks[0] in MUTATING_TOKENS
+            if ID_NAME.search(name) or (not verb_first and not METHOD_BEFORE.search(t[:mm.start()])):
                 continue
             if any(name.lower() == (m.name or "").lower() for m in methods):
                 continue
@@ -328,7 +337,7 @@ def rule_read_promise(doc: Doc, methods: list[Method], out: dict, named: set[str
         if not x.text or x.is_code or x.is_heading:
             continue
         t = x.joined
-        m = READ_PROMISE.search(t)
+        m = next((r for r in READ_PROMISE.finditer(t) if not UI_FEEDBACK.match(t[r.end():])), None)
         if not m or not (ACTOR.search(t) or INTEGRATION_CTX.search(t)):
             continue
         promises.append((x, _sentence(t, m.group(0))))
@@ -338,8 +347,7 @@ def rule_read_promise(doc: Doc, methods: list[Method], out: dict, named: set[str
         # обещание есть и чтение есть — линзе архитектора полезно знать, что именно читается
         names = fmt_list([m.label or m.verb for m in reads])
         out["signals"].append(signal("promises.read", promises[0][0], promises[0][1],
-                                     f"Обещано чтение или показ данных; операции чтения: {names}. "
-                                     "Проверьте, что они возвращают всё, что показывается.",
+                                     f"Справка для описи, не дефект: обещанный показ данных читают операции {names}.",
                                      ("architect",), "inventory"))
         return
     if any(split_camel(n)[0] in READ_TOKENS for n in named):

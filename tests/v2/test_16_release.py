@@ -272,7 +272,7 @@ def test_docker_and_scripts_install_with_constraints():
 
 
 # Файлы с синтаксисом только для Python 3.12+ (PEP 701) — просьба владельцу в статусе №16; новых быть не должно.
-KNOWN_PY312_ONLY = {"evaluation/v2/aggregate.py", "evaluation/v2/newtz.py"}
+KNOWN_PY312_ONLY: set[str] = set()  # aggregate.py и newtz.py исправлены №15 (патч 15_py311_fstrings)
 
 
 def _py312_only_fstrings(path: Path) -> list[int]:
@@ -323,8 +323,6 @@ def test_code_compiles_on_python_311():
     assert not bad, "\n".join(bad)
 
 
-@pytest.mark.xfail(strict=False, reason="просьба №15 (статус №16, «Волна 3»): f-строки с вложенными теми же "
-                                        "кавычками — на Python 3.11 tests/v2 не собираются (CI 3.11 красный)")
 def test_known_py312_only_files_are_fixed():
     bad = []
     for rel in sorted(KNOWN_PY312_ONLY):
@@ -521,8 +519,6 @@ def _review(tmp_path: Path, *args: str) -> subprocess.CompletedProcess:
                           cwd=tmp_path, env=env, capture_output=True, timeout=300)
 
 
-@pytest.mark.xfail(strict=False, reason="просьба №01 (статус №16, «Волна 3», патч 01_output_path.patch): папка "
-                                        "вместо файла отчёта — трейсбэк IsADirectoryError")
 def test_output_folder_gets_report_named_after_input(tmp_path):
     """`python -m bcc_review ТЗ.pdf reports/` — отчёт ложится в папку под именем входа, без трейсбэка."""
     if not _v2_cli_ready():
@@ -536,8 +532,6 @@ def test_output_folder_gets_report_named_after_input(tmp_path):
     assert (tmp_path / "reports" / "requirements.json").is_file()
 
 
-@pytest.mark.xfail(strict=False, reason="просьба №01 (статус №16, «Волна 3», патч 01_output_path.patch): "
-                                        "недоступный для записи путь отчёта — трейсбэк")
 def test_unwritable_output_gives_plain_error(tmp_path):
     if not _v2_cli_ready():
         pytest.skip("нет v2")
@@ -550,8 +544,6 @@ def test_unwritable_output_gives_plain_error(tmp_path):
     assert "отчёт" in text.lower()
 
 
-@pytest.mark.xfail(strict=False, reason="просьба №01 (статус №16, «Волна 3», патч 01_output_path.patch): "
-                                        "отчёт с путём входа затирает ТЗ")
 def test_output_same_as_input_does_not_overwrite_source(tmp_path):
     """Отчёт с тем же путём, что вход, не должен затереть ТЗ."""
     if not _v2_cli_ready():
