@@ -37,7 +37,18 @@ SOURCES = {
                  "model": "Gemini 3.8 Flash через OpenRouter, вход PDF", "active": ("active",)},
     "azekowka": {"path": "azekowka/ai-requirements-validator-task/c704a9e2dffe59390c7c104a517aedfa10ae4ce8/"
                          "reports/requirements-report.json", "model": "Claude Opus 5.5", "active": ("confirmed",)},
+    # Волна 4 (№31): ещё три опубликованных отчёта по официальному документу; у каждого своя схема — свой адаптер.
+    "ReqAudit": {"path": "kubectl-bekzhan/ReqAudit/a38c53fc8e58b13b353218aa63d84168820fa4ef/reports/"
+                         "requirements-report.json", "model": "Claude Haiku 5.5, 3 прогона (по паспорту)",
+                 "adapter": "reqaudit"},
+    "reqcheck-agent": {"path": "asimzhanovvv/reqcheck-agent/87af5d50ada49dae9dbeca813d830316d397a05f/report/report.json",
+                       "model": "Qwen 3.8 Omni Flash (по паспорту)", "adapter": "reqcheck"},
+    "goodgame": {"path": "zhneo/goodgame/bc1f3366fd419176873696038c65abf13bbf8781/reports/report.json",
+                 "model": "Gemini 3.5 Flash Lite (по паспорту), другой хеш Markdown", "adapter": "goodgame"},
 }
+# Соперники без опубликованного отчёта по официальному документу (смотрели закреплённый коммит) — в таблицу не идут.
+NO_REPORT = {"yernururue/bcc-hack": "ee1a936a2a693e749476bd5c78e082ccb55c30bc"}
+RU_SEV = {"критичная": "critical", "высокая": "major", "средняя": "major", "низкая": "minor"}
 KIND_MAP = {"ambiguous": "ambiguity", "contradiction": "contradiction", "incomplete": "incomplete",
             "infeasible": "infeasible", "unverifiable": "unverifiable"}
 
@@ -71,8 +82,91 @@ def _verdict(v: dict) -> dict:
     return {"development": m(v.get("development")), "testing": m(v.get("testing"))}
 
 
+def _ev(quote, line) -> dict | None:
+    q = str(quote or "").strip()
+    if not q:
+        return None
+    ln = line if isinstance(line, int) else None
+    return {"quote": q, "line_start": ln, "line_end": ln, "verified": "exact"}
+
+
+def _finding(n: int, name: str, title: str, sev: str, ev: list, problem: str, fix: str, kind: str = "other") -> dict:
+    return {"id": f"D-{n:02d}", "title": title, "severity": sev, "kind": kind, "evidence": [e for e in ev if e],
+            "problem": problem, "scenario": "", "impact": "", "recommendation": fix, "rewrite": "", "question": "",
+            "sources": [name]}
+
+
+def _crit_kind(c: str) -> str:
+    c = str(c or "").lower()
+    for k, v in (("consist", "contradiction"), ("противореч", "contradiction"), ("ambig", "ambiguity"),
+                 ("однознач", "ambiguity"), ("complete", "incomplete"), ("полн", "incomplete"),
+                 ("verif", "unverifiable"), ("проверя", "unverifiable"), ("feasib", "infeasible"),
+                 ("выполн", "infeasible")):
+        if k in c:
+            return v
+    return "other"
+
+
+def adapt_reqaudit(name: str, data: dict) -> list[dict]:
+    fs = []
+    for f in data.get("findings") or []:
+        if f.get("dropped_reason"):
+            continue
+        loc = f.get("location") or {}
+        ev = [_ev(f.get("quote"), loc.get("line_start")),
+              _ev(f.get("related_quote"), (f.get("related_location") or {}).get("line_start"))]
+        ev += [_ev(q, (l or {}).get("line_start")) for q, l in zip(f.get("extra_quotes") or [],
+                                                                   f.get("extra_locations") or [])]
+        title = str(f.get("explanation") or "").split(". ")[0][:120]
+        fs.append(_finding(len(fs) + 1, name, title, _sev(f.get("severity")), ev, str(f.get("explanation") or ""),
+                           str(f.get("suggestion") or ""), _crit_kind(f.get("criterion"))))
+    return fs
+
+
+def adapt_reqcheck(name: str, data: dict) -> list[dict]:
+    fs = []
+    for f in data.get("findings") or []:
+        qs, ls = f.get("quotes") or [], f.get("lines") or []
+        ev = [_ev(q, ls[i] if i < len(ls) and len(ls) == len(qs) else None) for i, q in enumerate(qs)]
+        fs.append(_finding(len(fs) + 1, name, str(f.get("title") or ""), RU_SEV.get(str(f.get("severity")), "minor"),
+                           ev, str(f.get("problem") or ""), str(f.get("fix") or ""), _crit_kind(f.get("criterion"))))
+    return fs
+
+
+def adapt_goodgame(name: str, data: dict) -> list[dict]:
+    fs = []
+    raw = [f for rc in data.get("requirement_checks") or [] for f in rc.get("findings") or []]
+    raw += list((data.get("set_check") or {}).get("findings") or [])
+    for f in raw:
+        ev = [_ev(f.get("quote"), None)] + [_ev(q, None) for q in f.get("related_quotes") or []]
+        title = str(f.get("explanation") or "").split(". ")[0][:120]
+        fs.append(_finding(len(fs) + 1, name, title, _sev(f.get("severity")), ev, str(f.get("explanation") or ""),
+                           str(f.get("fix") or ""), _crit_kind(f.get("criterion"))))
+    return fs
+
+
+def _verdict_other(name: str, data: dict) -> dict:
+    if name == "ReqAudit":
+        r = str(data.get("readiness") or "").lower()
+        v = "no" if "not" in r or "block" in r else ("yes" if r in ("ready", "ready_for_dev") else "conditional")
+        return {"development": v, "testing": v}
+    if name == "goodgame":
+        ok = (data.get("verdict") or {}).get("ready")
+        v = "yes" if ok is True else "no"
+        return {"development": v, "testing": v}
+    lv = str((data.get("verdict") or {}).get("level") or "").lower()
+    return {"development": lv or "conditional", "testing": lv or "conditional"}
+
+
+ADAPTERS = {"reqaudit": adapt_reqaudit, "reqcheck": adapt_reqcheck, "goodgame": adapt_goodgame}
+
+
 def adapt(name: str, data: dict, gold: dict) -> dict:
     """Отчёт конкурента → отчёт v2 нашего счётчика (только действующие замечания)."""
+    ad = SOURCES[name].get("adapter")
+    if ad:
+        return {"schema": "bcc-review/2", "run": {"status": "complete"}, "findings": ADAPTERS[ad](name, data),
+                "document": {"sha256": gold.get("sha256"), "format": "md"}, "verdict": _verdict_other(name, data)}
     active = SOURCES[name]["active"]
     fs = []
     for f in data.get("findings") or []:
@@ -144,7 +238,10 @@ def render(rows: list[dict]) -> str:
     L += ["", "Оговорки: эталон — наш (`docs/task-analysis.md`, раздел 5), а не организаторов; сопоставление — по цитатам "
           "и ключевым словам, арбитр — только кэш (спорное без решения не засчитано); у конкурентов — один опубликованный "
           "прогон на закреплённом коммите, только действующие замечания; модели и входы у всех разные (SoloHive — PDF, "
-          "ERA216 — Markdown с другим хешем). «Вне эталона» — не обязательно ложные: эталон не исчерпывает все дефекты. "
+          "ERA216 и goodgame — Markdown с другим хешем). ReqAudit — слитые замечания без отсеянных (`dropped_reason`), "
+          "reqcheck-agent — все из `findings` (высокая и средняя → major), goodgame — замечания по требованиям и по "
+          "набору. Без опубликованного отчёта по официальному документу: "
+          + ", ".join(f"{k} (`{v[:7]}`)" for k, v in NO_REPORT.items()) + ". «Вне эталона» — не обязательно ложные: эталон не исчерпывает все дефекты. "
           "Пересчитать: `python -m evaluation.v2.competitors --write`."]
     return "\n".join(L) + "\n"
 
