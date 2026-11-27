@@ -41,10 +41,12 @@ def _kind(model: str | None, label: str | None = "") -> str:
     return model or "?"
 
 
-def _row(set_name: str, model: str, label: str, at: str, case: str, sev: dict, verdict: dict | None) -> dict:
+def _row(set_name: str, model: str, label: str, at: str, case: str, sev: dict, verdict: dict | None,
+         calls: int | None = None) -> dict:
+    """`calls` — вызовов модели в прогоне документа: 0 у модели — повтор ответов из кэша (не новая выборка)."""
     return {"set": set_name, "model": _kind(model, label), "label": label, "at": at or "", "case": case,
             "critical": int(sev.get("critical") or 0), "major": int(sev.get("major") or 0),
-            "minor": int(sev.get("minor") or 0), "verdict": verdict or {}}
+            "minor": int(sev.get("minor") or 0), "verdict": verdict or {}, "calls": calls}
 
 
 def _corpus_rows() -> list[dict]:
@@ -55,7 +57,7 @@ def _corpus_rows() -> list[dict]:
             if c.get("expected") != "clean" or c.get("status") in (None, "failed") or c["case_id"] == "edge.empty":
                 continue
             out.append(_row("корпус: базы и перефразы", d.get("model"), d.get("label", p.parent.name), d.get("at", ""),
-                            c["case_id"], c.get("by_severity") or {}, c.get("verdict")))
+                            c["case_id"], c.get("by_severity") or {}, c.get("verdict"), c.get("calls")))
     return out
 
 
@@ -99,7 +101,8 @@ def _newtz_rows() -> list[dict]:
             sev = r.get("fa_by_severity") or r.get("by_severity") or {}
             commits = [c for c in [r.get("commit"), *(d.get("commit") or [])] if c]
             out.append(_row(_set_of(r.get("doc"), commits, d.get("at", "")), d.get("model"),
-                            d.get("label", p.parent.name), d.get("at", ""), r["case"], sev, r.get("verdict")))
+                            d.get("label", p.parent.name), d.get("at", ""), r["case"], sev, r.get("verdict"),
+                            r.get("calls")))
     return out
 
 
@@ -113,7 +116,8 @@ def _open2_rows() -> list[dict]:
             if r.get("variant") != "clean" or r.get("status") in (None, "failed"):
                 continue
             out.append(_row(f"№18: чистые версии ({edition})", r.get("model"), f"№18 {p.parent.name}",
-                            f"~{p.parent.name.split('_')[-1]}", r["case"], r.get("by_severity") or {}, r.get("verdict")))
+                            f"~{p.parent.name.split('_')[-1]}", r["case"], r.get("by_severity") or {}, r.get("verdict"),
+                            r.get("calls")))
     return out
 
 
@@ -208,6 +212,69 @@ def render(groups: dict[tuple, list[dict]]) -> str:
     return "\n".join(L) + "\n"
 
 
+ORDER = ["чистые ТЗ №20", "№18: чистые версии (2-я редакция)", "№18: чистые версии (1-я редакция)",
+         "корпус: базы и перефразы", "прочие чистые"]
+SUPERSEDED = {"№18: чистые версии (1-я редакция)"}  # документы заменены второй редакцией — в устойчивость не идут
+_SHA = re.compile(r"\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,8}\b")
+
+
+def _is_no(r: dict) -> bool:
+    return "no" in (r["verdict"] or {}).values()
+
+
+def stability(rows: list[dict]) -> dict[tuple, dict[str, list[dict]]]:
+    """(набор, модель) → документ → его прогоны по времени. Только прогоны модели: без правил без модели (они
+    детерминированы), без повторов ответов из кэша (`calls` = 0 — та же выборка, что у исходного прогона) и без
+    заменённых наборов (`SUPERSEDED`)."""
+    out: dict[tuple, dict[str, list[dict]]] = {}
+    for r in rows:
+        if r["model"].startswith("офлайн") or r.get("calls") == 0 or r["set"] in SUPERSEDED:
+            continue
+        out.setdefault((r["set"], r["model"]), {}).setdefault(r["case"], []).append(r)
+    for docs in out.values():
+        for rs in docs.values():
+            rs.sort(key=lambda r: (0 if r["at"].startswith("~") or not r["at"] else 1, r["at"], r["label"]))
+    return out
+
+
+def render_stability(rows: list[dict]) -> str:
+    """«Устойчивость по документам»: в скольких прогонах модели на наборе документ получил «нельзя» и critical.
+    Во всех — систематика (чинить первым), в части — шум модели; наборы и модели с одним прогоном не показываются."""
+    groups = {k: v for k, v in stability(rows).items() if max(len(rs) for rs in v.values()) > 1}
+    if not groups:
+        return ""
+    keys = sorted(groups, key=lambda k: (ORDER.index(k[0]) if k[0] in ORDER else 9, k[1]))
+    L = ["", "### Чистые ТЗ — устойчивость по документам (все прогоны модели, без повторов из кэша)", "",
+         "Сколько раз документ получил «нельзя» и critical во всех прогонах этой модели на наборе (на разных коммитах). "
+         "Во всех — систематика: чинить первым; в части — шум модели.", "",
+         "| Документ | Набор | Модель | Прогонов | «нельзя» | critical (прогонов) | major по прогонам | Итог |",
+         "| :--- | :--- | :--- | ---: | ---: | ---: | :--- | :--- |"]
+    notes = []
+    for k in keys:
+        docs = groups[k]
+        flagged = []
+        for case, rs in docs.items():
+            no, crit = sum(_is_no(r) for r in rs), sum(1 for r in rs if r["critical"])
+            if no or crit:
+                flagged.append((-max(no, crit), -no, case, rs, no, crit))
+        for _, _, case, rs, no, crit in sorted(flagged):
+            n = len(rs)
+            worst = max(no, crit)
+            verdict = ("один прогон" if n == 1 else
+                       f"во всех {n} — систематика" if worst == n else f"{worst} из {n} — плавает")
+            L.append(f"| {case} | {k[0]} | {k[1]} | {n} | {no} | {crit} | "
+                     f"{', '.join(str(r['major']) for r in rs)} | {verdict} |")
+        runs = sorted({(r["at"], r["label"]) for rs in docs.values() for r in rs},
+                      key=lambda x: (0 if x[0].startswith("~") or not x[0] else 1, x[0]))
+        clean = sorted(c for c, rs in docs.items() if not any(_is_no(r) or r["critical"] for r in rs))
+        codes = ", ".join(f"{at[11:16] or at}" + (f" ({_SHA.findall(lb)[0]})" if _SHA.findall(lb) else "")
+                          for at, lb in runs)
+        notes.append(f"{k[0]}, {k[1]} — прогонов {len(runs)}: {codes}; во всех без «нельзя» и critical: "
+                     f"{', '.join(clean) or '—'}.")
+    L += ["", *[f"* {n}" for n in notes]]
+    return "\n".join(L) + "\n"
+
+
 def write_results(text: str) -> None:
     res = RESULTS.read_text(encoding="utf-8")
     block = f"{START}\n{text}{END}"
@@ -225,11 +292,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--write", action="store_true", help="записать первой таблицей в evaluation/v2/RESULTS.md")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
-    groups = latest(_corpus_rows() + _newtz_rows() + _open2_rows() + _external_rows())
-    text = render_verdicts(groups) + render(groups)
+    rows = _corpus_rows() + _newtz_rows() + _open2_rows() + _external_rows()
+    groups = latest(rows)
+    text = render_verdicts(groups) + render(groups) + render_stability(rows)
     print(text)
     if a.write:
-        write_results(render(groups))
+        write_results(render(groups) + render_stability(rows))
         put_results_block(RESULTS, "verdict", render_verdicts(groups, heading=False), "Вердикт на исправленных ТЗ")
     return 0
 

@@ -783,6 +783,32 @@ def test_gate_rules_only_note_follows_gate_code(tmp_path, monkeypatch):
     assert gate._rules_only_note() == "; правила без модели (5411a15): TP 28, FP 0, F1 1.00 — ложные добавляют этапы модели"
 
 
+def test_cleantable_stability_marks_systematic_and_noisy_documents():
+    """Устойчивость на чистых: «нельзя» во всех прогонах модели — систематика, в части — шум; повтор ответов из
+    кэша (`calls` = 0), правила без модели и заменённая редакция в счёт не идут."""
+    from evaluation.v2 import cleantable as ct
+
+    no, yes = {"development": "no", "testing": "no"}, {"development": "yes", "testing": "yes"}
+    rows = []
+    for at, label, calls, repay, fx in (("2026-11-27 12:53", "чистые 13:00", 9, (2, no), (1, no)),
+                                        ("2026-11-27 15:41", "замер 15:30: c6aa9b5", 8, (1, no), (0, yes)),
+                                        ("2026-11-27 16:29", "повтор: 28fe64f", 0, (1, no), (1, no)),
+                                        ("2026-11-27 19:03", "голова: 3e7133c", 9, (1, no), (0, yes))):
+        for case, (crit, v) in (("repay", repay), ("fx", fx), ("roundup", (0, yes))):
+            rows.append(ct._row("чистые ТЗ №20", "haiku", label, at, case, {"critical": crit, "major": 2}, v, calls))
+    rows.append(ct._row("чистые ТЗ №20", "none", "v2 офлайн-правила (3e7133c)", "2026-11-27 18:51", "fx",
+                        {"critical": 1}, no, 0))
+    rows.append(ct._row("№18: чистые версии (1-я редакция)", "haiku", "старое", "~0520", "qr_clean", {"critical": 3}, no))
+    st = ct.stability(rows)
+    assert set(st) == {("чистые ТЗ №20", "haiku")}
+    assert [r["at"][11:16] for r in st[("чистые ТЗ №20", "haiku")]["repay"]] == ["12:53", "15:41", "19:03"]
+    text = ct.render_stability(rows)
+    assert "| repay | чистые ТЗ №20 | haiku | 3 | 3 | 3 | 2, 2, 2 | во всех 3 — систематика |" in text
+    assert "| fx | чистые ТЗ №20 | haiku | 3 | 1 | 1 | 2, 2, 2 | 1 из 3 — плавает |" in text
+    assert "roundup |" not in text and "qr_clean" not in text
+    assert ("прогонов 3: 12:53, 15:41 (c6aa9b5), 19:03 (3e7133c); во всех без «нельзя» и critical: roundup." in text)
+
+
 def test_final_calls_offline_rules_are_not_cache_replay():
     """Прогон правил без модели (`--provider offline`) — «0 — без модели», а не «повтор из кэша»."""
     from evaluation.v2 import final
