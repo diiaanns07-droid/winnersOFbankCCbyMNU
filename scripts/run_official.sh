@@ -15,6 +15,7 @@ MODEL="${2:-}"
 DOC="${DOC:-release/input/requirements.md}"
 OUT="${OUT:-reports/my/$(basename "${DOC%.*}").md}"
 PYTHON="${PYTHON:-python3}"
+export PIP_DISABLE_PIP_VERSION_CHECK=1
 
 cd "$(dirname "$0")/.."
 

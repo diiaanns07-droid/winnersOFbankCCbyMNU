@@ -14,6 +14,9 @@ param(
 )
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$env:PYTHONIOENCODING = "utf-8"
+$env:PIP_DISABLE_PIP_VERSION_CHECK = "1"
 
 if (-not $Out) { $Out = Join-Path "reports\my" ([System.IO.Path]::GetFileNameWithoutExtension($Doc) + ".md") }
 

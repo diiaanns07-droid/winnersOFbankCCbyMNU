@@ -13,6 +13,9 @@ param(
 )
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$env:PYTHONIOENCODING = "utf-8"
+$env:PIP_DISABLE_PIP_VERSION_CHECK = "1"
 
 if (-not (Test-Path ".venv\Scripts\python.exe")) {
     Write-Host "== создаю .venv"
