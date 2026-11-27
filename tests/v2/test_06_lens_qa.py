@@ -180,7 +180,9 @@ def test_model_duplicate_of_acceptance_conflict_removed():
     assert sum(c["severity"] == "critical" for c in out["candidates"]) == 1
 
 
-def test_non_conflict_critical_from_model_is_demoted():
+def test_model_critical_is_demoted_only_acceptance_conflict_stays_critical():
+    """Critical линзы — только вычисленный конфликт строки приёмки; кандидат модели — не выше major
+    (противоречие двух правил — зона проверки набора, серьёзность ставит судья), с подсказкой severity_hint."""
     c = {"title": "Нет метрики", "kind": "unverifiable", "criterion": "verifiable", "severity": "critical",
          "requirement_ids": ["R-02"], "evidence": [{"quote": "x", "line": 12}], "problem": "p", "scenario": "s",
          "impact": "i", "recommendation": "r", "rewrite": "", "question": "", "blocks": "none"}
@@ -188,7 +190,20 @@ def test_non_conflict_critical_from_model_is_demoted():
     out = lens_qa.postprocess({"candidates": [c, conflict]}, REQS)
     sev = {x["title"]: (x["severity"], x["blocks"]) for x in out["candidates"]}
     assert sev["Нет метрики"][0] == "major"
-    assert sev["Два исхода"] == ("critical", "testing")
+    assert sev["Два исхода"] == ("major", "testing")
+    assert all(x["severity_hint"] == "critical" for x in out["candidates"])
+    acc = lens_qa.postprocess({"acceptance_checks": [_check()]}, REQS)["candidates"]
+    assert [x["severity"] for x in acc] == ["critical"]
+
+
+def test_schema_field_names_in_texts_become_russian():
+    raw = {"title": "Acceptance не покрывает границы", "kind": "missing_element", "criterion": "set_validatable",
+           "severity": "major", "requirement_ids": [], "evidence": [], "problem": "Строки acceptance_checks пусты",
+           "scenario": "", "impact": "", "recommendation": "", "rewrite": "", "question": "", "blocks": "testing"}
+    c = lens_qa.normalize_candidate(raw)
+    assert c["title"].startswith("Критерии приёмки") and "acceptance" not in c["problem"].lower()
+    t = lens_qa.normalize_test_case({"title": "Граница", "then": "Итог по test cases", "expected_defined": True})
+    assert "тест-кейсы" in t["then"]
 
 
 def test_other_candidates_limited_conflicts_kept():
