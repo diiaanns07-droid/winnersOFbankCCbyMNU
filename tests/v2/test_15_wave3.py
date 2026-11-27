@@ -979,6 +979,40 @@ def test_newtz_outside_items_carry_evidence_for_gold_owner():
     assert "Где: L42 «Страхование доступно клиенту от 18 лет»; L123" in text and "Решение №18: ☐ пункт эталона" in text
 
 
+def test_final_code_auto_finds_measured_commit_with_same_code(tmp_path, monkeypatch):
+    """`final --code auto`: по тегу находится коммит из меток замеров официального с тем же кодом (самый поздний);
+    повторы из кэша не считаются; кода тега среди замеров нет — None (и CLI просит сначала замер)."""
+    import json as _json
+
+    from evaluation.v2 import final
+
+    hist = tmp_path / "history.jsonl"
+    rows = [{"version": "v2", "label": "W4-07 после заморозки: 28fe64f, sonnet", "at": "2026-11-27 16:30", "calls": 9},
+            {"version": "v2", "label": "W4-07 голова 18:36: 3e7133c, sonnet", "at": "2026-11-27 18:41", "calls": 9},
+            {"version": "v2", "label": "повтор: 1933b20, sonnet", "at": "2026-11-27 19:50", "calls": 0}]
+    hist.write_text("\n".join(_json.dumps(r, ensure_ascii=False) for r in rows), encoding="utf-8")
+    monkeypatch.setattr(final, "V2", tmp_path)
+    monkeypatch.setattr(final, "resolve", lambda ref: ({"v2.0.0": "1933b20"}.get(ref, ref), ""))
+    code = {"28fe64f": "A", "3e7133c": "B", "1933b20": "B", "5411a15": "C"}
+    monkeypatch.setattr(final, "same_code", lambda a, b: code.get(a) == code.get(b) if a in code and b in code else None)
+    assert final.measured_code("v2.0.0") == "3e7133c"
+    assert final.measured_code("28fe64f") == "28fe64f"
+    assert final.measured_code("5411a15") is None
+    assert final.main(["--commit", "5411a15", "--code", "auto"]) == 2
+
+
+def test_final_set_key_tells_release_code_sets_apart():
+    """Вид набора: корпус модели и правила без модели — разные; новые ТЗ с эталоном, чистые №20 и чистые open2 —
+    разные: набор, мерившийся на коде релиза, берётся оттуда, остальные — с `--sets-from`."""
+    from evaluation.v2 import final
+
+    assert final._set_key({"per_case": [], "provider": "offline"}) == ("corpus", "rules")
+    assert final._set_key({"per_case": [], "provider": "claude_cli"}) == ("corpus", "model")
+    assert final._set_key({"harness": {"support": 70}, "rows": []}) == ("newtz", "defects")
+    assert final._set_key({"rows": [{"doc": "evaluation/v2/clean/repay/source.md"}]}) == ("newtz", "clean20")
+    assert final._set_key({"rows": [{"doc": "evaluation/v2/open2/qr_clean/source.md"}]}) == ("newtz", "open2")
+
+
 def test_final_calls_offline_rules_are_not_cache_replay():
     """Прогон правил без модели (`--provider offline`) — «0 — без модели», а не «повтор из кэша»."""
     from evaluation.v2 import final

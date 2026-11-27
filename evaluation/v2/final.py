@@ -3,6 +3,7 @@
     python -m evaluation.v2.final --commit c6aa9b5            # таблицы в stdout
     python -m evaluation.v2.final --commit c6aa9b5 --write    # + блок «Финальные цифры» в RESULTS.md
     python -m evaluation.v2.final --commit v2.0.0 --write     # по тегу: код тега сверяется с кодом замеров
+    python -m evaluation.v2.final --commit v2.0.0 --code auto --sets-from 28fe64f --write   # код замеров — по git
 
 Ничего не запускает: собирает готовые замеры, в метке которых есть этот коммит (метки `round … --label-commit`):
 официальный документ (`history.jsonl` и `score.json` — каждый прогон и разброс по моделям), корпус
@@ -13,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -98,6 +100,39 @@ def _summaries(folder: Path, sha: str) -> list[dict]:
         if sha in str(d.get("label", "")):
             out.append({**d, "_dir": p.parent.name})
     return out
+
+
+def _set_key(d: dict) -> tuple[str, str]:
+    """Вид набора сводки: корпус — модель или правила без модели; `newtz` — новые ТЗ с эталоном, чистые №20 или чистые
+    open2. По нему у кода релиза и кода `--sets-from` выбирается, какой набор откуда (свой код — в приоритете)."""
+    if "per_case" in d:
+        return ("corpus", "rules" if d.get("provider") == "offline" else "model")
+    if (d.get("harness") or {}).get("support"):
+        return ("newtz", "defects")
+    docs = [str(r.get("doc") or "").replace("\\", "/") for r in d.get("rows") or []]
+    return ("newtz", "clean20" if docs and all("v2/clean/" in x for x in docs) else "open2")
+
+
+_SHA_RE = re.compile(r"\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,8}\b")
+
+
+def measured_code(ref: str) -> str | None:
+    """`--code auto`: коммит из меток замеров официального документа с тем же кодом (`src/` и `pyproject.toml` по git),
+    что у `ref` (тег релиза), — с самым поздним прогоном. None — на этом коде официальный документ не мерили."""
+    tag_sha, _ = resolve(ref)
+    hist = V2 / "history.jsonl"
+    best: tuple[str, str] | None = None
+    seen: dict[str, bool | None] = {}
+    for line in hist.read_text(encoding="utf-8").splitlines() if hist.exists() else []:
+        r = json.loads(line) if line.strip() else {}
+        if r.get("version") != "v2" or str(r.get("calls")) in ("0", "None"):
+            continue
+        for c in _SHA_RE.findall(str(r.get("label") or "")):
+            if c not in seen:
+                seen[c] = same_code(c, tag_sha)
+            if seen[c] and (best is None or str(r.get("at", "")) >= best[1]):
+                best = (c, str(r.get("at", "")))
+    return best[0] if best else None
 
 
 def _rows(n: int) -> str:
@@ -280,19 +315,30 @@ def render(ref: str, sha: str, note: str, checks: list[dict] | None = None, newe
     L += official_table(off)
     corp = _summaries(V2 / "corpus_results", sets_sha)
     nz = _summaries(V2 / "newtz_results", sets_sha)
+    own_c: list[dict] = []
+    own_n: list[dict] = []
+    if sets_sha != sha:
+        # набор, который мерили и на коде релиза, — с кода релиза; остальные — с `sets_sha`
+        own_c, own_n = _summaries(V2 / "corpus_results", sha), _summaries(V2 / "newtz_results", sha)
+        have = {_set_key(d) for d in own_c + own_n}
+        corp = own_c + [d for d in corp if _set_key(d) not in have]
+        nz = own_n + [d for d in nz if _set_key(d) not in have]
     if sets_sha != sha and (corp or nz):
-        L += ["", f"**Наборы ниже — на коде `{sets_sha}`**, не на `{sha}`: на коде релиза корпус, новые ТЗ и чистые "
-              "не мерились. " + (view_line(sets_sha, sha) if view_check else
-                                 f"Код отличается: {code_diff(sets_sha, sha)}.")]
+        own = ", ".join(f"«{x}»" for x in sorted({str(d.get("label")) for d in own_c + own_n}))
+        L += ["", f"**Наборы ниже — на коде `{sets_sha}`**, не на `{sha}`"
+              + (f", кроме мерившихся и на коде релиза ({own})" if own else "")
+              + ": на коде релиза " + ("остальные наборы" if own else "корпус, новые ТЗ и чистые") + " не мерились. "
+              + (view_line(sets_sha, sha) if view_check else f"Код отличается: {code_diff(sets_sha, sha)}.")]
     L += sets_tables(corp, nz)
     if not (off or corp or nz):
         L += ["", f"Замеров с `{sha}` в метке нет — `python -m evaluation.v2.round … --label-commit {sha}`."]
     else:
-        note_code = code_note(sha, [off, corp, nz] if sets_sha == sha else [off])
+        note_code = code_note(sha, [off, corp, nz] if sets_sha == sha else [off, own_c, own_n])
         if note_code:
             L[1:1] = ["", note_code]
         if sets_sha != sha:
-            note_sets = code_note(sets_sha, [corp, nz]).replace("Код прогонов сверен", "Код прогонов наборов сверен", 1)
+            note_sets = code_note(sets_sha, [[d for d in corp if d not in own_c], [d for d in nz if d not in own_n]]
+                                  ).replace("Код прогонов сверен", "Код прогонов наборов сверен", 1)
             if note_sets:
                 L[3 if note_code else 1:3 if note_code else 1] = ["", note_sets]
         L += newer_lines(sha, newer or [], view_check)
@@ -304,7 +350,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m evaluation.v2.final", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--commit", required=True, help="коммит замеров или тег релиза (v2.0.0)")
-    ap.add_argument("--code", help="коммит, на котором мерили, если --commit — тег (по умолчанию — сам тег)")
+    ap.add_argument("--code", help="коммит, на котором мерили, если --commit — тег (по умолчанию — сам тег); auto — "
+                                   "найти по git замер официального документа с тем же кодом, что у тега")
     ap.add_argument("--newer", action="append", default=[], metavar="SHA",
                     help="ещё и официальный документ на более новом коде (исправления после замера), с разницей кода")
     ap.add_argument("--no-view", action="store_true",
@@ -314,6 +361,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--write", action="store_true", help="записать блок «Финальные цифры» в RESULTS.md")
     a = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
+    if a.code == "auto":
+        a.code = measured_code(a.commit)
+        if not a.code:
+            tag_sha, _ = resolve(a.commit)
+            print(f"На коде `{a.commit}` (`{tag_sha}`) официальный документ не мерили — сначала замер, например: "
+                  f"python -m evaluation.v2.round --name \"W4-07 тег {a.commit}\" --official sonnet haiku --no-corpus "
+                  f"--no-newtz --no-cache --label-commit {tag_sha}; вход модели против прошлого кода — "
+                  f"python -m evaluation.v2.viewdiff <прошлый код> {tag_sha} --rules.")
+            return 2
+        print(f"--code auto: код `{a.commit}` совпадает с кодом замеров `{a.code}`", file=sys.stderr)
     sha, note = resolve(a.code or a.commit)
     extra: list[str] = []
     if a.code:
@@ -326,7 +383,8 @@ def main(argv: list[str] | None = None) -> int:
             if not a.no_view:
                 extra.append(view_line(sha, tag_sha))
     sets_sha = resolve(a.sets_from)[0] if a.sets_from else None
-    text = render(a.commit, sha, note, newer=a.newer, extra=extra, view_check=not a.no_view, sets_sha=sets_sha)
+    ref = a.commit + (f" --code {a.code}" if a.code else "")
+    text = render(ref, sha, note, newer=a.newer, extra=extra, view_check=not a.no_view, sets_sha=sets_sha)
     print(text)
     if a.write:
         put_results_block(RESULTS, "final", text, "Финальные цифры релиза (W4-07)")
