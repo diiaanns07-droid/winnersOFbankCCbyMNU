@@ -1119,6 +1119,28 @@ def _passport(report: dict) -> str:
     if qs.get("candidates_in") is not None:
         rows.insert(11, ("Кандидаты", f'{_fmt_int(qs.get("candidates_in", 0))} от ревьюеров → {_fmt_int(qs.get("candidates_kept", 0))} '
                                       f'с найденными цитатами → судье; отклонено {_fmt_int(qs.get("candidates_rejected", 0))}'))
+    rp = run.get("replay") if isinstance(run.get("replay"), dict) else {}
+    if rp:
+        rows.insert(3, ("Повтор прогона", f'из сохранённых ответов прогона <code>{e(rp.get("run_id") or rp.get("from") or "—")}</code>'
+                                          f' · {_fmt_int(rp.get("calls_replayed", 0))} ответов повторено, живых вызовов '
+                                          f'{_fmt_int(rp.get("calls_live", 0))}'))
+    cl = run.get("cost_limit") if isinstance(run.get("cost_limit"), dict) else {}
+    if cl:
+        lim = []
+        if isinstance(cl.get("max_cost_usd"), (int, float)):
+            spent = cl.get("spent_usd")
+            lim.append(f'потолок ${cl["max_cost_usd"]:.2f}, потрачено '
+                       + (f"${spent:.2f}" if isinstance(spent, (int, float)) else "—"))
+        if isinstance(cl.get("max_tokens"), int):
+            lim.append(f'потолок {_fmt_int(cl["max_tokens"])} токенов, потрачено {_fmt_int(cl.get("spent_tokens", 0))}')
+        if cl.get("hit"):
+            lim.append("<b>потолок достигнут — отчёт частичный</b>")
+        if cl.get("estimated"):
+            lim.append("стоимость оценена по токенам")
+        rows.append(("Потолок стоимости", " · ".join(lim) or "—"))
+    inc = run.get("incomplete_stages") or []
+    if inc:
+        rows.insert(3, ("Не завершены этапы", e(", ".join(STAGE_LABEL.get(s, s) for s in inc))))
     stab = report.get("stability") if isinstance(report.get("stability"), dict) else {}
     if stab.get("runs_counted"):
         rows.append(("Устойчивость", f'{_fmt_int(stab.get("runs_counted"))} из {_fmt_int(stab.get("runs_requested"))} '

@@ -216,3 +216,15 @@ def test_browser_roundtrip_answers_file(tmp_path, view):
     assert res["states_after_load"][0] == "есть ответ"
     assert res["states_after_load"][1] == "расхождение" and res["states_after_load"][2] == "нужно решить"
     assert res["checked_after_load"][0] == 0  # Q-01: вариант A из «Уже согласовано»
+
+
+def test_passport_shows_replay_cost_limit_and_incomplete(view):
+    r = _base()
+    r["run"]["replay"] = {"from": "runs/abc", "run_id": "abc", "calls_replayed": 9, "calls_live": 0}
+    r["run"]["cost_limit"] = {"max_cost_usd": 0.5, "spent_usd": 0.52, "max_tokens": None, "spent_tokens": 1000, "hit": True}
+    r["run"]["incomplete_stages"] = ["judge", "lens_qa"]
+    page = H.render_html(r, view)
+    panel = page[page.index('id="p-passport"'):]
+    assert "Повтор прогона" in panel and "живых вызовов 0" in panel
+    assert "потолок $0.50, потрачено $0.52" in panel and "потолок достигнут" in panel
+    assert "Не завершены этапы" in panel and "Судья" in panel and "Линза «Тестировщик»" in panel
