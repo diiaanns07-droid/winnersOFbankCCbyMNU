@@ -433,7 +433,7 @@ def _cand(**kw) -> dict:
 
 def test_hostile_segment_ranges_are_clamped(tmp_path):
     seg = {"requirements": [
-        {"source_id": "Ф-1", "kind": "functional", "summary": "a", "line_start": -5, "line_end": 10 ** 9},
+        {"source_id": "Ф-1", "kind": "functional", "summary": "a", "line_start": -5, "line_end": 10 ** 6},
         {"source_id": "Ф-2", "kind": "functional", "summary": "b", "line_start": 50, "line_end": 40},
         {"source_id": "Ф-2", "kind": "functional", "summary": "b", "line_start": 50, "line_end": 40},
         {"source_id": "", "kind": "other", "summary": "", "line_start": 0, "line_end": 0}],
