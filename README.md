@@ -105,7 +105,7 @@ scripts/run_official.sh
 | `out/report.md` | отчёт для чтения (GitHub, VS Code, любой просмотрщик Markdown) |
 | `out/report.json` | то же для программ: замечания, полные цитаты, паспорт прогона (схема `contracts/v2.json`) |
 | `out/report.html` | интерактивный отчёт одним файлом: документ с подсвеченными цитатами, фильтры, работает без интернета |
-| `out/report.annotated.docx` / `.annotated.pdf` | по `--export docx` / `--export pdf`: копия документа с комментариями на местах цитат |
+| `out/report.annotated.docx` / `.annotated.pdf` | по `--export docx` / `--export pdf`: копия документа с комментариями на местах цитат; для DOCX с `--revise` — ещё и правки «было → стало» исправлениями Word (Рецензирование → Принять / Отклонить) |
 | `out/report.jira.csv` | по `--export jira`: замечание — строка для импорта в Jira |
 | `out/report.revised.md` | по `--revise`: исправленная редакция ТЗ |
 | `out/report.sarif` | по `--export sarif`: SARIF 2.1.0 — дефекты на строках ТЗ в GitHub Code Scanning, Azure DevOps, SonarQube, VS Code |

@@ -425,11 +425,22 @@ def annotate_docx(report: dict, view: dict, input_path: Path, output_path: Path)
     if res.status != "written":
         return _res("docx", "failed", None, res.message, anchored=0, total=total)
     anchored = len({a.finding_id for a in res.anchors})
+    revisions: dict = {}
+    if report.get("rewrites"):  # --revise: «было → стало» исправлениями Word (Рецензирование → Принять/Отклонить)
+        try:
+            from .word_revisions import write_revisions
+            revisions = write_revisions(output_path, report["rewrites"], view)
+        except Exception as exc:  # noqa: BLE001 — комментарии уже записаны, правки необязательны
+            revisions = {"applied": 0, "total": len(report["rewrites"]), "error": f"{type(exc).__name__}: {exc}"}
+    rev_msg = ""
+    if revisions.get("applied"):
+        rev_msg = (f"; правок «было → стало» исправлениями Word: {revisions['applied']} из {revisions['total']}")
     return _res("docx", "written", output_path,
                 f"Word с комментариями: отмечено {anchored} из "
                 f"{_n(len(rep1['findings']), 'дефекта', 'дефектов', 'дефектов')} "
-                f"({_n(len(res.anchors), 'место', 'места', 'мест')} в тексте) и сводный комментарий", anchored=anchored,
-                total=len(rep1["findings"]), comments=len(res.anchors))
+                f"({_n(len(res.anchors), 'место', 'места', 'мест')} в тексте) и сводный комментарий" + rev_msg,
+                anchored=anchored, total=len(rep1["findings"]), comments=len(res.anchors),
+                revisions={k: v for k, v in revisions.items() if k != "skipped"} if revisions else None)
 
 
 def report_docx(report: dict, output_path: Path, *, markdown: str | None = None) -> dict:
