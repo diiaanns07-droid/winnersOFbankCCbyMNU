@@ -53,7 +53,7 @@ def run_agent(inp: Path, out_dir: Path, cmd_tpl: str, provider: str, model: str,
     return rc, log, dt
 
 
-def find_run_dir(report_json: Path, log: str) -> Path | None:
+def find_run_dir(report_json: Path, log: str, bases: list[Path] | None = None) -> Path | None:
     """Каталог runs/<id> прогона: из отчёта (run.run_dir / run.id) или из лога агента."""
     try:
         rep = json.loads(report_json.read_text(encoding="utf-8"))
@@ -62,8 +62,9 @@ def find_run_dir(report_json: Path, log: str) -> Path | None:
             if run.get(k) and Path(run[k]).exists():
                 return Path(run[k])
         rid = run.get("run_id") or run.get("id")
-        if rid and (ROOT / "runs" / str(rid)).exists():
-            return ROOT / "runs" / str(rid)
+        for base in [*(bases or []), ROOT / "runs"]:
+            if rid and (base / str(rid)).exists():
+                return base / str(rid)
     except (OSError, json.JSONDecodeError):
         pass
     m = re.findall(r"(runs/[\w\-.:]+)", log or "")
@@ -155,7 +156,9 @@ def main(argv: list[str] | None = None) -> int:
             print(log[-3000:])
             print("report.json не найден — замер не записан")
             return 1
-        run_dir = Path(a.run_dir) if a.run_dir else find_run_dir(dest / "report.json", log)
+        m = re.search(r"--runs-dir\s+(\S+)", a.extra or "")
+        bases = [Path(m.group(1)) if Path(m.group(1)).is_absolute() else ROOT / m.group(1)] if m else []
+        run_dir = Path(a.run_dir) if a.run_dir else find_run_dir(dest / "report.json", log, bases)
     for extra in ("report.html",):  # HTML большой и не нужен для оценки
         (dest / extra).unlink(missing_ok=True)
     gold = sc.load_gold(sc.DEFAULT_GOLD)

@@ -167,3 +167,11 @@ def test_gate_corpus_clean_rules():
     over = next(v for k, v in ch.items() if k.startswith("на чистом"))
     assert over["ok"] is False and over["owners"].startswith("№08 (2)")
     assert ch["critical на чистых"]["ok"] is True
+
+
+def test_round_dry_run_builds_jobs(capsys):
+    from evaluation.v2 import round as rnd
+
+    assert rnd.main(["--name", "проба", "--official", "sonnet", "sonnet", "--no-corpus", "--no-newtz", "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "official_sonnet_1" in out and "official_sonnet_2" in out and "#2" in out
