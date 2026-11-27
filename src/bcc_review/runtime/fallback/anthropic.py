@@ -29,6 +29,7 @@ def _retry_after(exc: Any) -> Optional[float]:
 
 class AnthropicAdapter:
     name = "anthropic"
+    supports_cache_hint = True  # переводит messages[i]["cache"] в cache_control блока
 
     def __init__(self, api_key: Optional[str] = None, *, client: Any = None, max_tokens: Optional[int] = None,
                  effort: Optional[str] = None, fallbacks: Optional[str] = None):
