@@ -1,0 +1,123 @@
+/* Страница задания (№41): светлый фон BCC (tokens.css №39), на нём белый лист документа. Во время проверки BCC AI
+ * плывёт вдоль строк и ведёт тонкий бледно-зелёный луч сверху вниз — это и есть прогресс; по готовности — тот же
+ * лист с правкой агента (HTML-отчёт в режиме встраивания) и одна стеклянная панель внизу. Встраивается в job_page. */
+.jb {
+  --ink: #0F2841; --ink-2: #3A5068; --ink-3: #5B6F84; --ink-4: #8795A5; --hair: rgba(15, 40, 65, .08); --hair-2: rgba(15, 40, 65, .14);
+  --green: #00B975; --green-strong: #008556; --green-ink: #00704A; --red: #C2362B;
+  --shadow-1: 0 0 0 1px rgba(15, 40, 65, .06), 0 1px 2px rgba(15, 40, 65, .04), 0 6px 18px rgba(15, 40, 65, .06);
+  --shadow-2: 0 0 0 1px rgba(15, 40, 65, .06), 0 2px 6px rgba(15, 40, 65, .05), 0 16px 40px rgba(15, 40, 65, .10);
+  --font: Inter, "Suisse Int'l", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, "DejaVu Sans Mono", monospace;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  position: relative; min-height: calc(100vh - 80px); padding: 32px 16px 120px; color: var(--ink);
+}
+.jb [hidden] { display: none !important; }
+.jb-parent { max-width: 760px; margin: 0 auto 16px; font-size: 15px; color: var(--ink-2); }
+.jb-parent a { color: var(--green-ink); }
+
+/* ── лист документа ── */
+@keyframes jb-sheet-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.jb-scan { position: relative; max-width: 760px; margin: 0 auto; }
+.jb-sheet {
+  position: relative; background: #fff; color: var(--ink); border-radius: 22px; padding: 36px 48px 64px 0; overflow: hidden;
+  box-shadow: var(--shadow-2); font: 17px/1.65 var(--font); animation: jb-sheet-in 360ms var(--ease);
+}
+.jb-sheet .ln { display: grid; grid-template-columns: 64px minmax(0, 1fr); transition: color 600ms var(--ease); }
+.jb-sheet .no { text-align: right; padding-right: 20px; font: 12px/28px var(--mono); color: var(--ink-4); user-select: none; }
+.jb-sheet .tx { white-space: pre-wrap; word-break: break-word; min-height: 28px; }
+.jb-sheet .h .tx { font-weight: 650; font-size: 19px; letter-spacing: -.01em; padding-top: 12px; }
+.jb-sheet .h .no { padding-top: 12px; }
+.jb-sheet .blank { min-height: 12px; }
+.jb-sheet .blank .tx, .jb-sheet .blank .no { min-height: 12px; font-size: 0; line-height: 12px; }
+.jb-sheet .skel .tx { height: 12px; min-height: 0; margin: 8px 0; border-radius: 6px; background: #EEF1F3; }
+.jb-sheet .skel:nth-child(3n) .tx { width: 70%; }
+/* прочитанное лучом — чуть тише */
+.jb-sheet .ln.read { color: var(--ink-2); }
+/* луч: тонкая бледно-зелёная линия и едва заметный след, без свечения */
+.jb-beam { position: absolute; z-index: 2; left: 0; right: 0; top: 36px; height: 1.5px; background: rgba(0, 185, 117, .5); pointer-events: none;
+  transition: top 900ms var(--ease), opacity 360ms var(--ease); }
+.jb-beam::before { content: ""; position: absolute; left: 0; right: 0; bottom: 1.5px; height: 48px;
+  background: linear-gradient(to bottom, rgba(0, 185, 117, 0), rgba(0, 185, 117, .06)); }
+.jb.finished .jb-beam { opacity: 0; }
+/* BCC AI плывёт у края листа вровень с лучом; этап — подписью рядом */
+.jb-pilot { position: absolute; z-index: 3; left: calc(100% + 14px); top: 36px; display: flex; align-items: center; gap: 12px;
+  transform: translateY(-50%); transition: top 900ms var(--ease); pointer-events: none; }
+.jb-agent { flex: none; width: 96px; height: 96px; position: relative; }
+.jb-agent:has(.bcc-agent)::after { content: ""; position: absolute; left: 22%; right: 22%; bottom: -4px; height: 10px; border-radius: 50%;
+  background: rgba(15, 40, 65, .12); filter: blur(4px); z-index: -1; }
+.jb-say { display: flex; flex-direction: column; gap: 2px; min-width: 190px; }
+.jb-say b { font-size: 16px; font-weight: 600; color: var(--ink); }
+.jb-say span { font-size: 13.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.jb-err { margin: 28px auto 0; max-width: 760px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.jb-errline { margin: 0; display: flex; gap: 10px; align-items: baseline; color: var(--red); font-size: 16px; overflow-wrap: anywhere; }
+.jb-errline::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--red); transform: translateY(-1px); }
+.jb-todo { margin: 0; font-size: 15px; color: var(--ink-2); }
+.jb-btn { display: inline-flex; align-items: center; height: 46px; padding: 0 22px; border-radius: 999px; background: var(--green-strong);
+  color: #fff !important; text-decoration: none; font-weight: 600; font-size: 16px; box-shadow: 0 6px 18px rgba(0, 133, 86, .28);
+  transition: transform 120ms var(--ease), background 120ms var(--ease); }
+.jb-btn:hover { background: #007A4F; transform: translateY(-1px); }
+.jb-btn:active { transform: scale(.98); }
+.jb-log { max-width: 760px; margin: 22px auto 0; font-size: 13.5px; color: var(--ink-3); }
+.jb-log summary { cursor: pointer; width: max-content; }
+.jb-log pre { margin: 10px 0 0; max-height: 240px; overflow: auto; padding: 12px 14px; border-radius: 14px; background: #fff;
+  box-shadow: var(--shadow-1); font: 12.5px/1.55 var(--mono); color: var(--ink-2); white-space: pre-wrap; }
+
+/* ── готовая правка: лист-отчёт на весь экран, фон — общий со страницей ── */
+.jb.done { padding: 0; min-height: 0; }
+body:has(main.jb.done) { overflow: hidden; }
+.jb-report { position: fixed; left: 0; right: 0; bottom: 0; top: var(--jb-top, 74px); width: 100%; height: calc(100vh - var(--jb-top, 74px));
+  border: 0; background: transparent; opacity: 0; transition: opacity 360ms var(--ease); }
+.jb-report.ready { opacity: 1; }
+
+/* ── стекло: нижняя плавающая панель действий — .b-dock (tokens.css №39); здесь только прокрутка на узком экране ── */
+.jb-dock { max-width: calc(100% - 16px); overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; justify-content: flex-start; }
+.jb-dock::-webkit-scrollbar { display: none; }
+.jb-d {
+  flex: none; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--ink-2) !important; font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1;
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background 220ms var(--ease), color 220ms var(--ease), box-shadow 220ms var(--ease), transform 120ms var(--ease);
+}
+.jb-d:hover { background: rgba(15, 40, 65, .05); color: var(--ink) !important; }
+.jb-d:active { transform: scale(.98); }
+.jb-d[aria-pressed="true"], .jb-d[aria-expanded="true"] { background: #fff; color: var(--ink) !important; box-shadow: inset 0 1px 0 #fff, 0 0 0 1px var(--hair), 0 2px 8px rgba(15, 40, 65, .10); }
+.jb-d[disabled] { opacity: .45; cursor: default; }
+.jb-n { font-size: 13px; color: var(--ink-4); font-variant-numeric: tabular-nums; }
+.jb-go, .jb-go:hover { background: var(--green-strong); color: #fff !important; margin-left: 4px; box-shadow: 0 6px 18px rgba(0, 133, 86, .28); }
+.jb-go:hover { background: #007A4F; }
+.jb-go[disabled] { box-shadow: none; }
+.jb-sep { flex: none; width: 1px; height: 22px; margin: 0 6px; background: var(--hair-2); }
+.jb-menu {
+  position: fixed; z-index: 31; left: 50%; bottom: 84px; transform: translateX(-50%); width: min(360px, calc(100% - 24px));
+  max-height: calc(100vh - 160px); overflow: auto; padding: 8px; border-radius: 22px; background: #fff; color: var(--ink); box-shadow: var(--shadow-2);
+}
+.jb-menu a, .jb-menu button {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 14px; width: 100%; min-height: 46px; padding: 11px 14px;
+  border: 0; border-radius: 14px; background: transparent; color: var(--ink) !important; font: inherit; font-size: 15.5px; text-align: left;
+  text-decoration: none; cursor: pointer; transition: background 120ms var(--ease);
+}
+.jb-menu a:hover, .jb-menu button:hover { background: #F3F6F5; }
+.jb-menu small { font-size: 13px; color: var(--ink-3); text-align: right; }
+.jb-toast { position: fixed; z-index: 32; left: 50%; bottom: 84px; transform: translateX(-50%); margin: 0; padding: 10px 18px; border-radius: 999px;
+  background: #fff; color: var(--ink); font-size: 15px; font-weight: 600; box-shadow: var(--shadow-2); max-width: calc(100% - 24px); }
+.jb-parent-done { position: fixed; z-index: 29; left: 50%; bottom: 82px; transform: translateX(-50%); margin: 0; max-width: calc(100% - 24px);
+  padding: 6px 14px; border-radius: 999px; background: #fff; box-shadow: var(--shadow-1); font-size: 13.5px; white-space: nowrap; }
+
+/* ── телефон: лист во всю ширину, BCC AI — у правого края листа ── */
+@media (max-width: 1100px) {
+  .jb-pilot { left: auto; right: 4px; flex-direction: row-reverse; }
+  .jb-say { min-width: 0; align-items: flex-end; padding: 6px 12px; border-radius: 14px; background: rgba(255, 255, 255, .94); box-shadow: var(--shadow-1); }
+}
+@media (max-width: 720px) {
+  .jb { padding: 16px 12px 110px; }
+  .jb-sheet { padding: 24px 16px 48px 0; font-size: 16.5px; }
+  .jb-sheet .ln { grid-template-columns: 40px minmax(0, 1fr); }
+  .jb-sheet .no { padding-right: 10px; font-size: 11px; }
+  .jb-say span { font-size: 12px; }
+  .jb-dock { bottom: 10px; }
+  .jb-d { padding: 0 13px; font-size: 14.5px; }
+  .jb-menu, .jb-toast { bottom: 72px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jb *, .jb *::before { animation: none !important; transition: none !important; }
+}
