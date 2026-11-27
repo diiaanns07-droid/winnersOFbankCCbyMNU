@@ -70,7 +70,7 @@ def test_official_expected_detectors(official):
                  "rules:placeholder.dash", "rules:placeholder.tbd", "rules:placeholder.checklist",
                  "rules:placeholder.approvals", "rules:placeholder.version", "rules:api.result_field_missing"):
         assert need in src, need
-    assert len(official["candidates"]) <= 19  # №30: +К2 (период ↔ «независимо от истории»), +С14 (повтор без ключа), +С13 (НФТ без доли)
+    assert len(official["candidates"]) <= 20  # №30: +К2, +С14, +С13, +К1 — все попадания в эталон
 
 
 def test_official_key_evidence(official):

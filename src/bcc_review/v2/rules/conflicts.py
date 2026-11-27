@@ -90,7 +90,8 @@ def _emit(out: dict, rule: str, kind: str, a: Sent | Line, qa: str, b: Sent | Li
 # К2 открытого набора). Границы (правило ↔ код API, приёмка на границе) — major, как в корпусе range_boundary;
 # судья поднимает их по контексту.
 CRITICAL_RULES = {"conflicts.event_negation": "critical", "conflicts.event_condition": "critical",
-                  "conflicts.event_quantity": "critical", "conflicts.event_effective": "critical"}
+                  "conflicts.event_quantity": "critical", "conflicts.event_effective": "critical",
+                  "conflicts.period_attribution": "critical"}
 
 
 # --- event_conflict -------------------------------------------------------------------------------
@@ -612,8 +613,90 @@ def rule_range_acceptance(doc: Doc, out: dict) -> None:
             return
 
 
+# --- отнесение к периоду на его границе -----------------------------------------------------------------------
+
+# «Месяц определяется по дате совершения покупки», «Сутки и месяц операции определяются по времени её проведения»
+PERIOD_ATTR = re.compile(r"\b(?:месяц|сутки)\w*(?:\s+и\s+(?:месяц|сутки)\w*)?(?:\s+[а-яё]+)?\s+(?:определя|счита|относ)\w*"
+                         r"\s+по\s+(?:дате|времени|моменту|дню)\s+(?P<ev>(?:[а-яё]+\s+){0,2}[а-яё]+)", re.I)
+MONTHS = ("январ", "феврал", "март", "апрел", "ма", "июн", "июл", "август", "сентябр", "октябр", "ноябр", "декабр")
+DATE_WORD = re.compile(r"\b(\d{1,2})\s+(январ|феврал|март|апрел|ма[яй]|июн|июл|август|сентябр|октябр|ноябр|декабр)\w*",
+                       re.I)
+DATE_NUM = re.compile(r"\b(\d{1,2})\.(\d{2})(?:\.(?:\d{4}|\d{2}))?\b")
+MONTH_ADJ = re.compile(r"\b(январ|феврал|март|апрел|ма|июн|июл|август|сентябр|октябр|ноябр|декабр)(?:ь?ск|овск|йск)\w*|"
+                       r"\b(?:за|в\s+сч[её]т)\s+(январ|феврал|март|апрел|ма[яй]|июн|июл|август|сентябр|октябр|ноябр|"
+                       r"декабр)\w*", re.I)
+EV_STOP = {"её", "ее", "его", "их", "этой", "этого", "данной", "данного"}
+
+
+def _month_of(word: str) -> int:
+    w = word.lower()
+    for i, m in enumerate(MONTHS, 1):
+        if w.startswith(m) if m != "ма" else w.startswith(("мая", "май", "майск", "ма")) and not w.startswith("март"):
+            return i
+    return 0
+
+
+def _cell_months(cell: str) -> set[int]:
+    res = {_month_of(m.group(2)) for m in DATE_WORD.finditer(cell)}
+    res |= {int(m.group(2)) for m in DATE_NUM.finditer(cell) if 1 <= int(m.group(2)) <= 12}
+    return res - {0}
+
+
+def rule_period_attribution(doc: Doc, out: dict) -> None:
+    """Правило «месяц — по дате события A» ↔ строка приёмки: событие A в одном месяце, а результат отнесён к месяцу
+    другой даты той же строки («Покупка 31 января … | Провести 1 февраля … | Февральский счётчик вырос»)."""
+    attr = None
+    for x in doc.lines:
+        if x.text and x.cells is None and not x.is_code:
+            m = PERIOD_ATTR.search(x.joined)
+            if m:
+                attr = (x, m)
+                break
+    if attr is None:
+        return
+    x0, m0 = attr
+    ev_stems = {_stem(_norm(w)) for w in WORD.findall(m0.group("ev")) if len(w) >= 5 and _norm(w) not in EV_STOP}
+    if not ev_stems:
+        return
+    for row, cells in _acceptance_rows(doc):
+        conds, res = cells[:-1], cells[-1]
+        scored = []
+        for i, c in enumerate(conds):
+            months = _cell_months(c)
+            hit = len(ev_stems & {_stem(_norm(w)) for w in WORD.findall(c)})
+            if months:
+                scored.append((hit, i, months))
+        if len(scored) < 2:
+            continue
+        scored.sort(key=lambda t: -t[0])
+        if scored[0][0] == 0 or scored[0][0] == scored[1][0] or len(scored[0][2]) != 1:
+            continue
+        ev_month = next(iter(scored[0][2]))
+        other = set().union(*(t[2] for t in scored[1:])) - {ev_month}
+        rm = MONTH_ADJ.search(res)
+        if not rm or not other:
+            continue
+        res_month = _month_of(rm.group(1) or rm.group(2))
+        if res_month == ev_month or res_month not in other:
+            continue
+        frag = _clause(res, rm.group(0))
+        _emit(out, "conflicts.period_attribution", "event_conflict", x0, _clause(x0.joined, m0.group(0)), row,
+              " | ".join(cells),
+              title="Критерий приёмки относит событие к другому периоду, чем требование",
+              problem=(f"Требование: {quoted(_clause(x0.joined, m0.group(0)))}. В строке приёмки событие "
+                       f"{quoted(m0.group('ev'))} приходится на один месяц, а результат {quoted(frag)} — на месяц "
+                       "другой даты той же строки. Требование и тест дают разные исходы для одной операции."),
+              scenario=(f"Операция на границе месяцев: {quoted(cells[scored[0][1]])}, затем {quoted(cells[scored[1][1]])}. "
+                        "По требованию она учитывается в первом месяце, по критерию приёмки — во втором."),
+              recommendation=("Выбрать одно правило отнесения к периоду (по дате какого события) и привести к нему "
+                              "требование и строку приёмки."),
+              question="По дате какого события операция относится к месяцу — и какой результат верен в этой строке?")
+        return
+
+
 def run(doc: Doc, out: dict) -> None:
     rule_events(doc, out)
+    rule_period_attribution(doc, out)
     rule_ranges(doc, out)
     rule_noun_bounds(doc, out)
     rule_acceptance_bounds(doc, out)

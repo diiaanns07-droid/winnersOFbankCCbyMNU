@@ -80,7 +80,7 @@ def test_new_offline_rules_silent_on_clean_documents() -> None:
     for p in paths:
         out = rules.run(docview.load(str(p)))
         bad = [c["title"] for c in out["candidates"]
-               if c["source"].startswith(("rules:ops.", "rules:conflicts.event_quantity", "rules:language.nfr_no_share"))]
+               if c["source"].startswith(("rules:ops.", "rules:conflicts.event_quantity", "rules:language.nfr_no_share", "rules:conflicts.period_attribution"))]
         assert bad == [], (p, bad)
 
 
@@ -105,3 +105,31 @@ def test_nfr_share_anywhere_or_batch_is_silent(tmp_path: Path) -> None:
         NFR.replace("## Нефункциональные требования", "## Функциональные требования"),
     ):
         assert _src(_run(tmp_path, text), "rules:language.nfr_no_share") == [], text
+
+
+PERIOD = """# Лимит снятия
+
+## Функциональные требования
+* **ФТ-1.** Месяц определяется по дате авторизации операции по времени Астаны.
+
+## Критерии приемки
+| Исходные условия | Действие | Ожидаемый результат |
+| --- | --- | --- |
+| Авторизация операции 30.04 в 23:59 на 10 000 ₸ | Списание 01.05 в 00:10 | Майский лимит уменьшился на 10 000 ₸ |
+"""
+
+
+def test_period_attribution_conflict(tmp_path: Path) -> None:
+    c = _src(_run(tmp_path, PERIOD), "rules:conflicts.period_attribution")
+    assert len(c) == 1 and c[0]["severity"] == "critical"
+    assert {e["line"] for e in c[0]["evidence"]} == {4, 9}
+
+
+def test_period_attribution_consistent_is_silent(tmp_path: Path) -> None:
+    for text in (
+        PERIOD.replace("Майский лимит", "Апрельский лимит"),
+        PERIOD.replace("Месяц определяется по дате авторизации", "Месяц определяется по дате списания"),
+        PERIOD.replace("* **ФТ-1.** Месяц определяется по дате авторизации операции по времени Астаны.", "* **ФТ-1.** Лимит."),
+        PERIOD.replace("Авторизация операции 30.04 в 23:59", "Авторизация операции 01.05 в 00:01"),
+    ):
+        assert _src(_run(tmp_path, text), "rules:conflicts.period_attribution") == [], text
