@@ -229,3 +229,19 @@ def test_gate_render_summary_lists_red_with_owners():
     text = gate.render_summary(checks, "Ворота, 15:30")
     assert "зелёных 1, красных 1, без замера 1" in text and "| A: С | 17/20 (≥ 18/20) | з | №10 / №05 |" in text
     assert "Без замера: C." in text
+
+
+def test_score_second_chance_for_focused_out_strict_pair():
+    """Просьба №07: замечание о С15 (строки 121 и 156) не уходит в дубль С3 — у С15 строгая пара, заголовок о нём."""
+    import json as _json
+
+    from evaluation.v2 import score as sc
+    from evaluation.v2.common import ROOT
+
+    gold = sc.load_gold(ROOT / "evaluation/v2/official/gold.yaml")
+    rep = _json.loads((ROOT / "evaluation/v2/measurements/zamer_13_00_9bd5954_haiku/report.json").read_text(encoding="utf-8"))
+    res = sc.score_report(rep, gold, arbiter="off")
+    got = {a["gold"]: a["finding"] for a in res["assignment"]}
+    assert got.get("С15") == "D-18"  # «Шаг 5 возвращает прежний порог, но в ответе ERROR amount не описан»
+    assert all(d["finding"] != "D-18" for d in res["duplicates"])
+    assert {"К1", "К2", "К3", "К4", "К5"} <= set(got)

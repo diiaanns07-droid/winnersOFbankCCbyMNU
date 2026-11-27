@@ -143,7 +143,7 @@ def pair_info(item: dict, f: dict) -> dict:
     # заголовок говорит, о чём замечание: совпадения в нём весят больше (замечание засчитывается за свою тему)
     score = line_score + 0.5 * n_kw + 0.3 * n_title + (0.3 if kind_ok else 0)
     return {"status": status, "score": round(score, 3), "groups_hit": groups_hit, "kw_hits": n_kw,
-            "kw_total": len(kw_hits), "kind_ok": kind_ok}
+            "kw_total": len(kw_hits), "kind_ok": kind_ok, "title_hits": n_title}
 
 
 def max_matching(items: list[dict], findings: list[dict], edges: dict[tuple[str, str], float]) -> dict[str, str]:
@@ -284,6 +284,25 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
                 e[(gid, fid)] = max(e.get((gid, fid), 0.0), 0.5)
         return e
 
+    def second_chance(assignment: dict[str, str], e_all: dict[tuple[str, str], float]) -> None:
+        """Замечание без пары, у которого есть строгая пара (строки-опоры + ключевые слова, `match`) с пунктом, не
+        найденным никем, засчитывается за этот пункт. focus() отбрасывает такую пару, когда соседний пункт по общей
+        строке набирает больше (С15 ↔ С3 на строке 156, С14 ↔ К4 на строке 52, просьба №07) — и замечание о другом
+        дефекте уходило в дубли. Только если заголовок замечания говорит о теме пункта (ключевые слова пункта в
+        заголовке): иначе настоящий дубль К1 «доставался» бы соседнему М8. Порядок: критичные первыми, по оценке."""
+        used = set(assignment.values())
+        for it in sorted(items, key=lambda it: (LEVEL_ORDER.get(it["level"], 3), items.index(it))):
+            gid = it["id"]
+            if gid in assignment:
+                continue
+            cand = sorted(((sc, fid) for (g, fid), sc in e_all.items()
+                           if g == gid and fid not in used and pairs.get((g, fid), {}).get("status") == "match"
+                           and pairs[(g, fid)].get("title_hits")),  # заголовок замечания — о теме этого пункта
+                          key=lambda x: (-x[0], x[1]))
+            if cand:
+                assignment[gid] = cand[0][1]
+                used.add(cand[0][1])
+
     def focus(e: dict[tuple[str, str], float]) -> dict[tuple[str, str], float]:
         """Оставить у каждого замечания только пункты эталона, близкие к лучшему по оценке (не дальше 0,3):
         замечание засчитывается за то, о чём оно, а не за всё, чего касается."""
@@ -322,6 +341,8 @@ def score_report(report: dict, gold: dict, *, report_md: str | None = None, run_
     edges_len = focus(edges_for(True, extra_gold))
     assign = max_matching(items, findings, edges)
     assign_len = max_matching(items, findings, edges_len)
+    second_chance(assign, edges_all)
+    second_chance(assign_len, edges_all)
     f2g = {fid: gid for gid, fid in assign.items()}
 
     # дубли: замечание без пары в паросочетании, но с допустимым ребром к уже найденному пункту
