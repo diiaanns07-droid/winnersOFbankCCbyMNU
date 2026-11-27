@@ -21,11 +21,21 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
+sys.path.insert(0, str(ROOT / "src"))
 TBD = '<span class="tbd">—</span>'
 
 
 def e(v) -> str:
     return escape("" if v is None else str(v), quote=True)
+
+
+def tx(v) -> str:
+    """Текст модели: «L038» → «строка 38» (как в HTML-отчёте), затем экранирование."""
+    try:
+        from bcc_review.v2.render.html import tx as html_tx
+        return html_tx(v)
+    except Exception:  # noqa: BLE001
+        return e(v)
 
 
 def _pct(x) -> str:
@@ -48,7 +58,7 @@ def from_report(path: Path | None) -> dict:
         lines = sorted({ev.get("line_start") for ev in f.get("evidence") or [] if ev.get("line_start")})
         where = "строки " + ", ".join(map(str, lines[:4])) if lines else ""
         items.append(f'<div class="panel bk"><span class="id">{e(f.get("id"))}</span><div class="t">{e(f.get("title"))}'
-                     f'<small>{e((f.get("problem") or "")[:170])}</small></div><span class="where">{e(where)}</span></div>')
+                     f'<small>{tx(_clip(f.get("problem") or "", 170))}</small></div><span class="where">{e(where)}</span></div>')
     ok = total = 0
     for f in fs:
         for ev in f.get("evidence") or []:
@@ -58,16 +68,131 @@ def from_report(path: Path | None) -> dict:
     dur = run.get("duration_s")
     src = f"отчёт агента {path.name}: модель {models}" + (f", {dur / 60:.0f} мин" if dur else "") + \
           (f", коммит {run.get('commit', '')[:7]}" if run.get("commit") else "")
-    return {"critical_count": str(len(crit)), "blockers": "".join(items),
+    n = len(crit)
+    title = (f"{n} {_plural(n, 'блокер', 'блокера', 'блокеров')}, <em>которые агент нашёл сам</em>" if n
+             else "Блокеров нет")
+    return {"critical_count": str(n), "blockers_title": title, "blockers": "".join(items),
             "quotes_verified": _pct(ok / total) if total else None,
             "rejected": str(len(r.get("rejected") or [])), "report_source": src}
+
+
+def _clip(s: str, n: int) -> str:
+    s = " ".join(str(s).split())
+    return s if len(s) <= n else s[:n].rsplit(" ", 1)[0] + "…"
+
+
+def _plural(n: int, one: str, few: str, many: str) -> str:
+    n = abs(int(n))
+    if n % 10 == 1 and n % 100 != 11:
+        return one
+    if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
+        return few
+    return many
+
+
+def _dur(s) -> str:
+    if not isinstance(s, (int, float)):
+        return "—"
+    s = int(round(s))
+    return f"{s} с" if s < 60 else f"{s // 60} мин {s % 60:02d} с"
+
+
+def _model_name(row: dict) -> str:
+    m = str(row.get("model") or "")
+    prov = row.get("provider") or ""
+    name = {"opus": "Claude Opus", "sonnet": "Claude Sonnet", "haiku": "Claude Haiku"}.get(m.lower(), m or "—")
+    if prov == "claude_cli":
+        name += " (CLI)"
+    return name
+
+
+def from_evaluation(root: Path) -> dict:
+    """Числа №15: история замеров официального документа и корпус. Только то, что посчитал счётчик."""
+    out: dict = {}
+    hist = root / "evaluation" / "v2" / "history.jsonl"
+    rows = []
+    if hist.is_file():
+        for line in hist.read_text(encoding="utf-8").splitlines():
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    v1 = next((r for r in rows if r.get("version") == "v1"), None)
+    v2 = [r for r in rows if r.get("version") == "v2" and r.get("status") == "complete"]
+    strong = [r for r in v2 if "opus" in str(r.get("model", "")).lower()] or \
+             [r for r in v2 if "sonnet" in str(r.get("model", "")).lower()] or v2
+    best = strong[-1] if strong else None
+    if best:
+        qt, qm = best.get("quotes_total") or 0, best.get("quotes_missing") or 0
+        cost = best.get("cost_usd")
+        out.update({
+            "k_found": f"{best['K']}/5", "k_crit": str(best.get("K_as_critical", "—")), "s_found": f"{best['C']}/20",
+            "crit_false": str(best.get("critical_false", "—")),
+            "quotes": f"{(qt - qm) * 100 // qt} %" if qt else "—",
+            "official_time": _dur(best.get("duration_s")), "official_calls": str(best.get("calls") or "—"),
+            "official_cost": f"≈ ${cost:.2f}" if isinstance(cost, (int, float)) else "стоимость не замерена",
+            "official_source": f"{_model_name(best)}; замер №15 {best.get('at', '')}: «{best.get('label', '')}»",
+        })
+    # модели: последний полный замер по каждой модели
+    per: dict = {}
+    for r in v2:
+        per[(r.get("provider"), r.get("model"))] = r
+    if per:
+        order = sorted(per.values(), key=lambda r: ["opus", "sonnet", "haiku"].index(str(r.get("model")).lower())
+                       if str(r.get("model")).lower() in ("opus", "sonnet", "haiku") else 9)
+        out["models_rows"] = "".join(
+            f"<tr><td>{e(_model_name(r))}</td><td class=mono>{r['K']}/5</td><td class=mono>{r['C']}/20</td>"
+            f"<td class=mono>{r.get('findings', '—')}</td><td class=mono>{e(_dur(r.get('duration_s')))}</td>"
+            f"<td class=mono>{r.get('calls') or '—'}</td></tr>" for r in order)
+        out["models_source"] = "Официальный документ, счётчик №15 (evaluation/v2/history.jsonl); статус каждого прогона — complete."
+    # было → стало
+    if v1 and best:
+        def row(lbl, a, b):
+            return f'<tr><td>{e(lbl)}</td><td class="old">{e(a)}</td><td class="new">{e(b)}</td></tr>'
+        rws = [row("Ключевые блокеры К1–К5", f"{v1['K']}/5", f"{best['K']}/5"),
+               row("Существенные дефекты С1–С20", f"{v1['C']}/20", f"{best['C']}/20"),
+               row("Дубли замечаний", str(v1.get("duplicates", "—")), str(best.get("duplicates", "—"))),
+               row("Английские слова в отчёте", str(v1.get("english", "—")), str(best.get("english", "—"))),
+               row("Строк в отчёте", f"{v1.get('report_md_lines', 0):,}".replace(",", " "),
+                   f"{best.get('report_md_lines', 0):,}".replace(",", " "))]
+        out["_v1v2_rows"] = rws
+        out["v1v2_rows"] = "".join(rws)
+        out["v1v2_source"] = (f"Официальный документ, один счётчик №15: v1 — «{v1.get('label', '')}» ({v1.get('at', '')}), "
+                              f"v2 — «{best.get('label', '')}» ({best.get('at', '')}).")
+    # корпус
+    best_c = None
+    for p in sorted((root / "evaluation" / "v2" / "corpus_results").glob("*/summary.json")):
+        try:
+            c = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            continue
+        if "офлайн" in str(c.get("label", "")).lower() and best_c is not None:
+            continue
+        if best_c is None or "офлайн" in str(best_c.get("label", "")).lower() or str(c.get("at")) > str(best_c.get("at")):
+            best_c = c
+    if best_c:
+        h = best_c.get("harness") or {}
+        clean = best_c.get("clean") or {}
+        out.update({
+            "corpus_recall": f"{h.get('tp', 0)}/{h.get('support', 28)}",
+            "corpus_precision": f"{round((h.get('precision') or 0) * 100)} %",
+            "corpus_clean": str(h.get("clean_false_alarms", clean.get("findings", "—"))),
+            "corpus_source": f"Корпус evaluation/dev, строгий счётчик: «{best_c.get('label', '')}» ({best_c.get('at', '')}). "
+                             f"v1 на том же корпусе: 0 из 28 и 44 тревоги на чистых.",
+        })
+        if out.get("_v1v2_rows"):  # v1 на корпусе — docs/plan-v2/ref/BCC-quality-08d3af5.md (bcc/eval-independent)
+            out["_v1v2_rows"].append(
+                f'<tr><td>Корпус: заложенные дефекты / тревоги на 8 чистых ТЗ</td><td class="old">0 из 28 / 44</td>'
+                f'<td class="new">{h.get("tp", 0)} из {h.get("support", 28)} / {h.get("clean_false_alarms", "—")}</td></tr>')
+            out["v1v2_rows"] = "".join(out["_v1v2_rows"])
+    return out
 
 
 def from_metrics(path: Path) -> dict:
     if not path.is_file():
         return {}
     m = json.loads(path.read_text(encoding="utf-8"))
-    out = {k: m[k] for k in ("k_found", "s_found", "clean_fp", "stability", "v2_summary", "metrics_source") if m.get(k)}
+    out = {k: v for k, v in m.items() if isinstance(v, str) and v}  # любое поле слайдов можно задать вручную
     rows = []
     for row in m.get("models") or []:
         cells = [row.get(k, "—") for k in ("model", "k", "s", "findings", "time", "calls")]
@@ -85,10 +210,13 @@ def from_metrics(path: Path) -> dict:
 
 def build_html(report: Path | None, metrics: Path) -> Path:
     data = {"models_rows": f'<tr><td colspan="6">{TBD} сравнение моделей — после замеров №15 и №17</td></tr>',
+            "blockers_title": f'{TBD} блокеров, <em>которые агент нашёл сам</em>',
+            "stability_source": "Стабильность — 3 прогона подряд (замер №15).",
             "team": f'<div class="panel mem"><div class="av">ST</div><b>{TBD}</b><span>имена и роли — из presentation/metrics.json</span></div>',
             "blockers": f'<div class="panel bk"><span class="id">К</span><div class="t">{TBD} список появится после финального прогона агента</div><span></span></div>',
             "report_source": "финальный отчёт ещё не собран"}
     data.update({k: v for k, v in from_report(report).items() if v})
+    data.update({k: v for k, v in from_evaluation(ROOT).items() if v and not k.startswith("_")})
     data.update(from_metrics(metrics))
     src = (HERE / "deck.src.html").read_text(encoding="utf-8")
     html = re.sub(r"\{\{(\w+)\}\}", lambda mm: str(data.get(mm.group(1), TBD)), src)
