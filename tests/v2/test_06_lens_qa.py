@@ -289,13 +289,15 @@ def test_verifiability_only_vague_words_stay_others_dropped():
     assert "числом" in run("Методы отвечают не дольше 2 с для 95 % запросов.")["dropped"][0]["reason"]
     assert sev("Ответ приходит мгновенно.") == "major"
     assert sev("Ответ быстрый, доступность 99,9 %.") == "major"  # размытое слово рядом с числом
-    assert sev("Сообщение отправляется в течение минуты после события.") == "major"
+    # без размытой оценки — снимается: измеримость НФТ код проверяет по nfr_checks
+    assert sev("Сообщение отправляется в течение минуты после события.") == "dropped"
     fn = [{"id": "R-03", "kind": "functional", "line_start": 30, "line_end": 30}]
     assert sev("В сообщении указывается причина", line=30, ids=("R-03",), extra=fn) == "dropped"
     assert sev("Экран удобный и понятный", line=30, ids=("R-03",), extra=fn) == "major"
     goal = run("Снизить число ошибок.", line=5, ids=("R-01",))
     assert goal["candidates"] == [] and "цель продукта" in goal["dropped"][0]["reason"]
-    assert sev("Снизить число ошибок.", line=20, ids=("R-01",)) == "major"  # цитата из НФТ — не только цель
+    assert sev("Снизить число ошибок.", line=20, ids=("R-01",)) == "dropped"
+    assert sev("Ошибок должно быть как можно меньше.", line=20, ids=("R-01",)) == "major"  # размытая оценка
 
 
 def test_vague_words_quotes_not_doubled_in_title():
@@ -747,3 +749,17 @@ def test_status_conflict_on_row_without_code_is_not_conflict():
     assert c["verdict"] == "match" and c["code_not_checked"]
     assert lens_qa.normalize_check(dict(raw, stated="Ответ 400, показано «Ошибка»"))["verdict"] == "conflict"
     assert lens_qa.normalize_check(dict(raw, stated="Статус DONE"))["verdict"] == "conflict"
+
+
+def test_model_contradiction_with_nfr_side_is_minor():
+    """Противоречие модели, одна сторона которого — НФТ (окно отправки, свежесть данных), — minor; два функциональных
+    правила — major, как было."""
+    reqs = REQS + [{"id": "R-09", "kind": "nonfunctional", "line_start": 46, "line_end": 46}]
+    base = {"title": "Два исхода", "kind": "contradiction", "criterion": "set_consistent", "severity": "major",
+            "requirement_ids": ["R-01", "R-09"], "evidence": [{"quote": "a", "line": 10}, {"quote": "b", "line": 46}],
+            "problem": "p", "scenario": "s", "impact": "i", "recommendation": "r", "rewrite": "", "question": "",
+            "blocks": "both"}
+    c = lens_qa.postprocess({"candidates": [base]}, reqs)["candidates"][0]
+    assert c["severity"] == "minor" and c["severity_hint"] == "major"
+    two = dict(base, evidence=[{"quote": "a", "line": 10}, {"quote": "b", "line": 12}])
+    assert lens_qa.postprocess({"candidates": [two]}, reqs)["candidates"][0]["severity"] == "major"
