@@ -219,6 +219,35 @@ def _doc_vocab(view: dict) -> set[str]:
     return vocab
 
 
+def _word_counts(view: dict) -> dict[str, int]:
+    from collections import Counter
+    return Counter(w.lower() for x in _lines(view) for w in _WORD.findall(_text(x)))
+
+
+def join_split_words(text: str, counts: dict[str, int]) -> str:
+    """Слово, которое PDF разрезал пробелом в узкой ячейке таблицы («проце нты», «нач ислени й», «consent Pd»),
+    склеивается, если целое слово есть в документе, а каждый кусок как слово редок (не больше двух раз — только
+    в разрезанных местах). Частые настоящие слова подряд («и», «не», «для») не склеиваются."""
+    toks = text.split(" ")
+    out: list[str] = []
+    i = 0
+    while i < len(toks):
+        for j in range(min(len(toks), i + 4), i + 1, -1):
+            parts = toks[i:j]
+            if not all(_WORD.fullmatch(t) for t in parts):
+                continue
+            whole = "".join(parts)
+            if (counts.get(whole.lower()) and all(counts.get(t.lower(), 0) <= 2 for t in parts)
+                    and counts[whole.lower()] >= max(counts.get(t.lower(), 0) for t in parts)):
+                out.append(whole)
+                i = j
+                break
+        else:
+            out.append(toks[i])
+            i += 1
+    return " ".join(out)
+
+
 # остальные латинские буквы внутри русского слова — по звучанию («лимite» → «лимите»)
 _LAT_SOUND = {"a": "а", "b": "б", "c": "к", "d": "д", "e": "е", "f": "ф", "g": "г", "h": "х", "i": "и", "j": "й",
               "k": "к", "l": "л", "m": "м", "n": "н", "o": "о", "p": "п", "q": "к", "r": "р", "s": "с", "t": "т",
@@ -375,12 +404,26 @@ def _covered(items: Iterable[dict]) -> set[int]:
     return out
 
 
+_STATUS_SID = re.compile(r"(?:.+: )?Статус [1-5]\d\d")
+
+
+def _distinct_items(a: dict, b: dict) -> bool:
+    """Два разных пункта на одной строке view: PDF/DOCX отдают перечень «200. Ответ… 400. Ответ…» одной строкой,
+    и модель ставит «Статус 200» и «Статус 400» на одну строку с одной цитатой — это не дубль."""
+    sa, sb = a.get("source_id") or "", b.get("source_id") or ""
+    if not sa or not sb or sa == sb:
+        return False
+    return bool((_STATUS_SID.fullmatch(sa) and _STATUS_SID.fullmatch(sb))
+                or (re.fullmatch(ITEM_ID, sa) and re.fullmatch(ITEM_ID, sb)))
+
+
 def merge_items(requirements: list[dict], excluded: list[dict]) -> tuple[list[dict], list[dict]]:
     """Снимает дубли и пересечения; требования важнее исключений."""
     reqs = sorted(requirements, key=lambda r: (r["line_start"], -(r["line_end"] - r["line_start"])))
     kept: list[dict] = []
     for r in reqs:
         dup = next((k for k in kept if (k["line_start"], k["line_end"]) == (r["line_start"], r["line_end"])
+                    and not _distinct_items(k, r)
                     and (not k["source_id"] or not r["source_id"] or k["source_id"] == r["source_id"]
                          or _norm(k["quote"]) == _norm(r["quote"]))), None)
         # одна строка view может нести несколько пунктов (абзац с переносами в DOCX/PDF): разные source_id и
@@ -390,7 +433,8 @@ def merge_items(requirements: list[dict], excluded: list[dict]) -> tuple[list[di
                 dup["source_id"] = r["source_id"]
             continue
         outer = next((k for k in kept if k["line_start"] <= r["line_start"] and r["line_end"] <= k["line_end"]), None)
-        if outer is not None and (outer["source_id"] == r["source_id"] or _norm(outer["quote"]) == _norm(r["quote"])):
+        if outer is not None and not _distinct_items(outer, r) and (
+                outer["source_id"] == r["source_id"] or _norm(outer["quote"]) == _norm(r["quote"])):
             continue  # тот же пункт, выделенный повторно внутри большего диапазона
         if kept and r["line_start"] <= kept[-1]["line_end"] and r["line_end"] > kept[-1]["line_end"] \
                 and kept[-1]["line_start"] < r["line_start"]:
@@ -595,6 +639,19 @@ def _drop_method_qualifier(sid: str, parts: list[str]) -> str:
     return sid
 
 
+_PARAM_CELL = re.compile(r"^(?P<name>[A-Za-z_][\w.{}/\[\]-]{0,39})\s*\((?P<q>[^()]{1,40})\)$")
+
+
+def _param_name(first: dict, rest: str) -> str:
+    """Имя параметра без пометки места из той же ячейки: «cardId (path)», «enabled (body, application/json)» →
+    «cardId», «enabled» — как в офлайн-нарезке; одна модель пометку переписывает в ID, другая нет."""
+    cell = _MD_DECOR.sub("", _text(first)).strip().strip("|").strip().split(" | ")[0].strip()
+    m = _PARAM_CELL.match(re.sub(r"\s+", " ", rest.strip()))
+    if m and cell.startswith(m.group("name")) and _PARAM_CELL.match(cell):
+        return m.group("name")
+    return rest
+
+
 def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
     """Одно оформление source_id при любом прогоне и любой модели.
 
@@ -607,6 +664,7 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
     fmt = str(view.get("format") or "").lower()
     starts = Counter(int(r["line_start"]) for r in requirements)
     doc_heads = _heading_texts(view)
+    counts = _word_counts(view) if fmt == "pdf" else {}  # PDF режет слова в узких ячейках таблиц
     for r in requirements:
         first = by_n.get(int(r["line_start"])) or {}
         parts = [p.strip() for p in str(first.get("section") or "").split("›") if p.strip()]
@@ -617,6 +675,8 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
         row_name = _numbered_row_name(first)
         if row_name and parts:
             r["source_id"] = f"{parts[-1]}: {row_name}"  # строка «2. Создание QR-кода | …» — как назвал её документ
+            if counts:
+                r["source_id"] = join_split_words(r["source_id"], counts)
             continue
         sid = _strip_heading_prefix(r.get("source_id") or "", parts, doc_heads)
         sid = _drop_method_qualifier(sid, parts)
@@ -649,6 +709,8 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
             if parts and any(_strip_num(pre).lower() == _strip_num(h).lower() for h in parts):
                 pre = parts[-1]  # префикс — всегда ближайший заголовок (таблица под «A › B» → «B: …»)
             sep, rest = m.group("sep"), m.group("rest")
+            if sep == ": " and _is_row(_text(first)):
+                rest = _param_name(first, rest)
             if sep in (", п. ", ", строка ") and rest.isdigit():
                 sep = ", строка " if _is_row(_text(first)) else ", п. "
             sid = f"{pre}{sep}{rest}"
@@ -660,7 +722,7 @@ def canonical_source_ids(view: dict, requirements: list[dict]) -> list[dict]:
             text = " ".join(_text(by_n[n]) for n in range(int(r["line_start"]), int(r["line_end"]) + 1) if n in by_n)
             if len(set(_CODE_RE.findall(text))) >= 2 and not _is_row(_text(first)):
                 sid = ""
-        r["source_id"] = sid
+        r["source_id"] = join_split_words(sid, counts) if counts else sid
     return requirements
 
 
@@ -699,6 +761,30 @@ def merge_same_source_ids(requirements: list[dict], view: dict) -> list[dict]:
     return out
 
 
+def merge_paragraph_lines(view: dict, requirements: list[dict]) -> list[dict]:
+    """Две строки одного абзаца Markdown без пустой строки между ними (мягкий перенос) — одно требование, как
+    в DOCX и PDF, где этот абзац — одна строка: «Экран условий: …» + «После выдачи: …» под одним заголовком.
+
+    Склеиваются только обычные абзацы без своего ID (не пункты списка, не строки таблицы, не коды ответа):
+    перечень кодов «**200.** …» / «**400.** …» — тоже один абзац Markdown, но по требованию на код."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    out: list[dict] = []
+    for r in sorted(requirements, key=lambda x: (x["line_start"], x["line_end"])):
+        prev = out[-1] if out else None
+        if prev is not None and r["line_start"] == prev["line_end"] + 1 and not r["source_id"] \
+                and not prev["source_id"]:
+            a, b = by_n.get(prev["line_end"]) or {}, by_n.get(r["line_start"]) or {}
+            ta, tb = _text(a).strip(), _text(b).strip()
+            if (a.get("block_id") and a.get("block_id") == b.get("block_id")
+                    and a.get("kind") == b.get("kind") == "paragraph" and str(view.get("format")) in ("md", "txt")
+                    and not _is_row(ta) and not _is_row(tb) and not _CODE_ITEM.match(_MD_DECOR.sub("", tb))
+                    and not _LEAD_CODE.match(_MD_DECOR.sub("", tb).strip("* ")) and not _ID_RE.match(tb)):
+                prev["line_end"] = r["line_end"]
+                continue
+        out.append(r)
+    return out
+
+
 def merge_bare_codes(view: dict, requirements: list[dict]) -> list[dict]:
     """Требование из голого кода ответа («404» под фразой «…возвращается 404…») склеивается с соседом выше."""
     by_n = {int(x["n"]): x for x in _lines(view)}
@@ -714,8 +800,69 @@ def merge_bare_codes(view: dict, requirements: list[dict]) -> list[dict]:
             prev["line_end"] = max(prev["line_end"], r["line_end"])
             prev["source_id"], prev["kind"] = f"Статус {code}", "api"
             continue
+        # PDF: голый код «404» читатель принял за заголовок, модель взяла тело ответа под ним отдельным требованием
+        gap = [n for n in range(prev["line_end"] + 1, r["line_start"]) if not is_trivial(_text(by_n.get(n) or {}))] \
+            if prev is not None else []
+        gap_code = _bare_code(_text(by_n.get(gap[0]) or {})) if len(gap) == 1 else None
+        body = [n for n in range(r["line_start"], r["line_end"] + 1) if not is_trivial(_text(by_n.get(n) or {}))]
+        if (gap_code and r["line_start"] - prev["line_end"] <= 3 and gap_code in _CODE_RE.findall(prev_text)
+                and (not prev["source_id"] or prev["source_id"] == f"Статус {gap_code}")
+                and (not r["source_id"] or r["source_id"] == f"Статус {gap_code}")
+                and body and all((by_n.get(n) or {}).get("kind") == "code" or _CODEISH.match(_text(by_n[n]))
+                                 for n in body)):
+            prev["line_end"] = r["line_end"]
+            prev["source_id"], prev["kind"] = f"Статус {gap_code}", "api"
+            continue
         out.append(r)
     return out
+
+
+def _bare_code(text: str) -> str | None:
+    t = _MD_DECOR.sub("", text or "").strip().strip("*").strip().rstrip(".")
+    return t if re.fullmatch(r"[1-5]\d\d", t) else None
+
+
+def absorb_bare_code_blocks(view: dict, requirements: list[dict], excluded: list[dict],
+                            headings: set[int] | None = None) -> tuple[list[dict], list[dict]]:
+    """«…возвращается 404…» + голый код «404» + тело ответа — одно описание кода, как в офлайн-нарезке и у sonnet.
+
+    haiku отдаёт «404» с телом в excluded («пример к статусу 404»), и у требования «Статус 404» нет тела ответа —
+    замечание с цитатой тела («Карта не найдена») не находит своё требование. Поглощается исключённый блок, который
+    стоит сразу за требованием (между ними — только пустые строки, не больше двух) и состоит из голого кода, уже
+    названного в требовании, и строк кода (тело, JSON). Заголовков внутри блока нет."""
+    headings = headings or set()
+    by_n = {int(x["n"]): x for x in _lines(view)}
+
+    def content(a: int, b: int) -> list[int]:
+        return [n for n in range(a, b + 1) if not is_trivial(_text(by_n.get(n) or {}))]
+
+    def codeish(n: int) -> bool:
+        x = by_n.get(n) or {}
+        return x.get("kind") == "code" or bool(_CODEISH.match(_text(x)))
+
+    reqs = sorted(requirements, key=lambda x: (x["line_start"], x["line_end"]))
+    keep: list[dict] = []
+    for e in sorted(excluded, key=lambda x: (x["line_start"], x["line_end"])):
+        a, b = int(e["line_start"]), int(e["line_end"])
+        body = content(a, b)
+        prev = next((r for r in reversed(reqs) if r["line_end"] < a), None)
+        if not body or prev is None or any(n in headings for n in range(a, b + 1)) \
+                or a - prev["line_end"] > 3 or content(prev["line_end"] + 1, a - 1):
+            keep.append(e)
+            continue
+        own = content(prev["line_start"], prev["line_end"])
+        text = " ".join(_text(by_n.get(n) or {}) for n in own)
+        lead = _bare_code(_text(by_n.get(body[0]) or {}))          # блок начинается с голого кода «404»
+        last = _bare_code(_text(by_n.get(own[-1]) or {})) if own else None  # код уже в конце требования
+        code, rest = (lead, body[1:]) if lead else (last, body)
+        if (code and code in _CODE_RE.findall(text) and (lead or rest)
+                and (not prev["source_id"] or prev["source_id"] == f"Статус {code}")
+                and all(codeish(n) for n in rest)):
+            prev["line_end"] = b
+            prev["source_id"], prev["kind"] = f"Статус {code}", "api"
+            continue
+        keep.append(e)
+    return reqs, keep
 
 
 # пункт перечня кодов внутри одной строки: «200. Ответ в случае… 400. Ответ в случае…» (DOCX/PDF склеили строки)
@@ -747,6 +894,29 @@ def split_status_lists(view: dict, requirements: list[dict]) -> list[dict]:
             out.append({**r, "source_id": f"Статус {m.group(1)}", "kind": "api", "summary": summary,
                         "quote": _short_quote(seg), "line_start": a, "line_end": b})
     return out
+
+
+def status_item_quotes(view: dict, requirements: list[dict]) -> list[dict]:
+    """Цитата «Статус N» на строке с несколькими кодами — пункт этого кода («404. Ответ в случае…»), а не начало
+    строки («200. Ответ…»): иначе в отчёте у кода 404 цитата про 200. Цитата не выходит за свою строку view."""
+    by_n = {int(x["n"]): x for x in _lines(view)}
+    for r in requirements:
+        m = _STATUS_SID.fullmatch(r.get("source_id") or "")
+        if not m:
+            continue
+        code = r["source_id"][-3:]
+        for n in range(int(r["line_start"]), int(r["line_end"]) + 1):
+            text = re.sub(r"\s+", " ", _MD_DECOR.sub("", _text(by_n.get(n) or {}))).strip()
+            items = list(_CODE_ITEM.finditer(text))
+            if len(items) < 2 and not (items and items[0].start() > 0):
+                continue
+            hit = next((i for i, it in enumerate(items) if it.group(1) == code), None)
+            if hit is None:
+                continue
+            end = items[hit + 1].start() if hit + 1 < len(items) else len(text)
+            r["quote"] = _short_quote(text[items[hit].start():end])
+            break
+    return requirements
 
 
 def code_in_summary(requirements: list[dict]) -> list[dict]:
@@ -1141,6 +1311,10 @@ _PLACEHOLDER = re.compile(r"^(не используется|не использ�
                           r"tbd|заполняются? .*)\.?$", re.I)
 
 
+# продолжение фразы с прошлой строки: строчная буква или тире-пояснение («— последние четыре цифры»)
+_CONTINUES = re.compile(r"^(?:[a-zа-яё]|[—–]\s)")
+
+
 def heuristic_segment(view: dict) -> dict:
     """Нарезка по строкам без модели: пункт, строка таблицы или абзац — одно требование."""
     headings = heading_lines(view)
@@ -1153,6 +1327,7 @@ def heuristic_segment(view: dict) -> dict:
     by_line = {int(x["n"]): x for x in lines}
     fmt_src = str(view.get("format") or "").lower() in ("md", "txt", "markdown")
     caption, caption_line, table_name = "", 0, ""
+    counts = _word_counts(view) if str(view.get("format") or "").lower() == "pdf" else {}
     for i, ln in enumerate(lines):
         n, t = int(ln["n"]), _text(ln).strip()
         if (n in headings and re.fullmatch(r"[1-5]\d\d\.?", t) and reqs and t[:3] in reqs[-1]["quote"]
@@ -1175,9 +1350,18 @@ def heuristic_segment(view: dict) -> dict:
                          "reason": "Метаданные или шаблон процесса, не требование"})
             prev_table_row = is_row
             continue
+        last_excl = _text(by_line.get(excl[-1]["line_end"]) or {}).rstrip() if excl else ""
+        if (not fmt_src and excl and excl[-1]["what"] == "Служебное пояснение" and n - excl[-1]["line_end"] <= 2
+                and _CONTINUES.match(t) and last_excl and not _SENT_END.search(last_excl)):
+            excl[-1]["line_end"] = n  # пояснение о документе продолжается на следующей строке PDF
+            continue
         if (not section and n < first_sectioned) or _DOC_NOTE.match(t):
             excl.append({"what": "Служебное пояснение", "line_start": n, "line_end": n,
                          "reason": "Пояснение о самом документе"})
+            continue
+        if is_row and prev_table_row and ln.get("kind") == "table_header":
+            # шапка, повторённая на новой странице PDF: та же таблица, нумерация строк продолжается
+            excl.append({"what": "Шапка таблицы", "line_start": n, "line_end": n, "reason": "Строка-шапка таблицы"})
             continue
         if is_row and not prev_table_row:
             excl.append({"what": "Шапка таблицы", "line_start": n, "line_end": n, "reason": "Строка-шапка таблицы"})
@@ -1227,6 +1411,11 @@ def heuristic_segment(view: dict) -> dict:
                 and n - reqs[-1]["line_end"] <= 2):
             reqs[-1]["line_end"] = n  # продолжение того же абзаца или пункта (перенос строки в HTML/PDF/DOCX)
             continue
+        if (not fmt_src and not starts_item and not is_row and reqs and n - reqs[-1]["line_end"] <= 2
+                and _CONTINUES.match(t) and prev_end and not _SENT_END.search(prev_end)
+                and not _is_row(prev_end)):
+            reqs[-1]["line_end"] = n  # пункт продолжается на следующей странице PDF: «…, проценты по» + «счёту …»
+            continue
         tail = _section_tail(ln)
         clean = re.sub(r"^\s*[-*•]\s+", "", t)
         sid, kind = "", _guess_kind(low_sec, clean, is_row)
@@ -1242,7 +1431,7 @@ def heuristic_segment(view: dict) -> dict:
             sid = f"{tail}, п. {m.group('n')}" if tail else f"п. {m.group('n')}"
         elif is_row:
             cells = [c.strip() for c in clean.strip("| ").split(" | ")]
-            first_cell = cells[0]
+            first_cell = join_split_words(cells[0], counts) if counts else cells[0]
             if first_cell.isdigit() and len(cells) > 1 and re.fullmatch(r"[A-Za-z_][\w.{}\[\]-]{0,39}", cells[1]):
                 first_cell = cells[1]  # столбец «№», затем имя параметра
             tname = table_name or tail
@@ -1262,10 +1451,11 @@ def heuristic_segment(view: dict) -> dict:
         r.pop("_block", None)
         r.pop("_bare", None)
     reqs = _collapse_key_value_tables(view, reqs)
+    reqs = merge_paragraph_lines(view, reqs)
     reqs, excl = merge_items(reqs, excl)
     reqs, excl = demote_examples(view, reqs, excl)
     reqs = split_status_lists(view, reqs)
-    reqs = canonical_source_ids(view, reqs)
+    reqs = status_item_quotes(view, canonical_source_ids(view, reqs))
     return {"requirements": assign_ids(uniquify_source_ids(code_in_summary(reqs))), "excluded": excl}
 
 
@@ -1564,9 +1754,12 @@ def segment_from_response(view: dict, raw: dict,
     reqs, excl = demote_examples(view, reqs, excl)
     reqs, excl = demote_non_requirements(view, reqs, excl)
     reqs = merge_bare_codes(view, reqs)
+    reqs = merge_paragraph_lines(view, reqs)
+    reqs, excl = absorb_bare_code_blocks(view, reqs, excl, headings)
     reqs = merge_same_source_ids(reqs, view)
     reqs = split_status_lists(view, reqs)
     canonical_source_ids(view, reqs)
+    status_item_quotes(view, reqs)
     code_in_summary(reqs)
     uniquify_source_ids(reqs)
     assign_ids(reqs)

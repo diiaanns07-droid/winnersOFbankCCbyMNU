@@ -188,12 +188,19 @@ class Pipeline:
         self.reuse = reuse
         self.rerun = set(rerun)
         self.log = log or (lambda msg: None)
-        self.run = RunDir(self.opts["runs_dir"], self.opts.get("run_id"))
+        runs_note = ""
+        try:
+            self.run = RunDir(self.opts["runs_dir"], self.opts.get("run_id"))
+        except OSError as exc:  # каталог только для чтения (установленный пакет, Docker с --user) — не повод терять отчёт
+            import tempfile
+            self.run = RunDir(Path(tempfile.gettempdir()) / "bcc_review_runs", self.opts.get("run_id"))
+            runs_note = (f"Каталог прогонов недоступен для записи ({type(exc).__name__}): артефакты этапов записаны "
+                         "во временный каталог системы (bcc_review_runs); отчёт от этого не зависит")
         self.started_at = now_iso()
         self.t0 = time.monotonic()
         self.stages: dict[str, str] = {}
         self.stage_stats: dict[str, dict] = {}
-        self.warnings: list[str] = []
+        self.warnings: list[str] = [runs_note] if runs_note else []
         self.ctx: Context | None = None
         self.provider_name = ""
         self.model_error = ""
@@ -282,6 +289,13 @@ class Pipeline:
         opts = self.opts
         self.log(f"Документ: {self.input}")
         view = load_view(self.input)
+        if not any(str(ln.get("text") or "").strip() for ln in view.get("lines") or []):
+            # пустой документ: модель не зовём (нечего проверять), вердикт «можно» невозможен — отчёт правилами
+            self.warnings.insert(0, "В документе нет текста: проверять нечего. Модель не вызывалась, вердикт не "
+                                    "выносится — проверьте, тот ли файл передан.")
+            self.ctx = Context(view=view, llm=None, options={**opts, "input": str(self.input)},
+                               run_dir=self.run.path, trace=self.run.trace)
+            return self._offline(view)
         try:
             llm, self.provider_name = make_llm(opts, self.run, self.input)
         except Exception as exc:  # noqa: BLE001 — нет ключа / не тот провайдер: отчёт правилами + объяснение
@@ -321,7 +335,10 @@ class Pipeline:
             ctx.excluded = seg.get("excluded") or []
             rules_out = self.stage("rules", lambda: self._rules(view, seg), empty={"signals": [], "candidates": []})
             ctx.signals = rules_out.get("signals") or []
-            self._remap_reviewers(outs, rctx.requirements, ctx.requirements)
+            try:
+                self._remap_reviewers(outs, rctx.requirements, ctx.requirements)
+            except Exception as exc:  # noqa: BLE001 — перевод ссылок не этап модели: прогон не роняет
+                self.warnings.append(f"Ссылки рецензентов на таблицу эвристики не переведены: {type(exc).__name__}: {exc}")
         else:
             # 1. нарезка (при сбое — эвристика кода, прогон partial)
             seg = self.stage("segment", lambda: self._segment(ctx), inputs={"lines": len(view.get("lines") or [])},
@@ -458,6 +475,10 @@ class Pipeline:
         if self.opts.get("consistency", True):
             jobs["consistency"] = lambda: self._consistency(ctx)
         names = list(self.opts.get("lenses") or LENSES)
+        for bad in [n for n in names if n not in LENSES]:
+            names.remove(bad)
+            self.stages[f"lens_{bad}"] = "failed"
+            self.warnings.append(f"Линза «{bad}» неизвестна — допустимо: {', '.join(LENSES)}")
         for name in sorted(names, key=lambda n: (LONGEST_FIRST.index(n) if n in LONGEST_FIRST else 99)):
             jobs[f"lens_{name}"] = (lambda n=name: self._lens(ctx, n))
         for name in [f"lens_{x}" for x in LENSES] + ["consistency"]:
@@ -615,8 +636,13 @@ class Pipeline:
                                    do_revise=bool(self.opts.get("revise")),
                                    report_path=self.opts.get("output") or None)
         except Exception as exc:  # noqa: BLE001
-            self.warnings.append(f"Режим --answers/--revise не выполнен: {type(exc).__name__}: {exc}")
+            msg = f"Режим --answers/--revise не выполнен: {type(exc).__name__}: {exc}"
+            self.warnings.append(msg)
             self.stages["recheck"] = "failed"
+            # отчёт уже собран — сбой режима должен быть виден в нём, а не только в self.*
+            run = report.setdefault("run", {})
+            run["warnings"] = _uniq(list(run.get("warnings") or []) + [msg])
+            run.setdefault("stages", {})["recheck"] = "failed"
             return
         self.stages["recheck"] = "ok"
         self.stage_stats["recheck"] = {"calls": 0, "seconds": round(time.monotonic() - t0, 2), "candidates": 0}
@@ -663,7 +689,8 @@ class Pipeline:
                 "model_requested": self.opts.get("model") or "", "models_used": s["models_used"],
                 "calls": s["calls"], "tokens": s["tokens"], "cost_usd": s["cost_usd"], "status": status,
                 "stages": _in_stage_order(self.stages), "stage_stats": _in_stage_order(self.stage_stats),
-                "warnings": _uniq(self.warnings + (self.ctx.warnings if self.ctx else [])), "options": opts}
+                "warnings": _uniq(self.warnings + (self.ctx.warnings if self.ctx else [])), "options": opts,
+                **({"model_error": self.model_error} if self.model_error else {})}
 
     def _report(self, view: dict, seg: dict, findings: list, rejected: list, extras: dict, jd: dict,
                 questions: list, qstats: dict) -> dict:
@@ -925,6 +952,17 @@ def fallback_markdown(report: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _unread_view(path: Path) -> dict:
+    """Паспорт нечитаемого входа для отчёта о сбое: тот же контракт (``contracts/v2.json``), что у прочитанного."""
+    try:
+        sha = hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        sha = hashlib.sha256(b"").hexdigest()
+    fmt = {".md": "md", ".markdown": "md", ".pdf": "pdf", ".docx": "docx", ".html": "html", ".htm": "html"}.get(
+        path.suffix.lower(), "txt")
+    return {"title": path.name, "file": path.name or "input", "format": fmt, "sha256": sha, "lines": []}
+
+
 def review(input_path: str | Path, output_md: str | Path, opts: dict | None = None, *,
            reuse: RunDir | None = None, rerun: set[str] = frozenset(),
            log: Callable[[str], None] | None = None) -> tuple[dict, dict]:
@@ -936,8 +974,7 @@ def review(input_path: str | Path, output_md: str | Path, opts: dict | None = No
     except Exception as exc:  # noqa: BLE001 — последний рубеж: отчёт о сбое вместо трейсбэка
         p.warnings.append(f"Прогон прерван: {type(exc).__name__}: {exc}")
         p.run.trace({"event": "fatal", "traceback": traceback.format_exc()[-4000:]})
-        view = p.ctx.view if p.ctx else {"title": Path(input_path).name, "file": Path(input_path).name,
-                                          "format": "", "sha256": "", "lines": []}
+        view = p.ctx.view if p.ctx else _unread_view(Path(input_path))
         report = {"schema": "bcc-review/2", "run": p._run_block("failed"), "document": document_summary(view),
                   "requirements": [], "findings": [], "verdict": {"development": "none", "testing": "none",
                                                                    "summary": "", "fix_first": []}}
