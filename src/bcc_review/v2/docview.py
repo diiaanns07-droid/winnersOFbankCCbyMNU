@@ -1286,8 +1286,6 @@ def _split_merged_headings(blocks: list[dict], sizes: dict) -> list[dict]:
         l1 = [f for f in frags if f.get("line") == lines_idx[1]]
         h0 = max(f["rect"][3] - f["rect"][1] for f in l0)
         h1 = max(f["rect"][3] - f["rect"][1] for f in l1)
-        right0 = max(f["rect"][2] for f in l0)
-        width = sizes[_page_of(b)][0]
         cut = max(f["end"] for f in l0)
         first, second = text[:cut].strip(), text[cut:].strip()
         # только разный кегль строк: короткая первая строка бывает и у обычного переноса заголовка в узкой колонке
