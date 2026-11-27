@@ -1,0 +1,52 @@
+{
+  "aligned": {
+    "input": "aligned",
+    "code": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+    "sha": "1afedacecd479c98a28e4a80b8aed067065cffbf5ad3a25cdd525d420b981b51",
+    "provider": "mock",
+    "status": "complete",
+    "n_requirements": 8,
+    "findings": 0,
+    "development": "yes",
+    "verification": {
+      "aligned": [
+        0,
+        [
+          "verify: OK — исходник совпадает (SHA-256 1afedacecd47…), цитат на своих строках 0 из 0, счётчики и вердикт сходятся, числа в отчёте .md те же, коммит 9d1e157c"
+        ]
+      ],
+      "clash": [
+        4,
+        [
+          "verify: расхождений — 1",
+          "  - document.sha256: SHA-256 исходника d296ea13471d… не совпадает с записанным 1afedacecd47…"
+        ]
+      ]
+    }
+  },
+  "clash": {
+    "input": "clash",
+    "code": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+    "sha": "d296ea13471da1e5094ed8991a2eaf42bb4d41bc20b3f74d2a8ec85d3b534e9c",
+    "provider": "mock",
+    "status": "complete",
+    "n_requirements": 8,
+    "findings": 0,
+    "development": "yes",
+    "verification": {
+      "aligned": [
+        4,
+        [
+          "verify: расхождений — 1",
+          "  - document.sha256: SHA-256 исходника 1afedacecd47… не совпадает с записанным d296ea13471d…"
+        ]
+      ],
+      "clash": [
+        0,
+        [
+          "verify: OK — исходник совпадает (SHA-256 d296ea13471d…), цитат на своих строках 0 из 0, счётчики и вердикт сходятся, числа в отчёте .md те же, коммит 9d1e157c"
+        ]
+      ]
+    }
+  }
+}
