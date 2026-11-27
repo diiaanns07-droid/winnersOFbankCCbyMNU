@@ -335,3 +335,66 @@ def test_runs_cost_limit_counts_all_passes(tmp_path):
     lim = report["run"]["cost_limit"]
     assert lim["spent_tokens"] == sum(report["stability"]["tokens_total"].values())
     assert lim["hit"] is False
+
+
+# --------------------------------------------------------------------------- самопроверка 17:20
+
+def test_cyrillic_letters_match_answers_parser():
+    """В консоли и в файле ответов кириллица читается одинаково: похожие А, В, С — A, B, C; Б — B; Г — D."""
+    from bcc_review.v2.__main__ import ask_questions
+    from bcc_review.v2.stages import recheck
+    qs = [{"id": f"Q-0{i}", "topic": "", "question": "?", "options": ["a", "b", "c", "d"]} for i in range(1, 6)]
+    lines = ask_questions(qs, input_fn=_feed("А", "В", "С", "Б", "Г"), print_fn=lambda *_: None)
+    assert [x.split(": ")[1][0] for x in lines] == ["A", "B", "C", "B", "D"]
+    for ru in "АВСБГ":
+        parsed = recheck.parse_answers_text(f"Q-01: {ru}")["answers"][0]
+        line = ask_questions(qs[:1], input_fn=_feed(ru), print_fn=lambda *_: None)[0]
+        assert "ABCD".index(line.split(": ")[1][0]) == parsed["choice"], ru
+
+
+def test_interactive_revise_without_answers_still_revises(tmp_path, monkeypatch):
+    import builtins
+    from bcc_review.v2.__main__ import main
+    monkeypatch.setattr(builtins, "input", _feed())
+    out = tmp_path / "r.md"
+    assert main([str(OFFICIAL), str(out), "--provider", "mock", "--interactive", "--revise", "-q", "--no-html",
+                 "--runs-dir", str(tmp_path / "runs")]) == 0
+    data = json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
+    assert data["run"]["options"]["revise"] is True and data.get("revise_stats") is not None
+    assert not data.get("clarification")
+
+
+def test_replay_parallel_calls_get_distinct_records(tmp_path):
+    """Два параллельных вызова одного этапа (деление пакета) берут ответы 1 и 2, а не оба первый."""
+    import threading
+    from bcc_review.v2.providers.mock import ReplayProvider
+    (tmp_path / "lens_qa.json").write_text(json.dumps([{"n": 1}, {"n": 2}]), encoding="utf-8")
+    prov = ReplayProvider(fixtures_dir=tmp_path)
+    schema = {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}
+    got, errs = [], []
+
+    def call():
+        try:
+            got.append(prov.invoke(model=None, messages=[{"role": "user", "content": "x"}], schema=schema,
+                                   stage="lens_qa")["data"]["n"])
+        except Exception as exc:  # noqa: BLE001
+            errs.append(exc)
+    ts = [threading.Thread(target=call) for _ in range(3)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert sorted(got) == [1, 2] and len(errs) == 1 and getattr(errs[0], "kind", "") == "bad_request"
+
+
+def test_runs_unstable_refs_dropped_everywhere():
+    from bcc_review.v2 import stability
+    f1 = {"id": "D-01", "kind": "k", "evidence": [{"line_start": 3}], "title": "t"}
+    f2 = {"id": "D-02", "kind": "m", "evidence": [{"line_start": 9}], "title": "u"}
+    base = {"run": {"status": "complete"}, "findings": [f1, f2], "requirements": [], "verdict": {"fix_first": ["D-02"]},
+            "acceptance_checks": [{"finding_ids": ["D-01", "D-02"]}], "pair_checks": [{"finding_id": "D-02"}],
+            "questions": [{"id": "Q-01", "finding_ids": ["D-02"]}]}
+    other = {"run": {"status": "complete"}, "findings": [dict(f1)]}
+    rep = stability.merge(base, [other, {"run": {"status": "complete"}, "findings": [dict(f1)]}], 3)
+    assert [f["id"] for f in rep["findings"]] == ["D-01"] and rep["findings_unstable"][0]["id"] == "D-02"
+    assert rep["acceptance_checks"][0]["finding_ids"] == ["D-01"]
+    assert rep["pair_checks"][0]["finding_id"] == ""
+    assert rep["questions"][0]["finding_ids"] == [] and rep["verdict"]["fix_first"] == []
