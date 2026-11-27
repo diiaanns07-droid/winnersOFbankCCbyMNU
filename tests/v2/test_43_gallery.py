@@ -173,12 +173,17 @@ def test_ready_job_survives_restart_and_refreshes(tmp_path):
     assert job.file_name == "requirements.md" and job.provider == "mock" and job.summary["critical"] == 5
     assert {"html", "json"} <= set(job.files) and "md" not in job.files
     assert job.notice.startswith("Готовый отчёт")
-    # перезапуск сервера: задание читается с диска, повторно не собирается
+    # «Последние проверки» — только свои проверки пользователя
+    own = app.store.create("my.md", b"# x\n", "offline", "")
+    assert [j.id for j in app.store.recent()] == [own.id]
+    # перезапуск сервера: JobStore готовое задание не подхватывает (нет job.json), ensure_ready берёт его с диска
     app2 = _app(tmp_path)
-    assert app2.store.get(jid) and app2.store.get(jid).state == "done"
-    mtime = (app2.store.dir(jid) / "job.json").stat().st_mtime_ns
+    assert app2.store.get(jid) is None and [j.id for j in app2.store.recent()] == [own.id]
+    mtime = (app2.store.dir(jid) / "ready.json").stat().st_mtime_ns
     assert G.ensure_ready(app2, G.load_examples(exp, tmp_path))["m"] == jid
-    assert (app2.store.dir(jid) / "job.json").stat().st_mtime_ns == mtime
+    assert (app2.store.dir(jid) / "ready.json").stat().st_mtime_ns == mtime  # не пересобиралось
+    assert app2.store.get(jid).state == "done" and [j.id for j in app2.store.recent()] == [own.id]
+    assert app2.store.get(jid).input_path == str(app2.store.dir(jid) / "input" / "requirements.md")
     # отчёт обновился → новый номер задания, старое удалено
     rep = json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
     rep["verdict"]["development"] = "conditional"

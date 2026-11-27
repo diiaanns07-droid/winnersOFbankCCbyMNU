@@ -186,9 +186,9 @@ def _build_job(store: Any, jid: str, rec: dict[str, Any], meta: dict[str, Any]) 
                 files={k: n for k, n, _, _ in R.FILES if (tmp / "out" / n).is_file()},
                 log=[f"Готовый отчёт «{rec.get('title', rec['id'])}» из examples.json (№43)."],
                 summary=meta["summary"], notice=(notice + " " + extra).strip() if extra else notice)
-    (tmp / "ready.json").write_text(json.dumps({"example": rec["id"], "digest": meta["digest"]}, ensure_ascii=False),
-                                    encoding="utf-8")
-    (tmp / "job.json").write_text(json.dumps(asdict(job), ensure_ascii=False, indent=1), encoding="utf-8")
+    # не job.json: JobStore при старте не подхватывает готовые задания в «Последние проверки»; их возвращает ensure_ready
+    (tmp / "ready.json").write_text(json.dumps({"example": rec["id"], "digest": meta["digest"], "job": asdict(job)},
+                                               ensure_ascii=False, indent=1), encoding="utf-8")
     shutil.rmtree(final, ignore_errors=True)
     tmp.replace(final)
     try:
@@ -198,30 +198,59 @@ def _build_job(store: Any, jid: str, rec: dict[str, Any], meta: dict[str, Any]) 
     return job
 
 
+def _from_disk(store: Any, jid: str, digest: str) -> R.Job | None:
+    """Готовое задание, собранное при прошлом запуске сервера (файлы уже на месте) — без повторного копирования."""
+    d = store.dir(jid)
+    try:
+        rec = json.loads((d / "ready.json").read_text(encoding="utf-8"))
+        if rec.get("digest") != digest or not (d / "out" / "report.html").is_file():
+            return None
+        job = R.Job(**{k: v for k, v in rec["job"].items() if k in R.Job.__dataclass_fields__})
+        job.input_path = str(d / "input" / job.file_name)  # каталог данных могли перенести
+        return job
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _hide_from_recent(store: Any) -> None:
+    """«Последние проверки» — только свои проверки пользователя: готовые отчёты живут в своём блоке."""
+    if getattr(store, "_g43_recent", False):
+        return
+    orig = store.recent
+
+    def recent(n: int = 12) -> list[R.Job]:
+        return [j for j in orig(len(store.jobs) or n) if not is_ready(j)][:n]
+
+    store.recent, store._g43_recent = recent, True
+
+
 def ensure_ready(app: Any, examples: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, str]:
     """Положить готовые отчёты в хранилище заданий, если их ещё нет. Возвращает {id записи: номер задания}."""
     store = app.store
     ex = examples if examples is not None else load_examples()
     out: dict[str, str] = {}
     with _LOCK:
+        _hide_from_recent(store)
         for rec in ex["reports"]:
             if not rec.get("ok"):
                 continue
             try:
                 meta = report_meta(rec["json"])
                 jid = ready_id(rec, meta)
-                have = store.get(jid)
-                if not (have and (store.dir(jid) / "out" / "report.html").is_file()):
-                    job = _build_job(store, jid, rec, meta)
+                if not (store.get(jid) and (store.dir(jid) / "out" / "report.html").is_file()):
+                    job = _from_disk(store, jid, meta["digest"]) or _build_job(store, jid, rec, meta)
                     with store.lock:
                         store.jobs[jid] = job
                 out[rec["id"]] = jid
             except Exception:  # noqa: BLE001 — битый отчёт просто не показываем, главная не падает
                 continue
-        for jid in [j for j in list(store.jobs) if is_ready(j) and j not in out.values()]:  # устаревшие версии
+        keep = set(out.values())
+        for jid in [j for j in list(store.jobs) if is_ready(j) and j not in keep]:  # устаревшие версии
             with store.lock:
                 store.jobs.pop(jid, None)
-            shutil.rmtree(store.dir(jid), ignore_errors=True)
+        for d in (Path(store.root) / "jobs").glob(PREFIX + "*"):
+            if d.name not in keep and (d / "ready.json").is_file():
+                shutil.rmtree(d, ignore_errors=True)
     return out
 
 
@@ -257,9 +286,6 @@ _CSS = """<style>
 .g43-card:hover{transform:translateY(-1px);box-shadow:0 0 0 1px var(--b-hair,rgba(15,40,65,.08)),var(--b-shadow-2,0 16px 40px rgba(15,40,65,.1))}
 .g43-card:active{transform:scale(.98)}
 .g43-t{font-size:17px;font-weight:650;line-height:1.3;letter-spacing:-.01em}
-.g43-k{flex:none;font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--b-ink-3,#5B6F84);
-  padding:3px 7px;border-radius:7px;box-shadow:inset 0 0 0 1px var(--b-hair-2,rgba(15,40,65,.14))}
-.g43-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .g43-m{margin-top:auto;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .g43-try{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
 .g43-try form{margin:0;display:contents}
@@ -270,10 +296,6 @@ _CSS = """<style>
 </style>"""
 
 
-def _kind(p: Path) -> str:
-    return {".md": "MD", ".markdown": "MD", ".pdf": "PDF", ".docx": "DOCX", ".txt": "TXT"}.get(p.suffix.lower(), "")
-
-
 def reports_block(app: Any, examples: dict[str, list[dict[str, Any]]] | None = None) -> str:
     ex = examples if examples is not None else load_examples()
     ready = ensure_ready(app, ex)
@@ -282,11 +304,9 @@ def reports_block(app: Any, examples: dict[str, list[dict[str, Any]]] | None = N
         if rec["id"] not in ready:
             continue
         m = report_meta(rec["json"])
-        kind = _kind(rec["source"])
         cards.append(
             f'<li><a class="b-surface g43-card" href="/examples/{e(rec["id"])}" data-job="{e(ready[rec["id"]])}">'
-            f'<span class="g43-top"><span class="g43-t">{e(rec.get("title") or rec["id"])}</span>'
-            f'{f"<span class=g43-k>{kind}</span>" if kind else ""}</span>'
+            f'<span class="g43-t">{e(rec.get("title") or rec["id"])}</span>'
             f'<span class="g43-m"><span class="b-note">{e(m["model"])}{" · " + e(m["date"]) if m["date"] else ""}</span>'
             f'<span class="b-badge {m["verdict_cls"]}">{e(m["line"])}</span></span></a></li>')
     return "".join(cards)
