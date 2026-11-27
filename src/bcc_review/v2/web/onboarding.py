@@ -36,6 +36,7 @@ HELLO = "Здравствуйте! Я BCC AI, проверяю ТЗ до нач�
 MAX_BODY = 8 * 1024
 
 ENV_FILE: Path | None = None          # куда писать .env; None — .env в текущем каталоге (тесты подменяют)
+SKIP_WELCOME = False                  # в терминале выбрали «без ключа» (tty_agent.greet) — окно ключа не показываем
 _verified: set[str] = set()           # отпечатки ключей, уже прошедших проверку в этом процессе
 _lock = threading.Lock()
 
@@ -68,7 +69,7 @@ def _fixture_mode(app: Any) -> bool:
 
 def needs_welcome(app: Any, cookie_header: str | None) -> bool:
     """Показывать ли знакомство: провайдер «auto», не показ по фикстуре, модели нет и «Без ключа» не выбран."""
-    if getattr(app, "default_provider", "auto") != "auto" or _fixture_mode(app):
+    if SKIP_WELCOME or getattr(app, "default_provider", "auto") != "auto" or _fixture_mode(app):
         return False
     return not chose_no_key(cookie_header) and not has_model_provider()
 
@@ -138,10 +139,37 @@ def verify_key(provider: str, key: str) -> tuple[bool, str]:
         return False, f"Нет связи с {vendor}: проверьте интернет, прокси или брандмауэр."
     if not status and re.search(r"\b429\b|лимит запросов|quota|rate.?limit", low):
         return True, "Ключ работает, но лимит запросов сейчас исчерпан — подождите минуту перед проверкой"
-    if status or re.search(r"ключ|key|auth|отклон|invalid|permission", low):
+    about_key = re.search(r"ключ|api.?key|unauthori|authenticat|permission|forbidden|отклон", low + tail.lower())
+    if about_key or (status and status.group(1) in ("401", "403")):
         said = f"{vendor} ответил {status.group(1)}" if status else f"{vendor} его отклонил"
         return False, f"Ключ не подошёл: {said}. Скопируйте ключ целиком."
+    if status:
+        return False, f"{vendor} ответил {status.group(1)}: {_first_sentence(detail, 140)}"
     return False, _first_sentence(detail) or "Проверка не прошла. Попробуйте ещё раз."
+
+
+def detect_provider(key: str) -> str:
+    """По виду ключа: AIza… — Gemini, sk-ant-… — Claude. Иначе пусто."""
+    if key.startswith("AIza"):
+        return "gemini"
+    if key.startswith("sk-ant-"):
+        return "anthropic"
+    return ""
+
+
+def accept_key(provider: str, key: str, *, remember: bool, path: Path | None = None) -> str:
+    """Проверенный ключ — в окружение работающего сервера, при ``remember`` — в .env. Пусто — всё записано."""
+    name = ENV_NAME[provider]
+    with _lock:
+        _verified.add(_fingerprint(provider + ":" + key))
+        _verified.add(_fingerprint(key))
+        os.environ[name] = key
+        if remember:
+            try:
+                write_env(path or env_path(), name, key)
+            except OSError as exc:
+                return f"Ключ работает, но файл .env не записан: {exc.strerror or 'нет доступа'}."
+    return ""
 
 
 def env_path() -> Path:
@@ -179,14 +207,18 @@ def write_env(path: Path, name: str, value: str) -> None:
 def handle_key(body: dict[str, Any], *, verify: Callable[[str, str], tuple[bool, str]] | None = None
                ) -> tuple[int, dict[str, Any]]:
     """Логика POST /api/key без HTTP: (код, ответ). Ключа в ответе нет — только маска."""
-    provider = str(body.get("provider") or "").strip().lower()
+    provider = str(body.get("provider") or "auto").strip().lower()
     if provider == "claude":
         provider = "anthropic"
-    if provider not in ENV_NAME:
-        return 400, {"ok": False, "message": "Выберите Gemini или Claude."}
     key = re.sub(r"\s+", "", str(body.get("key") or ""))
     if not key:
         return 400, {"ok": False, "message": "Вставьте ключ в поле."}
+    if provider == "auto":
+        provider = detect_provider(key)
+        if not provider:
+            return 400, {"ok": False, "message": "Не похоже на ключ: у Gemini он начинается с AIza, у Claude — с sk-ant-."}
+    if provider not in ENV_NAME:
+        return 400, {"ok": False, "message": "Нужен ключ Gemini или Claude."}
     if len(key) > 400:
         return 400, {"ok": False, "message": "Это не похоже на ключ: слишком длинный текст."}
     remember = body.get("remember") is True
@@ -200,17 +232,11 @@ def handle_key(body: dict[str, Any], *, verify: Callable[[str, str], tuple[bool,
     out: dict[str, Any] = {"ok": ok, "provider": provider, "mask": mask(key), "message": msg, "remembered": False}
     if not ok:
         return 200, out
-    name = ENV_NAME[provider]
-    with _lock:
-        _verified.add(fp)
-        _verified.add(_fingerprint(key))
-        os.environ[name] = key
-        if remember:
-            try:
-                write_env(env_path(), name, key)
-                out["remembered"] = True
-            except OSError as exc:
-                out["message"] = f"Ключ работает, но файл .env не записан: {exc.strerror or 'нет доступа'}."
+    problem = accept_key(provider, key, remember=remember)
+    if problem:
+        out["message"] = problem
+    else:
+        out["remembered"] = remember
     return 200, out
 
 

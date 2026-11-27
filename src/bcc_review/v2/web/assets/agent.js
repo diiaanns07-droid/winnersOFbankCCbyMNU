@@ -1,12 +1,25 @@
-/* BCC AI — маскот веб-демо (№40). Пиксельный дрон «Review Agent» с титульного слайда команды
- * (docs/design/source/stupits-title-slide.html: makeDrone, палитра DSK) в тёмно-синей плитке.
- * Без зависимостей. API:
- *   const a = BCCAgent.mount(el, {size: 160, mood: 'idle'});
+/* BCC AI — маскот веб-интерфейса (№40). Пиксельный дрон «Review Agent» с титульного слайда команды
+ * (docs/design/source/stupits-title-slide.html: makeDrone, палитра DSK). Без зависимостей, без внешних ссылок.
+ *
+ * Значок или персонаж:
+ *   const a = BCCAgent.mount(el, {size: 24, mood: 'idle', tile: false});
  *   a.mood('idle'|'scanning'|'analyzing'|'verified'|'alert'[, мс_до_idle]);
- *   a.say('Текст');      // облачко-стекло, печать ~10 мс на символ, щелчок показывает сразу; → Promise
+ *   a.say('Одна строка');   // печать ~10 мс на символ, щелчок показывает сразу; → Promise
+ *   a.stage('читаю');       // мелкая подпись у дрона
  *   a.destroy();
- * Автоподключение: каждый [data-bcc-agent] (data-size, data-mood, data-say).
- * Анимация идёт только пока элемент на экране и вкладка открыта; prefers-reduced-motion — статичный кадр. */
+ *   Автоподключение: [data-bcc-agent] с data-size, data-mood, data-say, data-tile="1" (плитка, как раньше).
+ *   Смена атрибутов data-mood / data-say на элементе сразу меняет дрона.
+ *
+ * Дрон над листом (прогресс проверки = луч сканера сверху вниз по строкам):
+ *   const p = BCCAgent.fly(sheetEl, {size: 80});
+ *   p.progress(0.4, 'правила');   // 0…1 и подпись этапа
+ *   p.say('Читаю раздел 3');
+ *   p.land();                     // садится на верхний край листа; на листе — событие 'bcc-agent:landed'
+ *   p.takeoff(); p.mood(...); p.destroy();
+ *   Без JS-вызовов: <div class="sheet" data-bcc-scan data-progress="0.4" data-stage="правила">,
+ *   data-bcc-scan="land" — посадка. data-land="left" — сесть слева (по умолчанию справа, над печатью).
+ *
+ * Анимация — только пока элемент виден и вкладка открыта; prefers-reduced-motion — статичные кадры. */
 (function () {
   'use strict';
   if (window.BCCAgent) return;
@@ -15,6 +28,7 @@
   var MOODS = ['idle', 'scanning', 'analyzing', 'verified', 'alert'];
   var R = function (a, b) { return a + Math.random() * (b - a); };
   var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
+  var ease = function (k) { return k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; };
 
   function sdRoundBox(px, py, cx, cy, bx, by, r) {
     var dx = Math.abs(px - cx) - (bx - r), dy = Math.abs(py - cy) - (by - r);
@@ -35,6 +49,7 @@
     eyeCore: '#EEFFF4', eyeHalo: '#34D36A', cheekL: '#34D36A', cheekR: '#F2C94C', lensRing: '#CAA166'
   };
   var DG = 80, DINK = '#121826';
+  var CROP = { x: 6, y: 16, w: 68, h: 48 };   // дрон без луча — для значков меньше 48 px
 
   function makeDrone() {
     var canvas = document.createElement('canvas'); canvas.width = canvas.height = DG;
@@ -63,12 +78,13 @@
       if (m === 'verified' && !LITE) d.sparkles(7);   // искры один раз
     };
     d.look = function (x, y) { d.gx = clamp(x, -1, 1); d.gy = clamp(y, -1, 1); };
-    d.render = function (now, dt) {
-      var t = now / 1000, st = d.cur, age = (now - d.since) / 1000, x, y, dx, dy, i;
+    d.render = function (now, dt, still) {
+      var t = now / 1000, st = d.cur, age = (now - d.since) / 1000, x, y, dx, dy, i, lite = LITE || !!still;
       d.cx += (d.gx - d.cx) * .14; d.cy += (d.gy - d.cy) * .14;
       if (now >= d.nextBlink) { d.blinkUntil = now + 130; d.nextBlink = now + R(2300, 4900); }
       var bob = 0, jit = 0;
-      if (!LITE) {
+      if (d.landed) { var sa = now - d.settleT; bob = (!lite && sa >= 0 && sa < 260) ? -Math.round(Math.sin(sa / 260 * Math.PI) * 2) : 0; }
+      else if (!lite) {
         if (st === 'scanning') bob = Math.round(Math.sin(t * 4.2) * 1.8);
         else if (st === 'verified' && age < 2.5) bob = -Math.round(Math.abs(Math.sin(t * 4.8)) * 3);
         else if (st === 'alert') { bob = Math.round(Math.sin(t * 14) * 1.4); jit = Math.round(Math.sin(t * 28) * 1.3); }
@@ -91,7 +107,7 @@
         }
       }
       // 4-кадровые двойные верхние роторы
-      var frame = LITE ? 0 : Math.floor(t * (st === 'alert' ? 30 : 22)) % 4;
+      var frame = (lite || d.landed) ? 0 : Math.floor(t * (st === 'alert' ? 30 : 22)) % 4;
       [-1, 1].forEach(function (side) {
         var ax = cx + side * 15, ay = by - 10, hx = cx + side * 22, hy = by - 19, ox = Math.min(ax, hx) - 4, oy = hy - 3, xx, yy, ddx;
         var am = new Uint8Array(256); for (yy = 0; yy < 16; yy++) for (xx = 0; xx < 16; xx++) if (sdSeg(ox + xx, oy + yy, ax, ay, hx, hy + 2) <= 1.55) am[yy * 16 + xx] = 1;
@@ -150,7 +166,7 @@
         var pp = Math.floor(t * 4) % 2, rc2 = pp ? '#475569' : DSK.scanMid, o = 25 + pp;
         [-1, 1].forEach(function (s) { set(cx + s * o, by - 2, rc2); set(cx + s * (o + 1), by - 1, rc2); set(cx + s * (o + 1), by, rc2); set(cx + s * (o + 1), by + 1, rc2); set(cx + s * o, by + 2, rc2); });
       } else if (st === 'verified') {
-        if (LITE || Math.floor(t * .9) % 2 === 1) [[-5, 0], [-4, 1], [-3, 2], [-2, 3], [-1, 2], [0, 1], [1, 0], [2, -1], [3, -2], [4, -3], [5, -3]].forEach(function (q) { gp(cx + q[0], vy + q[1]); gp(cx + q[0], vy + q[1] + 1); });
+        if (lite || Math.floor(t * .9) % 2 === 1) [[-5, 0], [-4, 1], [-3, 2], [-2, 3], [-1, 2], [0, 1], [1, 0], [2, -1], [3, -2], [4, -3], [5, -3]].forEach(function (q) { gp(cx + q[0], vy + q[1]); gp(cx + q[0], vy + q[1] + 1); });
         else { [[-3, 1], [-2, 0], [-1, -1], [0, -1], [1, -1], [2, 0], [3, 1]].forEach(function (q) { gp(cx - 7 + q[0], vy - 1 + q[1]); gp(cx - 7 + q[0], vy + q[1]); gp(cx + 7 + q[0], vy - 1 + q[1]); gp(cx + 7 + q[0], vy + q[1]); }); gp(cx - 2, vy + 2); gp(cx + 2, vy + 2); gp(cx - 1, vy + 3); gp(cx, vy + 3); gp(cx + 1, vy + 3); }
         flush('#EEFFF4', '#34D36A');
       } else if (st === 'analyzing') {
@@ -165,7 +181,7 @@
         flush('#FFF1F2', '#FF4D5E');
       } else {
         var dlx = Math.round(d.cx * 2.4), dly = Math.round(d.cy * 1.2), m0 = Math.min(0, dly);
-        if (!LITE && now < d.blinkUntil) { for (dx = -2; dx <= 2; dx++) { gp(cx - 6 + dlx + dx, vy + dly); gp(cx + 6 + dlx + dx, vy + dly); } }
+        if ((!LITE || still) && now < d.blinkUntil) { for (dx = -2; dx <= 2; dx++) { gp(cx - 6 + dlx + dx, vy + dly); gp(cx + 6 + dlx + dx, vy + dly); } }
         else { [cx - 6 + dlx, cx + 6 + dlx].forEach(function (ex) { for (var dy = -3; dy <= 3; dy++) for (var dx = -2; dx <= 2; dx++) if (!(Math.abs(dx) === 2 && Math.abs(dy) === 3) && !(dx === 0 && Math.abs(dy) <= 1)) gp(ex + dx, vy - 1 + dly + dy); }); }
         gp(cx + dlx - 2, vy + 2 + m0); gp(cx + dlx + 2, vy + 2 + m0); gp(cx + dlx - 1, vy + 3 + m0); gp(cx + dlx, vy + 3 + m0); gp(cx + dlx + 1, vy + 3 + m0);
         flush(DSK.eyeCore, DSK.eyeHalo);
@@ -178,148 +194,291 @@
       }
       ctx.clearRect(0, 0, DG, DG);
       for (y = 0; y < DG; y++) for (x = 0; x < DG;) { var col = buf[y * DG + x]; if (!col) { x++; continue; } var n = 1; while (x + n < DG && buf[y * DG + x + n] === col) n++; ctx.fillStyle = col; ctx.fillRect(x, y, n, 1); x += n; }
+      return buf;
     };
     d.mood('idle');
     return d;
   }
 
+
   // ── Общий цикл: один requestAnimationFrame на все видимые экземпляры ──
-  var agents = [], raf = 0, last = 0, mouse = null;
+  var agents = [], pilots = [], raf = 0, last = 0, mouse = null;
   var io = 'IntersectionObserver' in window ? new IntersectionObserver(function (es) {
-    es.forEach(function (en) { var a = en.target.__bccAgent; if (a) a._visible = en.isIntersecting; });
+    es.forEach(function (en) { var a = en.target.__bccAgent, p = en.target.__bccPilot; if (a) a._visible = en.isIntersecting; if (p) p._visible = en.isIntersecting; });
     kick();
   }) : null;
 
-  function active() {
-    if (document.hidden) return [];
-    return agents.filter(function (a) { return a._visible; });
+  function node(tag, cls) { var n = document.createElement(tag); if (cls) n.className = cls; return n; }
+
+  function lookAt(drone, rect) {
+    if (!mouse) return;
+    var k = Math.max(240, rect.width * 2.5);
+    drone.look((mouse.x - (rect.left + rect.width / 2)) / k, (mouse.y - (rect.top + rect.height / 2)) / k);
   }
-  function draw(a, now, dt) {
-    var g = a._ctx, c = a._out;
-    a._drone.render(now, dt);
-    g.imageSmoothingEnabled = false;
-    g.clearRect(0, 0, c.width, c.height);
-    g.drawImage(a._drone.canvas, 0, 0, c.width, c.height);
+
+  function paint(cv, g, drone, now, dt, crop, still) {
+    drone.render(now, dt, still);
+    g.clearRect(0, 0, cv.width, cv.height);
+    if (crop) {
+      g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+      var s = Math.min(cv.width / CROP.w, cv.height / CROP.h), w = CROP.w * s, h = CROP.h * s;
+      g.drawImage(drone.canvas, CROP.x, CROP.y, CROP.w, CROP.h, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
+    } else {
+      g.imageSmoothingEnabled = false;
+      g.drawImage(drone.canvas, 0, 0, cv.width, cv.height);
+    }
   }
+
+  // Размер холста: крупный дрон — целое число пикселей сетки на экранный пиксель (чётко на 1× и 2×)
+  function backing(size, crop, tile) {
+    var dpr = window.devicePixelRatio || 1;
+    if (crop || tile) return { px: Math.max(16, Math.round(size * dpr)), css: size };
+    var k = Math.max(1, Math.round(size * dpr / DG));
+    return { px: DG * k, css: DG * k / dpr };
+  }
+
+  function active(list) { return document.hidden ? [] : list.filter(function (a) { return a._visible; }); }
+
   function tick(now) {
     raf = 0;
     var dt = last ? Math.min(.05, (now - last) / 1000) : .016; last = now;
-    var list = active();
-    list.forEach(function (a) {
-      if (mouse) {
-        var r = a._tile.getBoundingClientRect(), k = Math.max(240, r.width * 2.5);
-        a._drone.look((mouse.x - (r.left + r.width / 2)) / k, (mouse.y - (r.top + r.height / 2)) / k);
-      }
-      draw(a, now, dt);
-    });
-    if (list.length && !LITE) raf = requestAnimationFrame(tick);
+    var la = active(agents), lp = active(pilots);
+    la.forEach(function (a) { if (a._mood === 'idle') lookAt(a._drone, a._box.getBoundingClientRect()); a._draw(now, dt); });
+    lp.forEach(function (p) { p._step(now, dt); });
+    if ((la.length || lp.length) && !LITE) raf = requestAnimationFrame(tick);
     else last = 0;
   }
   function kick() { if (!raf && !LITE) raf = requestAnimationFrame(tick); }
-  function still(a) { draw(a, 1200, 0); }   // статичный кадр (reduced motion, первый кадр)
 
   document.addEventListener('visibilitychange', function () { if (!document.hidden) kick(); });
   window.addEventListener('pointermove', function (ev) { mouse = { x: ev.clientX, y: ev.clientY }; }, { passive: true });
 
-  function sizeCanvas(a) {
-    var dpr = window.devicePixelRatio || 1, px = Math.max(DG / 2, Math.round(a.size * dpr));
-    if (a._out.width !== px) { a._out.width = a._out.height = px; }
+  // Реплика одной строкой: печать ~10 мс на символ, щелчок — сразу целиком
+  function typer(el) {
+    var timer = 0, finish = null;
+    el.addEventListener('click', function () { if (finish) finish(); });
+    return function (text) {
+      text = String(text == null ? '' : text);
+      if (finish) finish();
+      clearInterval(timer);
+      el.hidden = !text;
+      return new Promise(function (resolve) {
+        var shown = 0, t0 = performance.now();
+        finish = function () { clearInterval(timer); el.textContent = text; el.classList.remove('is-typing'); finish = null; resolve(); };
+        if (LITE || !text) return finish();
+        el.textContent = ''; el.classList.add('is-typing');
+        timer = setInterval(function () {
+          var n = Math.min(text.length, Math.floor((performance.now() - t0) / 10) + 1);
+          if (n !== shown) { shown = n; el.textContent = text.slice(0, n); }
+          if (n >= text.length) finish();
+        }, 16);
+      });
+    };
   }
 
+  // ── Значок / персонаж ──
   function mount(el, opts) {
     if (!el) return null;
     if (el.__bccAgent) return el.__bccAgent;
     opts = opts || {};
     var size = +(opts.size || el.getAttribute('data-size') || 96);
-    var mood0 = opts.mood || el.getAttribute('data-mood') || 'idle';
+    var tile = opts.tile != null ? !!opts.tile : el.getAttribute('data-tile') === '1';
+    var crop = !tile && size < 48;
+    var b = backing(size, crop, tile);
     el.classList.add('bcc-agent');
-    el.style.setProperty('--bcc-agent-size', size + 'px');
-    if (size < 64) el.classList.add('bcc-agent--small');
-    var tile = document.createElement('span');
-    tile.className = 'bcc-agent__tile';
-    var out = document.createElement('canvas');
-    out.className = 'bcc-agent__cv';
-    out.setAttribute('role', 'img');
-    out.setAttribute('aria-label', 'BCC AI');
-    tile.appendChild(out);
-    el.appendChild(tile);
-
+    if (tile) el.classList.add('bcc-agent--tile');
+    if (size < 48) el.classList.add('bcc-agent--small');
+    el.style.setProperty('--bcc-agent-size', b.css + 'px');
+    var box = node('span', 'bcc-agent__box'), cv = node('canvas', 'bcc-agent__cv');
+    cv.width = cv.height = b.px;
+    cv.setAttribute('role', 'img');
+    cv.setAttribute('aria-label', 'BCC AI');
+    box.appendChild(cv);
+    el.appendChild(box);
+    var talk = null, sayEl = null, stageEl = null, typeSay = null;
+    function ensureTalk() {
+      if (talk) return;
+      talk = node('span', 'bcc-agent__talk');
+      sayEl = node('span', 'bcc-agent__say'); sayEl.setAttribute('aria-live', 'polite'); sayEl.hidden = true;
+      stageEl = node('span', 'bcc-agent__stage'); stageEl.hidden = true;
+      talk.appendChild(stageEl); talk.appendChild(sayEl);
+      el.appendChild(talk);
+      typeSay = typer(sayEl);
+    }
     var a = {
-      el: el, size: size, _tile: tile, _out: out, _ctx: out.getContext('2d'), _drone: makeDrone(), _visible: !io,
-      _bubble: null, _timer: 0, _moodT: 0, _sayDone: null,
+      el: el, size: b.css, _box: box, _drone: makeDrone(), _visible: !io, _mood: '', _said: null, _moodT: 0,
+      _draw: function (now, dt, still) { paint(cv, cv.getContext('2d'), a._drone, now, dt, crop, still); },
       mood: function (name, ms) {
         if (MOODS.indexOf(name) < 0) name = 'idle';
         clearTimeout(a._moodT);
+        a._mood = name;
         a._drone.mood(name);
-        el.setAttribute('data-mood', name);
+        if (el.getAttribute('data-mood') !== name) el.setAttribute('data-mood', name);
         if (ms > 0) a._moodT = setTimeout(function () { a.mood('idle'); }, ms);
-        if (LITE) still(a); else kick();
+        if (LITE) a._draw(1200, 0, true); else kick();
         return a;
       },
-      say: function (text) {
-        text = String(text == null ? '' : text);
-        var b = a._bubble;
-        if (!b) {
-          b = a._bubble = document.createElement('span');
-          b.className = 'bcc-agent__say';
-          b.setAttribute('aria-live', 'polite');
-          b.addEventListener('click', function () { if (a._finish) a._finish(); });
-          el.appendChild(b);
-        }
-        if (a._finish) a._finish();
-        clearInterval(a._timer);
-        b.hidden = !text;
-        b.setAttribute('aria-label', text);
-        return new Promise(function (resolve) {
-          var i = 0;
-          a._finish = function () { clearInterval(a._timer); b.textContent = text; b.classList.remove('is-typing'); a._finish = null; resolve(); };
-          if (LITE || !text) return a._finish();
-          b.textContent = ''; b.classList.add('is-typing');
-          var t0 = performance.now();
-          a._timer = setInterval(function () {
-            var n = Math.min(text.length, Math.floor((performance.now() - t0) / 10) + 1);
-            if (n !== i) { i = n; b.textContent = text.slice(0, n); }
-            if (n >= text.length) a._finish();
-          }, 16);
-        });
-      },
+      say: function (text) { ensureTalk(); a._said = text == null ? '' : String(text); return typeSay(a._said); },
+      stage: function (text) { ensureTalk(); stageEl.textContent = text || ''; stageEl.hidden = !text; return a; },
       destroy: function () {
-        clearInterval(a._timer); clearTimeout(a._moodT);
+        clearTimeout(a._moodT);
         if (io) io.unobserve(el);
         agents = agents.filter(function (x) { return x !== a; });
-        if (tile.parentNode) tile.parentNode.removeChild(tile);
-        if (a._bubble && a._bubble.parentNode) a._bubble.parentNode.removeChild(a._bubble);
-        el.classList.remove('bcc-agent', 'bcc-agent--small');
+        if (box.parentNode) box.parentNode.removeChild(box);
+        if (talk && talk.parentNode) talk.parentNode.removeChild(talk);
+        el.classList.remove('bcc-agent', 'bcc-agent--tile', 'bcc-agent--small');
         delete el.__bccAgent;
       }
     };
     el.__bccAgent = a;
-    sizeCanvas(a);
     agents.push(a);
     if (io) io.observe(el);
-    a.mood(mood0);
-    still(a);
+    a.mood(opts.mood || el.getAttribute('data-mood') || 'idle');
+    a._draw(1200, 0, true);
     var say0 = opts.say || el.getAttribute('data-say');
     if (say0) a.say(say0);
     return a;
   }
 
-  function mountAll(root) {
-    (root || document).querySelectorAll('[data-bcc-agent]').forEach(function (el) { mount(el); });
+  // ── Дрон над листом: луч сканера по строкам, посадка на край ──
+  function fly(sheet, opts) {
+    if (!sheet) return null;
+    if (sheet.__bccPilot) return sheet.__bccPilot;
+    opts = opts || {};
+    if (getComputedStyle(sheet).position === 'static') sheet.style.position = 'relative';
+    var b = backing(+(opts.size || sheet.getAttribute('data-size') || 80), false, false), S = b.css;
+    var layer = node('div', 'bcc-pilot'), wash = node('div', 'bcc-pilot__wash'), line = node('div', 'bcc-pilot__line');
+    var craft = node('div', 'bcc-pilot__craft'), cv = node('canvas', 'bcc-pilot__cv');
+    var talk = node('div', 'bcc-pilot__talk'), sayEl = node('span', 'bcc-agent__say'), stageEl = node('span', 'bcc-agent__stage');
+    cv.width = cv.height = b.px;
+    cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', 'BCC AI');
+    sayEl.setAttribute('aria-live', 'polite'); sayEl.hidden = true; stageEl.hidden = true;
+    craft.style.width = craft.style.height = S + 'px';
+    talk.appendChild(stageEl); talk.appendChild(sayEl);
+    craft.appendChild(cv); craft.appendChild(talk);
+    layer.appendChild(wash); layer.appendChild(line); layer.appendChild(craft);
+    sheet.appendChild(layer);
+    var g = cv.getContext('2d'), typeSay = typer(sayEl);
+    var side = opts.land || sheet.getAttribute('data-land') || 'right';
+    var p = {
+      sheet: sheet, size: S, _drone: makeDrone(), _visible: !io, state: 'scan', prog: 0, target: 0,
+      x: null, y: null, x0: 0, y0: 0, t0: 0, dur: 900, bottomInset: +(opts.bottomInset || 96), _said: null,
+      _spot: function (W) { return { x: side === 'left' ? 28 : W - S - 40, y: -Math.round(S * 61 / 80) }; },
+      _step: function (now, dt, still) {
+        var r = sheet.getBoundingClientRect(), W = r.width, H = r.height, tt = now / 1000;
+        var vt = clamp(-r.top + 12, 0, H), vb = clamp(window.innerHeight - r.top - p.bottomInset, 0, H);
+        if (vb - vt < 180) { vt = 0; vb = H; }
+        if (p.state === 'scan') {
+          p.prog = (still || p.x == null) ? p.target : p.prog + (p.target - p.prog) * Math.min(1, dt * 2.5);
+          var ly = vt + 36 + p.prog * Math.max(0, vb - vt - 72);
+          var padL = Math.min(72, W * .12), padR = Math.min(48, W * .08), span = Math.max(0, W - padL - padR - S);
+          var cx = padL + S / 2 + (still ? .5 : .5 + .5 * Math.sin(tt * .7)) * span;
+          p.x = cx - S / 2; p.y = ly - S * 78 / 80;
+          line.style.transform = 'translate3d(0,' + ly.toFixed(1) + 'px,0)';
+          wash.style.transform = 'translate3d(0,' + (ly - 40).toFixed(1) + 'px,0)';
+        } else if (p.state === 'landing') {
+          var s = p._spot(W), k = still ? 1 : clamp((now - p.t0) / p.dur, 0, 1), e = ease(k);
+          p.x = p.x0 + (s.x - p.x0) * e; p.y = p.y0 + (s.y - p.y0) * e - Math.sin(k * Math.PI) * 28;
+          if (k >= 1) {
+            p.state = 'landed'; p._drone.landed = true; p._drone.settleT = now;
+            layer.classList.add('is-landed');
+            sheet.setAttribute('data-bcc-landed', '');
+            try { sheet.dispatchEvent(new CustomEvent('bcc-agent:landed', { bubbles: true })); } catch (e2) { /* старый браузер */ }
+          }
+        } else {
+          var s2 = p._spot(W); p.x = s2.x; p.y = s2.y;
+        }
+        talk.classList.toggle('is-left', p.x + S + 280 > W && p.x > 280);
+        craft.style.transform = 'translate3d(' + p.x.toFixed(1) + 'px,' + p.y.toFixed(1) + 'px,0)';
+        if (p.state === 'landed' && p._drone.cur === 'idle') lookAt(p._drone, cv.getBoundingClientRect());
+        paint(cv, g, p._drone, now, dt, false, still);
+      },
+      _refresh: function () { if (LITE) p._step(1200, 0, true); else kick(); },
+      progress: function (v, stage) {
+        p.target = clamp(+v || 0, 0, 1);
+        if (stage != null) p.stage(stage);
+        if (p.state !== 'scan') p.takeoff();
+        p._refresh();
+        return p;
+      },
+      stage: function (text) { stageEl.textContent = text || ''; stageEl.hidden = !text; return p; },
+      say: function (text) { p._said = text == null ? '' : String(text); return typeSay(p._said); },
+      mood: function (m) { p._drone.mood(MOODS.indexOf(m) < 0 ? 'idle' : m); p._refresh(); return p; },
+      land: function () {
+        if (p.state !== 'scan') return p;
+        p.state = 'landing'; p.t0 = performance.now(); p.x0 = p.x || 0; p.y0 = p.y || 0;
+        p._drone.mood('idle'); p.stage('');
+        p._refresh();
+        return p;
+      },
+      takeoff: function () {
+        p.state = 'scan'; p._drone.landed = false; p._drone.mood('scanning');
+        layer.classList.remove('is-landed'); sheet.removeAttribute('data-bcc-landed');
+        p._refresh();
+        return p;
+      },
+      destroy: function () {
+        if (io) io.unobserve(sheet);
+        pilots = pilots.filter(function (x) { return x !== p; });
+        if (layer.parentNode) layer.parentNode.removeChild(layer);
+        delete sheet.__bccPilot;
+      }
+    };
+    sheet.__bccPilot = p;
+    pilots.push(p);
+    if (io) io.observe(sheet);
+    p._drone.mood(opts.mood || 'scanning');
+    p._step(1200, 0, true);
+    p._refresh();
+    return p;
   }
 
-  window.addEventListener('resize', function () { agents.forEach(function (a) { sizeCanvas(a); still(a); }); });
-  window.BCCAgent = { mount: mount, mountAll: mountAll, moods: MOODS.slice(), reducedMotion: LITE };
+  // ── Декларативно: атрибуты на странице управляют дроном ──
+  function sync(el) {
+    if (el.hasAttribute('data-bcc-agent')) {
+      var a = mount(el), m = el.getAttribute('data-mood'), s = el.getAttribute('data-say');
+      if (m && m !== a._mood) a.mood(m);
+      if (s != null && s !== a._said) a.say(s);
+    }
+    if (el.hasAttribute('data-bcc-scan')) {
+      var p = fly(el), v = el.getAttribute('data-bcc-scan'), st = el.getAttribute('data-stage'), sy = el.getAttribute('data-say');
+      if (el.hasAttribute('data-progress') && v !== 'land' && v !== 'done') p.progress(parseFloat(el.getAttribute('data-progress')) || 0);
+      if (st != null) p.stage(st);
+      if (sy != null && sy !== p._said) p.say(sy);
+      if (el.hasAttribute('data-mood') && p.state === 'scan') p.mood(el.getAttribute('data-mood'));
+      if (v === 'land' || v === 'done') p.land();
+    }
+  }
+  function mountAll(root) {
+    (root || document).querySelectorAll('[data-bcc-agent],[data-bcc-scan]').forEach(sync);
+  }
+
+  window.addEventListener('resize', function () { agents.forEach(function (a) { a._draw(1200, 0, true); }); pilots.forEach(function (p) { p._refresh(); }); });
+  window.addEventListener('scroll', function () { if (LITE) pilots.forEach(function (p) { p._refresh(); }); }, { passive: true });
+
+  // Статичный кадр для терминала и тестов: массив 80×80 цветов (null — прозрачно)
+  function pixels(mood, o) {
+    o = o || {};
+    var d = makeDrone(); d.mood(mood || 'idle'); d.parts.length = 0;
+    d.cx = d.gx = o.gx || 0; d.cy = d.gy = o.gy || 0; d.nextBlink = Infinity; d.blinkUntil = o.blink ? Infinity : 0;
+    return d.render((o.t == null ? 1.2 : o.t) * 1000, 0, true).slice();
+  }
+
+  window.BCCAgent = { mount: mount, fly: fly, mountAll: mountAll, moods: MOODS.slice(), reducedMotion: LITE, _pixels: pixels };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { mountAll(); });
   else mountAll();
   if ('MutationObserver' in window) {
     new MutationObserver(function (ms) {
-      ms.forEach(function (m) { m.addedNodes.forEach(function (n) {
-        if (n.nodeType !== 1) return;
-        if (n.hasAttribute('data-bcc-agent')) mount(n);
-        if (n.querySelectorAll) mountAll(n);
-      }); });
-    }).observe(document.documentElement, { childList: true, subtree: true });
+      ms.forEach(function (m) {
+        if (m.type === 'attributes') { if (m.target.nodeType === 1) sync(m.target); return; }
+        m.addedNodes.forEach(function (n) {
+          if (n.nodeType !== 1 || (n.classList && (n.classList.contains('bcc-pilot') || n.classList.contains('bcc-agent__box')))) return;
+          if (n.hasAttribute('data-bcc-agent') || n.hasAttribute('data-bcc-scan')) sync(n);
+          if (n.querySelectorAll) mountAll(n);
+        });
+      });
+    }).observe(document.documentElement, { childList: true, subtree: true, attributes: true,
+      attributeFilter: ['data-mood', 'data-say', 'data-progress', 'data-stage', 'data-bcc-scan'] });
   }
 })();
