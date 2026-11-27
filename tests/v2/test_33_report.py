@@ -147,3 +147,60 @@ def test_passport_commands_use_paths_from_command_line(sample):
     assert "/home/u" not in md and "verify r.json requirements.md" in md
     # без путей — как раньше
     assert "verify отчёт.json requirements.md" in markdown.render(sample)
+
+
+# ------------------------------------------------------------------ v2.1: ответы владельца (№32)
+
+ANSWERS = ROOT / "tests" / "v2" / "fixtures" / "33_answers_official.json"
+
+
+@pytest.fixture()
+def answered() -> dict:
+    """Живой пересмотр sonnet по ответам экзамена F4 (записи №32 `32_live/official`, без модели): 2 расхождения
+    адресатов по Q-03, отложенная часть Q-04, без ответа Q-01, Q-06, Q-08."""
+    return json.loads(ANSWERS.read_text(encoding="utf-8"))
+
+
+def test_first_screen_lists_what_answers_left_open(answered):
+    md = markdown.render(answered, out_path="reports/answered.md", doc_path="release/input/requirements.md")
+    brief = md[md.find('id="s0"'):md.find('id="s1"')]
+    assert "**Осталось решить ответами (5):**" in brief
+    q03 = next(ln for ln in brief.splitlines() if ln.startswith("- [Q-03]"))
+    assert "ответы расходятся" in q03 and "Q-03.1 «От продукта" in q03 and "Q-03.2 «От владельца канала" in q03
+    assert "[D-03](#d-03)" in q03 and "[D-11](#d-11)" in q03
+    assert "отложено: «Про сумму за месяц договоримся отдельно" in brief
+    assert "- [Q-01](#q-01) — без ответа ([D-01](#d-01)): если ответа не будет: разработку и тестирование начинать " \
+           "нельзя" in brief
+    # файл следующего круга и команда — с путями из командной строки
+    assert "`answered.answers-next.md`" in brief
+    assert "`python -m bcc_review release/input/requirements.md reports/answered.md --answers " \
+           "answered.answers-next.md`" in brief
+
+
+def test_appendix_shows_conflicting_replies_postponed_and_if_no_answer(answered):
+    md = markdown.render(answered)
+    app = md[md.find('id="pa"'):md.find('id="pb"')]
+    q03 = app[app.find('id="q-03"'):app.find('id="q-04"')]
+    assert "**Ответы расходятся**" in q03 and "**Ответ владельца:**" not in q03
+    assert "Q-03.1 — «От продукта." in q03 and "Q-03.2 — «От владельца канала." in q03
+    q04 = app[app.find('id="q-04"'):app.find('id="q-05"')]
+    assert "**Отложено владельцем:** «Про сумму за месяц" in q04 and "Если ответа не будет:" in q04
+    q01 = app[app.find('id="q-01"'):app.find('id="q-02"')]
+    assert "Если ответа не будет: разработку и тестирование начинать нельзя" in q01
+    q02 = app[app.find('id="q-02"'):app.find('id="q-03"')]
+    assert "Если ответа не будет" not in q02  # ответ есть — «если не будет» не нужно
+
+
+def test_answers_report_verifies_and_absolute_next_file_is_hidden(answered):
+    from bcc_review.v2 import verify
+
+    md = markdown.render(answered)
+    errors, _ = verify.check_markdown(answered, md)  # запись №32 урезана (без нарезки) — сверяем числа Markdown
+    assert errors == []
+    assert broken_rows(md) == []
+    anchors, links = _anchors_and_links(md)
+    assert links - anchors == set()
+    r = copy.deepcopy(answered)
+    r["clarification"]["next_answers_file"] = "/home/u/Мои документы/answered.answers-next.md"
+    md = markdown.render(r)
+    assert "/home/u" not in md and "`answered.answers-next.md`" in md
