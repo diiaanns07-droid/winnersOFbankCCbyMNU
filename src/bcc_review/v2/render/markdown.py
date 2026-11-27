@@ -128,6 +128,7 @@ STAGES = {
     "lenses": ("Проверка ролями", "аналитик, тестировщик, архитектор, риски"),
     "export": ("Экспорт", "DOCX, PDF, задачи Jira"),
     "html": ("HTML-отчёт", "интерактивная страница отчёта"),
+    "refute": ("Повторная проверка", "подтверждает или снимает критичные и существенные дефекты по тексту документа"),
 }
 
 
@@ -136,7 +137,7 @@ def stage_name(key: str) -> str:
 PROPOSING = {"rules", "analyst", "qa", "architect", "risk", "consistency"}  # этапы, которые предлагают кандидатов
 STAGE_STATUS = {"ok": "✅ выполнен", "partial": "⚠️ частично", "failed": "⛔ сбой", "skipped": "— пропущен"}
 SOURCES = {"analyst": "аналитик", "qa": "тестировщик", "architect": "архитектор", "risk": "риски",
-           "consistency": "проверка набора", "rules": "правило", "judge": "судья", "recheck": "пересмотр"}
+           "consistency": "проверка набора", "rules": "правило", "judge": "судья", "recheck": "пересмотр", "refute": "повторная проверка"}
 PROVIDERS = {
     "claude_cli": "«Claude Code», команда `claude -p`", "gemini": "«Google Gemini», API", "anthropic": "«Anthropic», API",
     "openai": "сервер, совместимый с «OpenAI» («Ollama», «vLLM» и др.)", "mock": "тестовый: ответы из файлов",
@@ -1142,8 +1143,9 @@ def _candidate_counts(c: _Ctx) -> dict:
     out = {"accepted": accepted,
            "self_dropped": sum(1 for r in rej if code(r) == "lens_dropped"),
            "no_quote": sum(1 for r in rej if code(r) == "no_quote"),
-           "not_reviewed": sum(1 for r in rej if code(r) == "not_reviewed")}
-    out["judge"] = len(rej) - out["self_dropped"] - out["no_quote"] - out["not_reviewed"]
+           "not_reviewed": sum(1 for r in rej if code(r) == "not_reviewed"),
+           "refuted": sum(1 for r in rej if code(r) == "refuted")}  # сняты повторной проверкой (№17), не судьёй
+    out["judge"] = len(rej) - out["self_dropped"] - out["no_quote"] - out["not_reviewed"] - out["refuted"]
     out["total"] = accepted + len(rej) - out["self_dropped"]
     return out
 
@@ -1186,6 +1188,12 @@ def _how_obtained(c: _Ctx) -> list[str]:
                      + (f", ещё {n['no_quote']} отброшены программой: цитата не найдена в документе"
                         if n["no_quote"] else "")
                      + (f"; после ответов владельца открыто {len(c.findings)}" if c.resolved else ""))
+        ref = c.r.get("refutation") if isinstance(c.r.get("refutation"), dict) else {}
+        dec = [d for d in ref.get("decisions") or [] if isinstance(d, dict)]
+        if dec:
+            gone = sum(1 for d in dec if d.get("decision") == "refuted")
+            lower = sum(1 for d in dec if d.get("decision") == "partial")
+            parts.append(f"повторная проверка критичных и существенных ({len(dec)}) сняла {gone} и понизила {lower}")
     elif c.findings:
         parts.append(f"в отчёт вошли {nf} {plural(nf, 'дефект', 'дефекта', 'дефектов')} без итогового отбора моделью"
                      + (" (она не ответила, повторы объединены программой)" if judge_down else ""))
@@ -2225,6 +2233,8 @@ def _appendix_how(c: _Ctx) -> list[str]:
             bits.append(f"без найденной в документе цитаты — {n['no_quote']}")
         if n["not_reviewed"]:
             bits.append(f"не рассмотрены судьёй — {n['not_reviewed']}")
+        if n["refuted"]:
+            bits.append(f"сняты повторной проверкой — {n['refuted']}")
         out += [f"Кандидатов в дефекты: {total}{extra}; " + "; ".join(bits) + "."
                 + (f" Ещё {n['self_dropped']} {plural(n['self_dropped'], 'кандидат отброшен', 'кандидата отброшены', 'кандидатов отброшены')} самой ролью при проверке." if n["self_dropped"] else "")
                 + " Кандидат без найденной в документе цитаты в отчёт не попадает.", ""]
