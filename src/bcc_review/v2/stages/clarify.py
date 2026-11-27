@@ -14,7 +14,9 @@ import unicodedata
 from typing import Any, Iterable
 
 STAGE = "clarify"
-MAX_QUESTIONS = 10
+# меньше, но точнее: каждый вопрос закрывает critical или major; без critical хватает пяти главных решений
+MAX_QUESTIONS = 8
+MAX_QUESTIONS_NO_CRITICAL = 5
 # лимит вывода с запасом: модели с рассуждением (haiku, Gemini Flash) тратят на него до 3/4 ответа
 OUTPUT_TOKENS = 24000
 OPTION_LETTERS = "ABCD"
@@ -31,6 +33,35 @@ FORMAT_KINDS = {"placeholder", "traceability", "terminology", "non_singular", "d
 FORMAT_CRITERIA = {"conforming", "ranked", "modifiable", "traceable"}
 CONFLICT_KINDS = {"event_conflict", "status_conflict", "unit_mismatch", "boundary_conflict", "contradiction",
                   "api_contract"}
+
+
+# внутренние коды отчёта в тексте для владельца: «L038», «(D-03, D-07)», «R-12», «C-014», «lens:qa»
+_CODE_PAREN = re.compile(r"\s*\((?:\s*(?:строк[аиеу]\s*)?(?:L\d{1,4}|[DRCQT]-\d{1,3})(?:\s*[-–—]\s*L?\d{1,4})?\s*[,;]?)+\)")
+_CODE_LINE = re.compile(r"\bL0*(\d{1,4})\b")
+_CODE_ID = re.compile(r"\s*\b(?:дефект\w*\s+|требовани\w*\s+)?[DRCQT]-\d{1,3}\b")
+_CODE_SRC = re.compile(r"\s*\b(?:lens|rules):[\w.]+")
+
+
+def plain_text(text: str, keep: set[str] | frozenset = frozenset()) -> str:
+    """Текст для владельца без внутренних кодов отчёта. ``keep`` — коды, которые есть в самом документе."""
+    s = str(text or "")
+    if not s:
+        return s
+    s = _CODE_PAREN.sub(lambda m: m.group(0) if any(k in m.group(0) for k in keep) else "", s)
+    s = _CODE_ID.sub(lambda m: m.group(0) if m.group(0).strip().split()[-1] in keep else "", s)
+    s = _CODE_LINE.sub(lambda m: m.group(0) if m.group(0) in keep else f"строка {int(m.group(1))}", s)
+    s = _CODE_SRC.sub("", s)
+    s = re.sub(r"\s+([,.;:!?)])", r"\1", s)
+    s = re.sub(r"\(\s*\)", "", s)
+    return re.sub(r"[ \t]{2,}", " ", s).strip()
+
+
+def doc_codes(view: Any) -> set[str]:
+    """Строки вида «R-12», «L038», которые встречаются в самом документе: их не трогаем."""
+    found: set[str] = set()
+    for ln in _lines(view):
+        found.update(re.findall(r"\b(?:L\d{1,4}|[DRCQT]-\d{1,3})\b", str(ln.get("text", ""))))
+    return found
 
 
 def is_formatting(f: dict) -> bool:
@@ -53,7 +84,7 @@ def _evidence_schema() -> dict:
 
 SCHEMA: dict = {
     "type": "object", "additionalProperties": False, "required": ["questions"],
-    "properties": {"questions": {"type": "array", "maxItems": 14, "items": {
+    "properties": {"questions": {"type": "array", "maxItems": 10, "items": {
         "type": "object", "additionalProperties": False,
         "required": ["topic", "finding_ids", "to", "blocking", "question", "evidence", "options", "why"],
         "properties": {
@@ -238,17 +269,30 @@ def _warn(ctx: Any, msg: str) -> None:
 
 
 # --------------------------------------------------------------------------- постобработка
+def question_cap(findings: list[dict]) -> int:
+    """Сколько вопросов оставить: 8, если есть critical; иначе 5 главных решений."""
+    return MAX_QUESTIONS if any(f.get("severity") == "critical" for f in findings) else MAX_QUESTIONS_NO_CRITICAL
+
+
 def postprocess(raw: dict, findings: list[dict], view: Any, warnings: list[str] | None = None) -> list[dict]:
-    """Ответ модели → вопросы контракта: проверки кодом, сортировка, ID Q-01…"""
+    """Ответ модели → вопросы контракта: проверки кодом, сортировка, ID Q-01…
+
+    Каждый вопрос закрывает хотя бы один critical или major (если такие есть); блокирующий — только вопрос
+    по critical; тексты для владельца без внутренних кодов; не больше ``question_cap`` вопросов."""
     warnings = warnings if warnings is not None else []
     by_id = {f.get("id"): f for f in findings}
+    has_serious = any(f.get("severity") in ("critical", "major") for f in findings)
+    keep_codes = doc_codes(view)
     kept: list[dict] = []
     seen_keys: list[tuple[str, str]] = []
     for i, q in enumerate(raw.get("questions") or [], 1):
         ids = [x for x in dict.fromkeys(str(x).strip() for x in q.get("finding_ids") or []) if x in by_id]
-        text = str(q.get("question", "")).strip()
+        text = plain_text(str(q.get("question", "")).strip(), keep_codes)
         if not ids or not text:
             warnings.append(f"clarify: вопрос {i} отброшен — нет связи с дефектами отчёта")
+            continue
+        if has_serious and not any(by_id[fid].get("severity") in ("critical", "major") for fid in ids):
+            warnings.append(f"clarify: вопрос «{text[:60]}» отброшен — касается только незначительных дефектов")
             continue
         near = [n for fid in ids for n in finding_lines(by_id[fid])]
         evidence = verified_evidence(view, q.get("evidence") or [], near)
@@ -271,7 +315,8 @@ def postprocess(raw: dict, findings: list[dict], view: Any, warnings: list[str] 
                     if e.get("line_start") and e["line_start"] not in lines_have and e.get("verified", "exact") != "missing":
                         evidence.append(dict(e))
                         lines_have.add(e["line_start"])
-        options = clean_options(q.get("options") or [])
+        options = [plain_text(o, keep_codes) for o in clean_options(q.get("options") or [])]
+        options = [o for o in options if len(o) >= 3]
         if len(options) < 2:
             warnings.append(f"clarify: вопрос «{text[:60]}» отброшен — меньше двух проверяемых вариантов")
             continue
@@ -281,24 +326,21 @@ def postprocess(raw: dict, findings: list[dict], view: Any, warnings: list[str] 
             continue
         seen_keys.append(key)
         sev = [by_id[fid].get("severity", "minor") for fid in ids]
-        # блокирующий — только вопрос по critical или по major из «исправить первым» (priority 1–7 судьи)
-        if "critical" in sev:
-            blocking = True
-        else:
-            blocking = bool(q.get("blocking")) and any(
-                by_id[fid].get("severity") == "major" and 1 <= int(by_id[fid].get("priority") or 0) <= 7
-                and by_id[fid].get("blocks", "both") != "none" for fid in ids)
+        # блокирующий — только вопрос по critical: без ответа вердикт «нельзя» не снять (контракт, раздел 5)
+        blocking = any(by_id[fid].get("severity") == "critical" and by_id[fid].get("blocks", "both") != "none"
+                       for fid in ids)
         prio = min((int(by_id[fid].get("priority") or 0) or 99) for fid in ids)
         kept.append({
-            "id": "", "topic": str(q.get("topic", "")).strip()[:80], "finding_ids": ids, "to": _role(q.get("to")),
-            "blocking": blocking, "question": text, "evidence": evidence[:3], "options": options,
-            "why": str(q.get("why", "")).strip(),
+            "id": "", "topic": plain_text(str(q.get("topic", "")).strip(), keep_codes)[:80], "finding_ids": ids,
+            "to": _role(q.get("to")), "blocking": blocking, "question": text, "evidence": evidence[:3],
+            "options": options, "why": plain_text(str(q.get("why", "")).strip(), keep_codes),
             "_rank": (0 if blocking else 1, min(_SEV_RANK.get(s, 2) for s in sev), prio, i),
         })
     kept.sort(key=lambda x: x["_rank"])
-    if len(kept) > MAX_QUESTIONS:
-        warnings.append(f"clarify: оставлено {MAX_QUESTIONS} вопросов из {len(kept)}")
-        kept = kept[:MAX_QUESTIONS]
+    cap = question_cap(findings)
+    if len(kept) > cap:
+        warnings.append(f"clarify: оставлено {cap} вопросов из {len(kept)}")
+        kept = kept[:cap]
     for n, q in enumerate(kept, 1):
         q.pop("_rank", None)
         q["id"] = f"Q-{n:02d}"
@@ -310,22 +352,163 @@ def option_label(index: int) -> str:
 
 
 # --------------------------------------------------------------------------- этап
+def select_findings(findings: list[dict]) -> list[dict]:
+    """Что показать модели: critical и major (без оформления), critical первыми, затем по приоритету судьи."""
+    serious = [f for f in findings if f.get("severity") in ("critical", "major") and not is_formatting(f)]
+    if not serious:
+        serious = [f for f in findings if not is_formatting(f)]
+    def first_line(f: dict) -> int:
+        lines = finding_lines(f)
+        return min(lines) if lines else 10 ** 6
+    return sorted(serious, key=lambda f: (_SEV_RANK.get(f.get("severity"), 2), int(f.get("priority") or 0) or 99,
+                                          first_line(f)))
+
+
+def _ask_questions(ctx: Any, items: list[dict], block: str) -> dict:
+    def build(_items: list) -> tuple[str, str]:
+        return build_messages(ctx, STAGE, "findings", block, "Задание: вопросы владельцу")
+    system, user = build(items)
+    return ctx.llm.ask(STAGE, system, user, SCHEMA, max_output_tokens=OUTPUT_TOKENS) or {}
+
+
 def run(ctx: Any, findings: list[dict]) -> dict:
     """Вопросы владельцу по итоговым дефектам. Один вызов модели; без дефектов — без вызова."""
-    relevant = [f for f in findings if f.get("severity") in ("critical", "major")] or \
-        [f for f in findings if not is_formatting(f)]
+    relevant = select_findings(findings)
     if not relevant:  # только оформление (или дефектов нет) — спрашивать владельца не о чем
         return {"questions": []}
-    def build(items: list) -> tuple[str, str]:
-        return build_messages(ctx, STAGE, "findings", format_findings(items), "Задание: вопросы владельцу")
-
     warnings: list[str] = []
     try:
-        raw = ask_items(ctx, STAGE, relevant, build, SCHEMA, max_output_tokens=OUTPUT_TOKENS)
+        raw = _ask_questions(ctx, relevant, format_findings(relevant))
     except Exception as exc:  # noqa: BLE001 — вопросы не должны ронять весь прогон
         _warn(ctx, f"clarify: модель не ответила ({type(exc).__name__}: {str(exc)[:200]}); вопросы не сформированы")
         return {"questions": [], "status": "failed"}
     questions = postprocess(raw or {}, findings, ctx.view, warnings)
+    for w in warnings:
+        _warn(ctx, w)
+    return {"questions": questions}
+
+
+# --------------------------------------------------------------------------- ранний запуск (параллельно с судьёй)
+def select_candidates(candidates: list[dict]) -> list[list[dict]]:
+    """Кандидаты critical/major со сверенными цитатами, сгруппированные в вероятные дубли (кластеры судьи)."""
+    good = [c for c in candidates if c.get("severity") in ("critical", "major") and c.get("id")
+            and c.get("kind") not in FORMAT_KINDS and c.get("criterion") not in FORMAT_CRITERIA
+            and any(e.get("verified", "exact") != "missing" for e in c.get("evidence") or [])]
+    if not good:
+        return []
+    by_id = {c["id"]: c for c in good}
+    try:
+        from bcc_review.v2.stages import judge as _judge
+        groups = _judge.precluster(good)
+    except Exception:  # noqa: BLE001
+        groups = [[c["id"]] for c in good]
+    out = [[by_id[x] for x in g if x in by_id] for g in groups]
+    out = [g for g in out if g]
+    out.sort(key=lambda g: (min(_SEV_RANK.get(c.get("severity"), 2) for c in g), -len(g)))
+    return out
+
+
+def format_candidates(groups: list[list[dict]]) -> str:
+    """Кластеры кандидатов в том же виде, что и дефекты: ID через запятую в первой колонке."""
+    rows: list[str] = []
+    for g in groups:
+        head = g[0]
+        sev = min((c.get("severity", "minor") for c in g), key=lambda s: _SEV_RANK.get(s, 2))
+        reqs = sorted({r for c in g for r in c.get("requirement_ids") or []})
+        rows.append(f"{', '.join(c['id'] for c in g)} | {sev} | блокирует: {head.get('blocks', 'both')} | "
+                    f"{', '.join(reqs) or '—'} | {head.get('title', '')}")
+        seen: set[int] = set()
+        quotes = []
+        for c in g:
+            for e in c.get("evidence") or []:
+                ln = int(e.get("line_start") or e.get("line") or 0)
+                if ln in seen or len(quotes) >= 3:
+                    continue
+                seen.add(ln)
+                quotes.append(f"L{ln:03d} «{e.get('quote', '')}»")
+        if quotes:
+            rows.append(f"  цитаты: {'; '.join(quotes)}")
+        for key, label in (("problem", "проблема"), ("question", "вопрос ревьюера")):
+            val = next((str(c.get(key) or "").strip() for c in g if str(c.get(key) or "").strip()), "")
+            if val:
+                rows.append(f"  {label}: {val[:600]}")
+    return "\n".join(rows)
+
+
+def ask_candidates(ctx: Any, candidates: list[dict]) -> dict | None:
+    """Ранний вызов: вопросы по сверенным кандидатам, пока судья ещё работает. ``None`` — спрашивать не о чем."""
+    groups = select_candidates(candidates)
+    if not groups:
+        return None
+    return _ask_questions(ctx, [c for g in groups for c in g], format_candidates(groups))
+
+
+def remap(raw: dict, findings: list[dict]) -> dict:
+    """ID кандидатов в ответе раннего вызова → ID итоговых дефектов судьи (по ``candidate_ids``)."""
+    to_finding = {str(c): f.get("id") for f in findings for c in f.get("candidate_ids") or []}
+    known = {f.get("id") for f in findings}
+    out = {"questions": []}
+    for q in (raw or {}).get("questions") or []:
+        ids: list[str] = []
+        for x in q.get("finding_ids") or []:
+            x = str(x).strip()
+            fid = x if x in known else to_finding.get(x)
+            if fid and fid not in ids:
+                ids.append(fid)
+        out["questions"].append({**q, "finding_ids": ids})
+    return out
+
+
+class Early:
+    """Ранний запуск вопросов: вызов модели идёт в фоне, пока работает судья (не удлиняет критический путь)."""
+
+    def __init__(self, ctx: Any, candidates: list[dict]):
+        import threading
+        self.ctx, self.raw, self.error = ctx, None, None
+        self._done = threading.Event()
+        self._thread = threading.Thread(target=self._work, args=(list(candidates or []),), daemon=True,
+                                        name="clarify-early")
+        self._thread.start()
+
+    def _work(self, candidates: list[dict]) -> None:
+        try:
+            self.raw = ask_candidates(self.ctx, candidates)
+        except Exception as exc:  # noqa: BLE001
+            self.error = exc
+        finally:
+            self._done.set()
+
+    def result(self, timeout: float | None = None) -> tuple[dict | None, BaseException | None]:
+        self._done.wait(timeout)
+        return self.raw, self.error
+
+
+def start(ctx: Any, candidates: list[dict]) -> Early | None:
+    """Для конвейера (№01): запустить вопросы сразу после сверки цитат, параллельно с судьёй."""
+    if getattr(ctx, "llm", None) is None:
+        return None
+    return Early(ctx, candidates)
+
+
+def finish(ctx: Any, findings: list[dict], early: "Early | dict | None" = None) -> dict:
+    """Вопросы по итоговым дефектам: ответ раннего вызова привязывается к дефектам судьи.
+
+    Если раннего вызова не было, он упал или ни один его вопрос не лёг на critical/major судьи —
+    обычный вызов ``run`` по итоговым дефектам."""
+    raw, err = (early.result() if isinstance(early, Early) else (early, None))
+    if err is not None or not isinstance(raw, dict):
+        if err is not None:
+            _warn(ctx, f"clarify: ранний вызов не удался ({type(err).__name__}); вопросы — по итоговым дефектам")
+        return run(ctx, findings)
+    if not select_findings(findings):
+        return {"questions": []}
+    warnings: list[str] = []
+    questions = postprocess(remap(raw, findings), findings, ctx.view, warnings)
+    covered = {fid for q in questions for fid in q["finding_ids"]}
+    crit = [f["id"] for f in findings if f.get("severity") == "critical" and f.get("id")]
+    if not questions or (crit and not any(c in covered for c in crit)):
+        _warn(ctx, "clarify: вопросы раннего вызова не легли на итоговые дефекты — повторный вызов по ним")
+        return run(ctx, findings)
     for w in warnings:
         _warn(ctx, w)
     return {"questions": questions}

@@ -132,7 +132,7 @@ def test_recheck_is_honest(findings, questions):
     q1 = questions[0]
     answers = f"{q1['id']}: A\n"
     resp = _resp([
-        {"finding_id": q1["finding_ids"][0], "status": "resolved", "reason": "Ответ задаёт правило"},
+        {"finding_id": q1["finding_ids"][0], "status": "resolved", "by": [q1["id"]], "reason": "Ответ задаёт правило"},
         {"finding_id": "D-27", "status": "resolved", "reason": "не связан — должен быть проигнорирован"},
     ], [CAND, FAKE])
     ctx = FakeCtx(FakeLLM(resp))
@@ -183,9 +183,11 @@ def test_apply_answers_changes_verdict(findings, questions, stub_judge):
     crit = [q for q in questions if any(fid in {"D-01", "D-02", "D-03", "D-04"} for fid in q["finding_ids"])]
     answers = "\n".join(f"{q['id']}: A" for q in crit)
     affected = sorted({fid for q in crit for fid in q["finding_ids"]})
-    decisions = [{"finding_id": fid, "status": "resolved", "reason": "закрыто ответом"} for fid in affected]
-    decisions[-1] = {"finding_id": affected[-1], "status": "changed", "reason": "частично", "severity": "minor",
-                     "title": "Осталось уточнить текст"}
+    q_of = {fid: q["id"] for q in crit for fid in q["finding_ids"]}
+    decisions = [{"finding_id": fid, "status": "resolved", "by": [q_of[fid]], "reason": "закрыто ответом"}
+                 for fid in affected]
+    decisions[-1] = {"finding_id": affected[-1], "status": "changed", "by": [q_of[affected[-1]]], "reason": "частично",
+                     "severity": "minor", "title": "Осталось уточнить текст"}
     ctx = FakeCtx(FakeLLM(_resp(decisions, [CAND])))
     report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
     out = recheck.apply_answers(ctx, report, answers)
@@ -206,15 +208,17 @@ def test_apply_answers_changes_verdict(findings, questions, stub_judge):
 
 
 def test_question_closed_by_decision_is_not_unanswered(findings, questions, stub_judge):
-    q = next(x for x in questions if x["finding_ids"] == ["D-09"])
-    ctx = FakeCtx(FakeLLM(_resp([{"finding_id": "D-09", "status": "resolved", "reason": "общее решение"}])))
+    q = next(x for x in questions if len(x["finding_ids"]) == 1 and not x["blocking"])
+    fid = q["finding_ids"][0]
+    ctx = FakeCtx(FakeLLM(_resp([{"finding_id": fid, "status": "resolved", "by": ["Решение-1"],
+                                  "reason": "общее решение"}])))
     report = {"findings": findings, "questions": questions, "verdict": {}, "run": {"status": "complete"}}
     clar = recheck.apply_answers(ctx, report, "## Решения\n- Учитываются только покупки у торговцев.\n")["clarification"]
     assert q["id"] in clar["closed_by_decisions"] and q["id"] not in clar["unanswered"]
 
 
 def test_general_decision_affects_major(findings, questions):
-    ctx = FakeCtx(FakeLLM(_resp([{"finding_id": "D-09", "status": "resolved", "reason": "общее решение"}])))
+    ctx = FakeCtx(FakeLLM(_resp([{"finding_id": "D-09", "status": "resolved", "reason": "закрыто, Решение-1"}])))
     res = recheck.run(ctx, findings, "## Решения\n- Учитываются только покупки у торговцев.\n", questions)
     by = {g["id"]: g["recheck"] for g in res["findings"]}
     assert by["D-09"]["status"] == "resolved"
@@ -235,3 +239,49 @@ def test_example_answers_file_parses():
     assert len(p["answers"]) == 10 and all(a["topic_hint"] and a["text"] for a in p["answers"])
     assert len(p["decisions"]) == 7
     assert not any("python -m" in a["text"] for a in p["answers"])  # строки-комментарии «>» не читаются
+
+
+# --------------------------------------------------------------------------- третья волна: закрывает только прямой ответ
+def test_resolved_requires_named_answer(findings, questions):
+    q1 = questions[0]
+    fid = q1["finding_ids"][0]
+    resp = _resp([{"finding_id": fid, "status": "resolved", "by": [], "reason": "Владелец ответил"}])
+    res = recheck.run(FakeCtx(FakeLLM(resp)), findings, f"{q1['id']}: A\n", questions)
+    rc = {g["id"]: g["recheck"] for g in res["findings"]}[fid]
+    assert rc["status"] == "open" and "не назван ответ" in rc["reason"]
+
+
+def test_resolved_by_unknown_answer_stays_open(findings, questions):
+    q1 = questions[0]
+    fid = q1["finding_ids"][0]
+    resp = _resp([{"finding_id": fid, "status": "changed", "by": ["Q-77", "Решение-3"], "reason": "частично",
+                   "severity": "minor"}])
+    res = recheck.run(FakeCtx(FakeLLM(resp)), findings, f"{q1['id']}: A\n", questions)
+    rc = {g["id"]: g["recheck"] for g in res["findings"]}[fid]
+    assert rc["status"] == "open" and rc["severity_after"] == rc["severity_before"]
+
+
+def test_closing_answer_is_recorded(findings, questions):
+    q1, q2 = questions[0], questions[1]
+    fid = q1["finding_ids"][0]
+    resp = _resp([{"finding_id": fid, "status": "resolved", "by": ["q-" + q2["id"][2:].lstrip("0"), "решение 1"],
+                   "reason": "правило задано"}])
+    answers = f"{q1['id']}: A\n{q2['id']}: B\n\n## Решения\n- Общее правило.\n"
+    res = recheck.run(FakeCtx(FakeLLM(resp)), findings, answers, questions)
+    rc = {g["id"]: g["recheck"] for g in res["findings"]}[fid]
+    assert rc["status"] == "resolved"
+    assert rc["answer_ids"] == [q2["id"], "Решение-1"] and rc["question_ids"] == [q2["id"]]
+    assert q1["id"] in rc["linked_question_ids"]
+
+
+def test_by_label_from_reason_is_accepted(findings, questions):
+    q1 = questions[0]
+    fid = q1["finding_ids"][0]
+    resp = _resp([{"finding_id": fid, "status": "resolved", "reason": f"Ответ {q1['id']} задаёт правило"}])
+    res = recheck.run(FakeCtx(FakeLLM(resp)), findings, f"{q1['id']}: A\n", questions)
+    assert {g["id"]: g["recheck"] for g in res["findings"]}[fid]["status"] == "resolved"
+
+
+def test_schema_requires_by():
+    item = recheck.SCHEMA["properties"]["decisions"]["items"]
+    assert "by" in item["required"] and item["properties"]["by"]["type"] == "array"

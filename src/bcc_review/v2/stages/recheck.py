@@ -66,10 +66,11 @@ SCHEMA: dict = {
     "properties": {
         "decisions": {"type": "array", "items": {
             "type": "object", "additionalProperties": False,
-            "required": ["finding_id", "status", "reason", "severity", "title", "problem"],
+            "required": ["finding_id", "status", "by", "reason", "severity", "title", "problem"],
             "properties": {
                 "finding_id": {"type": "string"},
                 "status": {"type": "string", "enum": list(STATUSES)},
+                "by": {"type": "array", "items": {"type": "string"}},
                 "reason": {"type": "string"},
                 "severity": {"type": "string", "enum": list(SEVERITIES)},
                 "title": {"type": "string"},
@@ -349,6 +350,27 @@ def _format_answers(resolved: dict) -> str:
     return "\n".join(rows) or "—"
 
 
+def answer_labels(resolved: dict) -> set[str]:
+    """ID ответов, на которые модель может сослаться в ``by``: Q-… с ответом и Решение-1…N."""
+    return {a["question_id"] for a in resolved["answered"]} | \
+        {f"Решение-{i}" for i in range(1, len(resolved["decisions"]) + 1)}
+
+
+_LABEL = re.compile(r"(Q\s*-?\s*\d{1,3})|(Решени\w*\s*-?\s*\d{1,3})", re.I)
+
+
+def norm_labels(items: Iterable[str], valid: set[str]) -> list[str]:
+    """«q-3», «Q-03», «решение 2» → «Q-03», «Решение-2»; только существующие ответы."""
+    out: list[str] = []
+    for raw in items or []:
+        for m in _LABEL.finditer(str(raw)):
+            num = re.sub(r"\D", "", m.group(2) or "")
+            lab = _qid(m.group(1)) if m.group(1) else ("Решение-" + str(int(num)) if num else "")
+            if lab in valid and lab not in out:
+                out.append(lab)
+    return out
+
+
 def _next_candidate_number(report: dict | None, findings: list[dict]) -> int:
     nums = [0]
     pools = list(findings) + list((report or {}).get("rejected") or [])
@@ -419,6 +441,7 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         return _finish(ctx, result)
 
     by_id = {g["id"]: g for g in out_findings}
+    valid = answer_labels(resolved)
     for d in raw.get("decisions") or []:
         g = by_id.get(str(d.get("finding_id", "")).strip())
         if g is None or not g["recheck"]["affected"]:
@@ -426,6 +449,18 @@ def run(ctx: Any, findings: list[dict], answers: Any, questions: list[dict] | No
         status = d.get("status") if d.get("status") in STATUSES else "open"
         rc = g["recheck"]
         rc["status"], rc["reason"] = status, str(d.get("reason", "")).strip()
+        # дефект снимает только ответ, который модель назвала прямо (в by или в тексте причины)
+        by = norm_labels(list(d.get("by") or []), valid) if status != "open" else []
+        if status != "open" and not by:
+            by = norm_labels([rc["reason"]], valid)
+        if status != "open" and not by:
+            rc["status"], status = "open", "open"
+            rc["reason"] = ("не назван ответ, который снимает дефект: " + rc["reason"]).strip(": ")
+        if by:
+            rc["answer_ids"] = by
+            closing = [x for x in by if x.startswith("Q-")]
+            rc["linked_question_ids"] = list(rc["question_ids"])
+            rc["question_ids"] = closing
         if status == "changed":
             sev = d.get("severity") if d.get("severity") in SEVERITIES else g.get("severity")
             rc["severity_after"] = sev
@@ -534,7 +569,8 @@ def apply_answers(ctx: Any, report: dict, answers: Any) -> dict:
             continue
         changes.append({"finding_id": g["id"], "title": g.get("title", ""), "severity_before": r["severity_before"],
                         "status": r["status"], "severity_after": r["severity_after"], "reason": r["reason"],
-                        "question_ids": r["question_ids"], "title_after": r.get("title_after", "")})
+                        "question_ids": r["question_ids"], "answer_ids": r.get("answer_ids", []),
+                        "title_after": r.get("title_after", "")})
     order = {"resolved": 0, "changed": 1, "open": 2}
     changes.sort(key=lambda c: (order.get(c["status"], 3), SEVERITIES.index(c["severity_before"] or "minor")))
     # вопрос без прямого ответа, все дефекты которого сняты общими решениями, — не «без ответа»
