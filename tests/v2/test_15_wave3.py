@@ -839,6 +839,29 @@ def test_cleantable_recurring_complaints_glue_paraphrases_across_runs():
            "architect 2, qa 2 | №07 |" in text
 
 
+def test_gate_clean_rows_say_which_documents_fail_in_every_run(monkeypatch):
+    """Красные ворота чистых называют, какие документы последнего прогона дают critical / «нельзя» во всех прогонах
+    модели (систематика), а какие — в части (шум)."""
+    from evaluation.v2 import cleantable as ct
+
+    no, yes = {"development": "no", "testing": "no"}, {"development": "yes", "testing": "yes"}
+    hist = []
+    for at, repay, grace in (("2026-11-27 12:53", (2, no), (1, no)), ("2026-11-27 15:41", (1, no), (0, yes)),
+                             ("2026-11-27 19:03", (1, no), (1, no))):
+        for case, (crit, v) in (("repay", repay), ("grace_v2", grace)):
+            hist.append(ct._row("чистые ТЗ №20", "haiku", f"прогон {at[11:16]}", at, case, {"critical": crit}, v, 9, []))
+    monkeypatch.setattr(ct, "_newtz_rows", lambda: hist)
+    d = {"model": "haiku", "label": "голова: 3e7133c", "rows": [
+        {"case": "repay", "variant": "clean", "doc": "evaluation/v2/clean/repay/source.md",
+         "fa_by_severity": {"critical": 1}, "verdict": no},
+        {"case": "grace_v2", "variant": "clean", "doc": "evaluation/v2/clean/grace_v2/source.md",
+         "fa_by_severity": {"critical": 1}, "verdict": no}]}
+    assert gate._runs_note(d, "critical") == "; по всем прогонам haiku: repay 3 из 3 — систематика, grace_v2 2 из 3"
+    assert gate._runs_note(d, "no") == "; по всем прогонам haiku: repay 3 из 3 — систематика, grace_v2 2 из 3"
+    d["rows"][1]["verdict"] = yes
+    assert gate._runs_note(d, "no") == "; по всем прогонам haiku: repay 3 из 3 — систематика"
+
+
 def test_final_calls_offline_rules_are_not_cache_replay():
     """Прогон правил без модели (`--provider offline`) — «0 — без модели», а не «повтор из кэша»."""
     from evaluation.v2 import final

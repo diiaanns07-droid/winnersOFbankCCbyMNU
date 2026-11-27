@@ -507,9 +507,9 @@ def newtz_gates(title: str, d: dict | None, t: dict, missing_owner: str) -> list
     if c.get("n"):
         out.append(_check(f"{title}: critical на чистых", "0", f"{c.get('critical', 0)} (документов "
                           f"{c.get('docs_with_critical', 0)} из {c['n']})", c.get("critical", 0) == 0,
-                          _clean_owners(d, "critical") + "; №10 (серьёзность)"))
+                          _clean_owners(d, "critical") + "; №10 (серьёзность)" + _runs_note(d, "critical")))
         out.append(_check(f"{title}: вердикт «нельзя» на чистых", "0", f"{c.get('verdict_no', 0)} из {c['n']}",
-                          c.get("verdict_no", 0) == 0, "№10 (вердикт)"))
+                          c.get("verdict_no", 0) == 0, "№10 (вердикт)" + _runs_note(d, "no")))
         per = _per_doc(d, "major")
         worst = max(per.values(), default=0)
         over = [f"{k} {v}" for k, v in sorted(per.items(), key=lambda kv: -kv[1]) if v > t["clean_major_per_doc"]]
@@ -519,6 +519,33 @@ def newtz_gates(title: str, d: dict | None, t: dict, missing_owner: str) -> list
     for x in out:
         x["source"] = src
     return out
+
+
+def _runs_note(d: dict, what: str) -> str:
+    """«; по всем прогонам haiku: repay 4 из 4 — систематика, grace_v2 2 из 4» — для документов, где последний прогон
+    дал critical (`what` = "critical") или «нельзя» ("no"): в скольких прогонах этой модели на наборе так же
+    (`cleantable.stability`: без повторов из кэша). Во всех — систематика, в части — шум модели."""
+    from . import cleantable as ct
+
+    hit = [r.get("case") for r in d.get("rows") or [] if r.get("variant") == "clean" and (
+        (r.get("fa_by_severity") or r.get("by_severity") or {}).get("critical") if what == "critical"
+        else "no" in (r.get("verdict") or {}).values())]
+    if not hit:
+        return ""
+    set_name = "чистые ТЗ №20" if _newtz_set(d) == "№20" else "№18: чистые версии (2-я редакция)"
+    kind = ct._kind(d.get("model"), d.get("label"))
+    try:
+        docs = ct.stability(ct._newtz_rows()).get((set_name, kind)) or {}
+    except (OSError, ValueError):
+        return ""
+    parts = []
+    for case in hit:
+        rs = docs.get(case) or []
+        if len(rs) < 2:
+            continue
+        k = sum(1 for r in rs if (r["critical"] if what == "critical" else ct._is_no(r)))
+        parts.append((-k / len(rs), case, f"{case} {k} из {len(rs)}" + (" — систематика" if k == len(rs) else "")))
+    return f"; по всем прогонам {kind}: " + ", ".join(p for *_, p in sorted(parts)) if parts else ""
 
 
 def _newtz_set(d: dict) -> str:
