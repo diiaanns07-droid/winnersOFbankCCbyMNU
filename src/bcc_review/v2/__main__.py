@@ -104,6 +104,8 @@ def _common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--max-cost", metavar="ПОТОЛОК",
                    help="потолок на прогон: «0.5» — доллары, «200k» — токены; при превышении — частичный отчёт")
     p.add_argument("-q", "--quiet", action="store_true", help="без хода выполнения в консоли")
+    p.add_argument("--redact", action="store_true",
+                   help="скрыть персональные данные (карты, ИИН/БИН, телефоны, почта, IBAN) до отправки модели и в отчёте")
 
 
 def _opts(a: argparse.Namespace) -> dict:
@@ -116,7 +118,7 @@ def _opts(a: argparse.Namespace) -> dict:
         "export": [x.strip().lower() for x in (a.export or "").split(",") if x.strip()], "html": not a.no_html,
         "passes": a.passes, "lenses": [x.strip() for x in a.lenses.split(",") if x.strip()],
         "consistency": not a.no_consistency, "clarify": not a.no_clarify, "quiet": a.quiet,
-        "fast_start": getattr(a, "fast_start", None),
+        "fast_start": getattr(a, "fast_start", None), "redact": bool(getattr(a, "redact", False)),
         "answers": getattr(a, "answers", None), "revise": getattr(a, "revise", False),
         "replay": getattr(a, "replay", None), "runs": getattr(a, "runs", 1) or 1,
         **parse_cost(getattr(a, "max_cost", None)),
@@ -238,6 +240,12 @@ def cmd_review(argv: list[str]) -> int:
     except ValueError:
         print(f"--max-cost: не понял «{a.max_cost}»; примеры: 0.5 (доллары), 200k (токены)", file=sys.stderr)
         return 2
+    if a.redact:
+        from .runs import redact_available
+        if not redact_available():
+            print("--redact: в этой сборке нет модуля маскирования (rules/redact.py) — персональные данные не скрыть",
+                  file=sys.stderr)
+            return 2
     if a.runs < 1 or a.runs > 9:
         print("--runs: от 1 до 9", file=sys.stderr)
         return 2
@@ -397,6 +405,12 @@ def cmd_stage(argv: list[str]) -> int:
     except ValueError:
         print(f"--max-cost: не понял «{a.max_cost}»; примеры: 0.5 (доллары), 200k (токены)", file=sys.stderr)
         return 2
+    if a.redact:
+        from .runs import redact_available
+        if not redact_available():
+            print("--redact: в этой сборке нет модуля маскирования (rules/redact.py) — персональные данные не скрыть",
+                  file=sys.stderr)
+            return 2
     from . import pipeline
     from .runs import RunDir
     src = RunDir(a.from_run, create=False)

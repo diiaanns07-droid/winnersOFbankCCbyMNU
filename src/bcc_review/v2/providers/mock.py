@@ -87,13 +87,15 @@ Provider = MockProvider
 
 class ReplayProvider(MockProvider):
     """``--replay runs/<id>`` (№22): ответы модели — только записанные этим прогоном (``responses/<этап>.json``),
-    в порядке вызовов. Записи нет — ошибка «not_configured», а не пустой ответ: этап честно помечается
-    невыполненным, вердикт не выносится. Сети и ключа не нужно."""
+    в порядке вызовов. Записи нет — ошибка этапа («bad_request»), а не пустой ответ: этап честно помечается
+    невыполненным, вердикт не выносится. Сети и ключа не нужно. ПДн в записях маскированы (``runs.mask_pd``) —
+    ``restore`` (ставит конвейер) подставляет их из текста документа."""
 
     name = "replay"
 
     def __init__(self, *, fixtures_dir: str | Path | None = None, model: str | None = None, **kw: Any) -> None:
         super().__init__(fixtures_dir=fixtures_dir, model=model or "replay", **kw)
+        self.restore: Any = None
 
     def _lookup(self, stage: str, k: int) -> Any:
         """Строго k-я запись: в отличие от mock, последний ответ не повторяется для лишних вызовов."""
@@ -113,6 +115,8 @@ class ReplayProvider(MockProvider):
         stage = stage or "unknown"
         k = self._next(stage)
         raw = self._lookup(stage, k)
+        if raw is not None and self.restore:
+            raw = self.restore(raw)
         if raw is None or not _valid(conform(raw, dict(schema)), schema):
             from bcc_review.contracts import ProviderError
             # bad_request, а не not_configured: ошибка одного этапа, а не «модель не настроена» на весь прогон

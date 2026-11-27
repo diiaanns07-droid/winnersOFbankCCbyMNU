@@ -25,7 +25,7 @@ from typing import Any, Callable
 from . import AGENT, __version__
 from .context import Context
 from .llm import BudgetExceeded, LLMClient, LLMError
-from .runs import RunDir, now_iso
+from .runs import RunDir, mask_pd, mask_text, now_iso, pd_restorer
 from .types import LENSES, STANDARD_REFS
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -234,6 +234,7 @@ class Pipeline:
         self.model_error = ""
         self.fast_start_used = False
         self.replay: dict | None = None
+        self._pd_restore: Callable[[Any], Any] | None = None
         if self.opts.get("replay"):
             self._setup_replay(Path(self.opts["replay"]))
 
@@ -258,6 +259,20 @@ class Pipeline:
                 shutil.copytree(src / "responses", self.run.path / "responses", dirs_exist_ok=True)
         except OSError:
             pass
+
+    def _redact_view(self, view: dict) -> dict:
+        """``--redact`` (№30): персональные данные скрыты до модели — в промптах, отчёте, кэше и ``runs/`` их нет."""
+        from .rules import redact
+        view, stats = redact.mask_view(view)
+        lines = [{**ln, "section": redact.mask(ln["section"])}
+                 if isinstance(ln, dict) and isinstance(ln.get("section"), str) and ln["section"] else ln
+                 for ln in view.get("lines") or []]
+        view = {**view, "lines": lines}
+        if isinstance(view.get("title"), str):
+            view["title"] = redact.mask(view["title"])
+        if stats:
+            self.warnings.append(redact.summary(stats) + " (--redact): в модель и отчёт они не попали.")
+        return view
 
     # ------------------------------------------------------------------ один этап
 
@@ -343,6 +358,14 @@ class Pipeline:
         opts = self.opts
         self.log(f"Документ: {self.input}")
         view = load_view(self.input)
+        if opts.get("redact"):
+            view = self._redact_view(view)
+        # ПДн в runs/ маскированы (runs.mask_pd): этапы, прочитанные с диска, получают их обратно из документа
+        self._pd_restore = pd_restorer(view)
+        if self._pd_restore:
+            self.run.restore = self._pd_restore
+            if self.reuse is not None:
+                self.reuse.restore = self._pd_restore
         if self.replay and self.replay.get("document_sha256") and \
                 self.replay["document_sha256"] != view.get("sha256"):
             self.warnings.insert(0, "Повтор прогона: документ изменился после исходного прогона (SHA-256 "
@@ -365,6 +388,8 @@ class Pipeline:
             self.model_error = explain(exc, self.provider_name)
             self.warnings.insert(0, self.model_error)
             llm = None
+        if llm is not None and self._pd_restore and hasattr(getattr(llm, "provider", None), "restore"):
+            llm.provider.restore = self._pd_restore  # --replay: записанные ответы — с ПДн документа, как в исходном
         ctx = self.ctx = Context(view=view, llm=llm, options={**opts, "input": str(self.input)},
                                  run_dir=self.run.path, trace=self.run.trace)
         if llm is None:
@@ -1161,12 +1186,14 @@ def review(input_path: str | Path, output_md: str | Path, opts: dict | None = No
             p.run.write_json(f"responses/{stage}.json", items)
         except OSError:
             pass
+    if opts.get("redact"):  # --redact: и то, что модель могла написать сама, в отчёт без ПДн
+        report = mask_pd(report)
     written = write_outputs(report, view, Path(input_path), Path(output_md), opts, log or (lambda m: None))
     for fmt in ("json", "md", "html"):
         if fmt in written:
-            try:
-                import shutil
-                shutil.copy2(written[fmt], p.run.path / f"report.{fmt}")
+            try:  # копия отчёта в runs/ — без ПДн в открытом виде (№30)
+                text = Path(written[fmt]).read_text(encoding="utf-8")
+                (p.run.path / f"report.{fmt}").write_text(mask_text(text), encoding="utf-8")
             except OSError:
                 pass
     return report, written

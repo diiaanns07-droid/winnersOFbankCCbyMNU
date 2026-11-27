@@ -170,6 +170,9 @@ class LLMClient:
     def _cache_put(self, key: str, payload: dict) -> None:
         if not self.cache_dir:
             return
+        from .runs import has_pd
+        if has_pd(payload):  # ответ с персональными данными в кэш не кладём (№30): без кэша, зато без ПДн на диске
+            return
         try:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             tmp = self.cache_dir / f"{key}.tmp{threading.get_ident()}"
