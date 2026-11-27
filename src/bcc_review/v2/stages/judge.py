@@ -279,6 +279,54 @@ def _cid_num(cid: str) -> int:
     return int(m.group(1)) if m else 10 ** 6
 
 
+_CID_LOOSE = re.compile(r"[Cc]\s*[-_\u2010-\u2014]?\s*0*(\d+)")  # «C001», «C 1», «C‑001» (дефисы Юникода)
+
+
+def _canon_ids(response: Any, known: Iterable[str]) -> Any:
+    """ID кандидатов в ответе модели → как во входе: «C001», «c-1», «C 001» → «C-001».
+
+    Gemini Flash-Lite пишет ID без дефиса. Без приведения все решения такого ответа отбрасывались как ссылки на
+    несуществующих кандидатов, и повторный вызов раскладывал всех заново (живой прогон №02/F3 27.11: 31 из 31,
+    +61 с). Gemini не принимает ``pattern`` в схеме ответа, поэтому формат держит код. Неизвестный номер и номер,
+    общий для двух входных ID, не трогаются — их разбирает обычная проверка.
+    """
+    if not isinstance(response, dict):
+        return response
+    known = set(known)
+    by_num: dict[int, str | None] = {}
+    for cid in known:
+        m = _CID_LOOSE.fullmatch(cid)
+        if m:
+            n = int(m.group(1))
+            by_num[n] = None if n in by_num else cid
+
+    def canon(x: Any) -> Any:
+        s = _s(x)
+        if not s or s in known:
+            return x
+        m = _CID_LOOSE.fullmatch(s)
+        return (by_num.get(int(m.group(1))) or x) if m else x
+
+    def canon_finding(f: Any) -> Any:
+        if not isinstance(f, dict):
+            return f
+        f = dict(f)
+        if isinstance(f.get("candidate_ids"), list):
+            f["candidate_ids"] = [canon(x) for x in f["candidate_ids"]]
+        if "base" in f:
+            f["base"] = canon(f["base"])
+        return f
+
+    out = dict(response)
+    if isinstance(response.get("findings"), list):
+        out["findings"] = [canon_finding(f) for f in response["findings"]]
+    for key in ("rejected", "assignments"):
+        if isinstance(response.get(key), list):
+            out[key] = [dict(r, candidate_id=canon(r["candidate_id"])) if isinstance(r, dict) and "candidate_id" in r
+                        else r for r in response[key]]
+    return out
+
+
 def _ev_line(ev: dict) -> int | None:
     for k in ("line_start", "line"):
         v = ev.get(k)
@@ -1580,7 +1628,7 @@ def _repair_missing(ctx: Any, missing: list[dict], response: dict, warnings: lis
             system, _ = prompt(STAGE, candidates="", checklist="", stats="")
         except Exception:  # noqa: BLE001
             system = ""
-    data = _ask(ctx, system, user, assign_schema())
+    data = _canon_ids(_ask(ctx, system, user, assign_schema()), [c["id"] for c in missing])
     by_id = {c["id"]: c for c in missing}
     resp = {**response, "findings": [dict(f, candidate_ids=list(f.get("candidate_ids") or [])) for f in findings],
             "rejected": list(response.get("rejected") or [])}
@@ -1820,7 +1868,7 @@ def run(ctx: Any, candidates: list[dict]) -> dict:
     check_block = _checklist_block(items, source)
     try:
         parts = _call_judge(ctx, good, clusters, check_block, warnings)
-        response = _merge_responses(parts)
+        response = _canon_ids(_merge_responses(parts), [c["id"] for c in good])
         if not (response.get("findings") or response.get("rejected")):
             raise ValueError("пустой ответ: ни один кандидат не распределён")
     except Exception as exc:  # noqa: BLE001 — запасной реестр лучше, чем пустой отчёт
