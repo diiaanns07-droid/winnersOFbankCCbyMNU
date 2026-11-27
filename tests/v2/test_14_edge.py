@@ -485,7 +485,8 @@ def test_answers_file_in_cp1251_is_read(tmp_path):
     ans = tmp_path / "answers.md"
     ans.write_bytes(ANSWERS.encode("cp1251"))
     report, _, _ = _review(tmp_path, OFFICIAL, provider="mock", answers=str(ans))
-    assert report.get("clarification") and report["clarification"]["answers"] >= 1
+    answers = (report.get("clarification") or {}).get("answers")
+    assert (len(answers) if isinstance(answers, list) else int(answers or 0)) >= 1
 
 
 @_bug("01", "сбой режима --answers/--revise теряется: предупреждение и статус recheck=failed пишутся в self.*, "
