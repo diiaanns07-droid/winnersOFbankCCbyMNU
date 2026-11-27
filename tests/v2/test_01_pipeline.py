@@ -436,6 +436,16 @@ def test_stage_rerun_after_fast_start_remaps_reused_reviewers(tmp_path, monkeypa
                                 "blocks": "none"}]}
 
     monkeypatch.setattr(lens, "run_named", fake_lens)
+    from bcc_review.v2.stages import segment
+    real_h = segment.heuristic_segment
+
+    def heur_plus(view):  # эвристика = модели (40/40, №04); два лишних требования — R-42 снова только у эвристики
+        out = real_h(view)
+        last = out["requirements"][-1]
+        extra = [{**last, "id": f"R-{len(out['requirements']) + k:02d}"} for k in (1, 2)]
+        return {**out, "requirements": out["requirements"] + extra}
+
+    monkeypatch.setattr(segment, "heuristic_segment", heur_plus)
     report, _, _ = _run(tmp_path, fast_start=True)
     src = pipeline.RunDir(tmp_path / "runs" / report["run"]["run_id"], create=False)
     saved = json.loads((src.path / "stages" / "lens_qa.json").read_text(encoding="utf-8"))["output"]
