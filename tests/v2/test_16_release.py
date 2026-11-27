@@ -297,7 +297,7 @@ def test_docker_and_scripts_install_with_constraints():
 
 
 # Файлы с синтаксисом только для Python 3.12+ (PEP 701) — просьба владельцу в статусе №16; новых быть не должно.
-KNOWN_PY312_ONLY: set[str] = {"src/bcc_review/v2/stages/judge.py"}  # №10: патч 10_judge_py311.patch
+KNOWN_PY312_ONLY: set[str] = set()  # judge.py исправлен (патч 10_judge_py311), aggregate/newtz — №15
 
 
 def _py312_only_fstrings(path: Path) -> list[int]:
@@ -348,9 +348,6 @@ def test_code_compiles_on_python_311():
     assert not bad, "\n".join(bad)
 
 
-@pytest.mark.xfail(strict=False, reason="просьба №10 (статус №16, патч 10_judge_py311.patch): stages/judge.py:1072 и "
-                                        ":1489 — обратная косая в выражении f-строки; на Python 3.11 судья падает "
-                                        "SyntaxError, отчёт без судьи")
 def test_known_py312_only_files_are_fixed():
     bad = []
     for rel in sorted(KNOWN_PY312_ONLY):
