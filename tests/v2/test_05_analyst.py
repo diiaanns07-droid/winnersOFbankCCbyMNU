@@ -313,3 +313,29 @@ def test_maturity_same_for_pdf_and_docx(ext):
     assert clean["mature"] and clean["score"] == 4
     if raw is not None:
         assert not raw["mature"] and raw["score"] == 0
+
+
+# --- Волна 3, вторая смена: русский заголовок и правила против ложных на чистых ТЗ ---
+
+def test_latin_title_replaced_by_problem_start():
+    from bcc_review.v2.stages.lens_analyst import postprocess
+    c = {"title": "Forecast uses unpaid part only, actual interest uses whole debt", "kind": "contradiction",
+         "severity": "major", "evidence": [{"line": 3, "quote": "x"}],
+         "problem": "Прогноз считается на остаток, а начисление — на всю задолженность. Второе предложение."}
+    out = postprocess([c])[0]
+    assert out["title"] == "Прогноз считается на остаток, а начисление — на всю задолженность"
+
+
+def test_russian_title_kept_and_identifiers_allowed():
+    from bcc_review.v2.stages.lens_analyst import postprocess
+    c = {"title": "Срок ttl: минуты в данных и секунды в логике", "kind": "unit_mismatch", "severity": "major",
+         "evidence": [{"line": 3, "quote": "x"}], "problem": "p"}
+    assert postprocess([c])[0]["title"] == "Срок ttl: минуты в данных и секунды в логике"
+
+
+def test_prompt_has_clean_document_filters():
+    from pathlib import Path
+    text = (Path(__file__).resolve().parents[2] / "src/bcc_review/v2/prompts/lens_analyst.md").read_text()
+    for phrase in ("Правило счёта записано", "Названные состояния", "этот пояс действует для всех дат",
+                   "включая `title`"):
+        assert phrase in text

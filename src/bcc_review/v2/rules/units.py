@@ -94,6 +94,7 @@ def rule_currency(doc: Doc, out: dict) -> None:
                     scenario=f"В ответе приходит «100.00»: по описанию это 100 {MN[2]}, по смыслу — 100 {MJ[2]}.",
                     impact="Клиент покажет сумму в 100 раз меньше или больше; тест не определит правильное значение.",
                     recommendation=f"Указать одну единицу: целое число {MN[2]} либо сумму в {MJ[1]} с двумя знаками.",
+                    question=f"В каких единицах это значение: целое число {MN[2]} или {MJ[0]} с двумя знаками после запятой?",
                     conflict=len(evidence) >= 2,
                 ))
                 break
@@ -238,6 +239,7 @@ def rule_timezone(doc: Doc, out: dict) -> None:
                     scenario="Событие в 10:15 по местному времени: одна система запишет 10:15, другая — 05:15.",
                     impact="Сдвиг времени на величину смещения: неверные сутки или месяц, споры при приёмке.",
                     recommendation="Указать один часовой пояс для поля во всех разделах (и смещение в формате ISO 8601).",
+                    question=f"В каком часовом поясе хранится и передаётся это время: {a[2]} или {b[2]}?",
                     conflict=True,
                 ))
                 return
@@ -431,12 +433,22 @@ def rule_time_units(doc: Doc, out: dict) -> None:
                     kind="unit_mismatch", criterion="set_consistent", severity="major", blocks="both",
                     evidence=[ev(prev[1], qa), ev(x, qb)],
                     problem=(f"{quoted(qa)} и {quoted(qb)}: одно и то же поле {name} задано в {prev[0]} и в {unit}."),
-                    scenario=f"{name} = 15: по одному месту это 15 {prev[0]}, по другому — 15 {unit}.",
+                    scenario=f"{name} = 15: по одному месту это 15 {_gen_pl(prev[0])}, по другому — 15 {_gen_pl(unit)}.",
                     impact="Срок или интервал отличается в десятки раз; поведение системы и тесты расходятся.",
                     recommendation=f"Указать одну единицу для {name} во всех разделах.",
+                    question=f"В каких единицах задаётся {name}: {prev[0]} или {unit}?",
                     conflict=True,
                 ))
                 return
+
+
+GEN_PL = {"секунды": "секунд", "минуты": "минут", "часы": "часов", "сутки": "суток", "дни": "дней",
+          "миллисекунды": "миллисекунд", "недели": "недель", "месяцы": "месяцев", "годы": "лет"}
+
+
+def _gen_pl(unit: str) -> str:
+    """«15 минут», а не «15 минуты»: родительный падеж множественного числа после числа."""
+    return GEN_PL.get(unit, unit)
 
 
 def rule_day_kinds(doc: Doc, out: dict) -> None:
@@ -470,16 +482,23 @@ def rule_day_kinds(doc: Doc, out: dict) -> None:
                     common = stems(ca) & stems(cb)
                     if not common:
                         continue
+                    kind_a = "рабочих" if ka.startswith("рабоч") else "календарных"
+                    kind_b = "рабочих" if kb.startswith("рабоч") else "календарных"
+                    clause_a, clause_b = ca.strip(" *"), cb.strip(" *")
                     out["candidates"].append(candidate(
                         "units.day_kinds",
                         title=f"Одна величина в разных днях: {quoted(qa)} и {quoted(qb)}",
                         kind="unit_mismatch", criterion="unambiguous", severity="major", blocks="both",
                         evidence=[ev(xa, qa), ev(xb, qb)],
-                        problem=(f"{quoted(xa.joined[:160])} и {quoted(xb.joined[:160])}: срок считается в разных днях "
-                                 f"({qa} и {qb})."),
-                        scenario="Период включает выходные: по одному месту остаётся 5 дней, по другому — 3.",
+                        problem=(f"Связанный срок в одном месте считается в {kind_a} днях — {quoted(clause_a)}, "
+                                 f"в другом — в {kind_b}: {quoted(clause_b)}. Какие дни "
+                                 "считать, не сказано: от этого зависят дата окончания и число дней, которое видит клиент."),
+                        scenario=("До окончания срока 9 календарных дней, из них 2 выходных: по одному месту осталось 9 "
+                                  "дней, по другому — 7; дата окончания по двум местам разная."),
                         impact="Клиенту показывают неверный срок; расчёт и тесты расходятся на выходных и праздниках.",
-                        recommendation="Указать один вид дней для этого срока во всех разделах.",
+                        recommendation=("Указать один вид дней для этого срока во всех разделах; если в другом месте нужен "
+                                        "другой вид — назвать величину иначе и описать пересчёт."),
+                        question="Какие дни считать для этого срока во всех разделах: календарные или рабочие?",
                         conflict=True,
                     ))
                     return

@@ -193,7 +193,9 @@ def rule_version(doc: Doc, out: dict) -> None:
                      and NOT_FILLED.search(x.text) and not x.cells), None)
     meta = next((x for x in doc.lines[:60] if x.cells and len(x.cells) == 2 and x.cells[0]
                  and norm(x.cells[0]) not in ("поле", "field", "параметр")), None)
-    anchor = explicit or meta or next((x for x in doc.lines if x.text), None)
+    # только при шапке-шаблоне (таблица общих сведений) или явной строке «версия … не заполнена»; у выдержки
+    # требований без шапки отсутствие версии — не дефект требований, а лишняя карточка на чистом документе
+    anchor = explicit or meta
     if anchor is None:
         return
     has_date = bool(DATE.search("\n".join(x.joined for x in doc.lines[:60] if x.text)))
