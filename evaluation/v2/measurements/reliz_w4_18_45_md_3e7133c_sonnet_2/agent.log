@@ -1,0 +1,37 @@
+$ /usr/local/bin/python -m bcc_review release/input/requirements.md /home/user/repo/evaluation/v2/measurements/reliz_w4_18_45_md_3e7133c_sonnet_2/report.md --provider claude_cli --model sonnet --no-cache
+rc=0
+--- stdout
+BCC Review: «Уведомление о расходах по карте» — 40 требований, 27 дефектов (критичных 5, существенных 13, незначительных 9), вопросов 8
+Разработка: нельзя · тестирование: нельзя — блокеров 5, каждый останавливает разработку и тестирование:
+  D-01 Обещано чтение настроек через API, метода чтения нет
+  D-02 Не определено, какое событие процессинга считается «проведённой» покупкой
+  D-03 Критерий приёмки №2 противоречит правилу месяца из Ф-2
+  и ещё 2: D-04, D-05 — в отчёте, раздел «Кратко»
+Прогон завершён полностью: 2 мин 33 с, 9 вызовов модели, claude-sonnet-5-5; цитат сверено 75 из 75
+Отчёт: /home/user/repo/evaluation/v2/measurements/reliz_w4_18_45_md_3e7133c_sonnet_2/report.md и /home/user/repo/evaluation/v2/measurements/reliz_w4_18_45_md_3e7133c_sonnet_2/report.json
+  ! Тестировщик: тест-кейсов 13, оставлено 12
+  ! Вопросы: вопрос «Входят ли в расходы платежи за услуги, пополнение кошельков…» отброшен…
+HTML: /home/user/repo/evaluation/v2/measurements/reliz_w4_18_45_md_3e7133c_sonnet_2/report.html
+
+--- stderr
+Документ: release/input/requirements.md
+  segment: запуск
+  consistency: запуск
+  lens_analyst: запуск
+  lens_architect: запуск
+  lens_risk: запуск
+  lens_qa: запуск
+  segment: готово за 26 с, вызовов 1
+  lens_analyst: готово за 35 с, вызовов 1, кандидатов 6
+  lens_risk: готово за 45 с, вызовов 1, кандидатов 8
+  lens_qa: готово за 47 с, вызовов 1, кандидатов 4
+  lens_architect: готово за 49 с, вызовов 1, кандидатов 9
+  consistency: готово за 54 с, вызовов 1, кандидатов 12
+  rules: запуск
+  rules: готово за 0 с, вызовов 0, кандидатов 15
+  quotes: запуск
+  quotes: готово за 0 с, вызовов 0, кандидатов 54
+  judge: запуск
+  judge: готово за 91 с, вызовов 2
+  clarify: запуск
+  clarify: готово за 0 с, вызовов 0
