@@ -76,6 +76,22 @@ body:has(main.jb.done) { overflow: hidden; }
  *    --jb-hdr — низ шапки, --jb-top — низ панели (оба ставит app.js), лист начинается под панелью ── */
 .jb-dock { top: calc(var(--jb-hdr, 74px) + 8px); bottom: auto; max-width: calc(100% - 16px); overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; justify-content: flex-start; }
 .jb-dock::-webkit-scrollbar { display: none; }
+/* одна панель (владелец 27.11): app.js переносит вкладки в шапку .b-bar — без своего стекла, по центру шапки;
+ * имя файла и модель ужимаются с многоточием, вкладки — нет */
+.b-bar-tabs .jb-dock { position: static; transform: none; z-index: auto; flex: 0 0 auto; max-width: none; margin: 0 auto; padding: 0;
+  border-radius: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; overflow: visible; }
+.b-bar-tabs .jb-dock > .jb-d { height: 40px; padding: 0 13px; font-size: 14.5px; }
+@media (min-width: 761px) { .b-bar-tabs { max-width: min(1520px, calc(100% - 28px)); } }
+.b-bar-tabs .b-bar-doc { flex: 0 1 auto; }
+.b-bar-tabs .b-bar-end { flex: 0 1 auto; margin-left: 0; }
+@media (max-width: 1680px) {  /* «Вопросы», «Редакция» — чтобы имя файла и модель в шапке читались целиком */
+  .b-bar-tabs .jb-dock .long { display: none; } .b-bar-tabs .jb-dock .short { display: inline; }
+}
+@media (max-width: 1120px) {  /* узко для одной строки: вкладки — второй строкой той же панели */
+  .b-bar-tabs { flex-wrap: wrap; row-gap: 2px; }
+  .b-bar-tabs .b-bar-end { margin-left: auto; }
+  .b-bar-tabs .jb-dock { order: 3; flex: 1 0 100%; justify-content: center; flex-wrap: wrap; }
+}
 .jb-d {
   flex: none; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border: 0; border-radius: 999px;
   background: transparent; color: var(--ink-2) !important; font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1;
