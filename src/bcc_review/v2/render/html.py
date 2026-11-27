@@ -255,6 +255,26 @@ def e(v: Any) -> str:
     return escape("" if v is None else str(v), quote=True)
 
 
+_LREF = re.compile(r"(?:(?<![\w-])([А-Яа-яЁё]{1,7})\s+)?\bL0*(\d{1,5})(?:\s*[–-]\s*L?0*(\d{1,5}))?\b")
+_SEV_WORD = re.compile(r"\b(critical|major|minor)\b")
+_SEV_RU = {"critical": "критичный", "major": "существенный", "minor": "незначительный"}
+
+
+def _lref(m: re.Match) -> str:
+    try:  # падежи «по строке», «из строки» — как в Markdown-отчёте №13
+        from bcc_review.v2.render.markdown import _lref as md_lref
+        return md_lref(m)
+    except Exception:  # noqa: BLE001
+        word = f"строки {m.group(2)}–{m.group(3)}" if m.group(3) else f"строка {m.group(2)}"
+        return f"{m.group(1)} {word}" if m.group(1) else word
+
+
+def tx(v: Any) -> str:
+    """Текст модели для показа: «L038» → «строка 38», critical → критичный, затем экранирование."""
+    s = "" if v is None else str(v)
+    return e(_SEV_WORD.sub(lambda m: _SEV_RU[m.group(1)], _LREF.sub(_lref, s)))
+
+
 def _fmt_int(n: Any) -> str:
     try:
         return f"{int(n):,}".replace(",", " ")
@@ -436,7 +456,7 @@ def _hero(report: dict, findings: list[dict], by_id: dict) -> str:
     </div>
   </div>
   <div class="hero-text">
-    <p class="vsummary">{e(verdict.get("summary", ""))}</p>
+    <p class="vsummary">{tx(verdict.get("summary", ""))}</p>
     <p class="runmeta">{" · ".join(meta)}</p>
   </div>
   {fix_html}
@@ -588,7 +608,7 @@ def _card(f: dict, idx: int, reqs_by_id: dict) -> str:
             continue
         copy = ('<button type="button" class="copy" data-copy title="Скопировать формулировку">Копировать</button>'
                 if key == "rewrite" else "")
-        details.append(f'<div class="dl {extra}"><div class="dt">{label}{copy}</div><div class="dd">{e(val)}</div></div>')
+        details.append(f'<div class="dl {extra}"><div class="dt">{label}{copy}</div><div class="dd">{e(val) if key == "rewrite" else tx(val)}</div></div>')
     more = ""
     if details:
         open_attr = " open" if sev == "critical" else ""
@@ -625,7 +645,7 @@ def _card(f: dict, idx: int, reqs_by_id: dict) -> str:
   <h3 class="ct">{e(f.get("title", ""))}</h3>
   <div class="meta">{"".join(meta)}</div>
   <ul class="evs">{"".join(ev_items)}</ul>
-  <p class="problem">{e(f.get("problem", ""))}</p>
+  <p class="problem">{tx(f.get("problem", ""))}</p>
   {more}
   <footer class="cf">{"".join(foot)}</footer>
 </article>"""
@@ -727,7 +747,7 @@ def _questions(report: dict, by_id: dict) -> str:
   {_ev_list(q.get("evidence") or [])}
   {f'<ol class="opts">{opts}</ol>' if opts else ''}
   <label class="own">Свой ответ<textarea rows="2" data-own="{e(qid)}" placeholder="Если ни один вариант не подходит"></textarea></label>
-  {f'<p class="why"><b>Зачем:</b> {e(q.get("why"))}</p>' if q.get("why") else ''}
+  {f'<p class="why"><b>Зачем:</b> {tx(q.get("why"))}</p>' if q.get("why") else ''}
 </article>""")
     return (f'<div class="qtools"><p>Отметьте варианты или впишите свой ответ и скачайте файл ответов — агент '
             f'перепроверит замечания и покажет вердикт «до и после»: <code>--answers ответы.md</code>.</p>'
@@ -768,7 +788,7 @@ def _clarification(report: dict, by_id: dict) -> str:
             sb, sa = x.get("severity_before", ""), x.get("severity_after", "")
             crow.append([_finding_link(x.get("finding_id", ""), by_id) + " " + e(x.get("title_after") or x.get("title", "")),
                          e(SEV_LABEL.get(sb, sb).lower()), f'<span class="ans {cls}">{e(lbl)}</span>',
-                         e(SEV_LABEL.get(sa, sa).lower()) if sa else "—", e(x.get("reason", "")),
+                         e(SEV_LABEL.get(sa, sa).lower()) if sa else "—", tx(x.get("reason", "")),
                          ", ".join(e(q) for q in x.get("question_ids") or [])])
         out.append('<h3 class="sub">Что изменилось по замечаниям</h3>'
                    + _table(["Замечание", "Было", "Статус", "Стало", "Почему", "Ответ"], crow))
@@ -805,7 +825,7 @@ def _tests(report: dict, reqs_by_id: dict) -> str:
         rows.append([f'<span class="fid">{e(t.get("id", ""))}</span>',
                      " ".join(_req_link(r, reqs_by_id) for r in t.get("requirement_ids") or []),
                      f'<b>{e(t.get("title", ""))}</b>', e(t.get("given", "")), e(t.get("when", "")), then,
-                     e(t.get("gap", ""))])
+                     tx(t.get("gap", ""))])
     return ('<p class="lead">Черновик для раздела «Тестирование требований»: проверки, которых не хватает в '
             'критериях приёмки. Где ожидаемый результат нельзя вывести из текста, это отмечено.</p>'
             + _table(["ID", "Требования", "Проверка", "Дано", "Когда", "Тогда", "Чего нет в приёмке"], rows, "tc"))
@@ -819,7 +839,7 @@ def _checklist(report: dict, by_id: dict) -> str:
     for c in items:
         ans = str(c.get("answer", ""))
         cls = ANSWER_CLASS.get(ans.strip().lower(), "na")
-        rows.append([e(c.get("item", "")), f'<span class="ans a-{cls}">{e(ans)}</span>', e(c.get("comment", "")),
+        rows.append([e(c.get("item", "")), f'<span class="ans a-{cls}">{e(ans)}</span>', tx(c.get("comment", "")),
                      " ".join(_finding_link(fid, by_id) for fid in c.get("finding_ids") or [])])
     return ('<p class="lead">Чек-лист «Ревью требований» банка, заполненный по результатам проверки.</p>'
             + _table(["Проверка", "Ответ", "Комментарий", "Замечания"], rows, "cl"))
@@ -833,10 +853,10 @@ def _checks(report: dict, reqs_by_id: dict) -> str:
     if acc:
         rows = [[_req_link(a.get("row_requirement_id", ""), reqs_by_id), e(a.get("row_facts", "")),
                  " ".join(_req_link(r, reqs_by_id) for r in a.get("rule_requirement_ids") or []),
-                 e(a.get("expected_by_rules", "")) + (f'<div class="deriv">{e(a["derivation"])}</div>' if a.get("derivation") else ""),
+                 e(a.get("expected_by_rules", "")) + (f'<div class="deriv">{tx(a["derivation"])}</div>' if a.get("derivation") else ""),
                  e(a.get("stated", "")),
                  f'<span class="ans {verdict_cls.get(a.get("verdict"), "a-na")}">{e(verdict_lbl.get(a.get("verdict"), a.get("verdict", "")))}</span>'
-                 + (f'<div class="deriv">{e(a.get("explanation") or a.get("fix"))}</div>'
+                 + (f'<div class="deriv">{tx(a.get("explanation") or a.get("fix"))}</div>'
                     if a.get("verdict") == "conflict" and (a.get("explanation") or a.get("fix")) else "")]
                 for a in acc]
         parts.append('<h3 class="sub">Исполнение критериев приёмки</h3><p class="lead">Ожидаемый результат выведен '
@@ -845,7 +865,7 @@ def _checks(report: dict, reqs_by_id: dict) -> str:
     pairs = report.get("pair_checks") or []
     if pairs:
         rows = [[f'{_req_link(p.get("a", ""), reqs_by_id)} ↔ {_req_link(p.get("b", ""), reqs_by_id)}',
-                 e(p.get("subject", "")), e(p.get("scenario", "")), e(p.get("outcome_a", "")), e(p.get("outcome_b", "")),
+                 e(p.get("subject", "")), tx(p.get("scenario", "")), tx(p.get("outcome_a", "")), tx(p.get("outcome_b", "")),
                  f'<span class="ans {verdict_cls.get(p.get("verdict"), "a-na")}">{e(verdict_lbl.get(p.get("verdict"), p.get("verdict", "")))}</span>']
                 for p in pairs]
         parts.append('<h3 class="sub">Попарная сверка требований</h3>'
@@ -855,13 +875,13 @@ def _checks(report: dict, reqs_by_id: dict) -> str:
         rows = [[_req_link(t.get("requirement_id", ""), reqs_by_id),
                  " ".join(_req_link(r, reqs_by_id) for r in t.get("verified_by") or []) or '<span class="muted">нет</span>',
                  " ".join(_req_link(r, reqs_by_id) for r in t.get("implemented_by") or []) or '<span class="muted">—</span>',
-                 e(t.get("note", ""))] for t in trace]
+                 tx(t.get("note", ""))] for t in trace]
         parts.append('<h3 class="sub">Трассировка</h3>' + _table(["Требование", "Проверяется", "Реализуется", "Примечание"], rows))
     gl = report.get("glossary") or []
     if gl:
         rows = [[f'<b>{e(g.get("concept", ""))}</b>',
                  ", ".join(f'{e(t.get("term", ""))} <a class="lnref" href="#L{e(t.get("line"))}" data-line="{e(t.get("line"))}">строка {e(t.get("line"))}</a>'
-                           for t in g.get("terms") or []), e(g.get("problem", ""))] for g in gl]
+                           for t in g.get("terms") or []), tx(g.get("problem", ""))] for g in gl]
         parts.append('<h3 class="sub">Глоссарий: один смысл — разные слова</h3>' + _table(["Понятие", "Термины в документе", "Проблема"], rows))
     return "".join(parts) or '<p class="none">Дополнительных проверок в отчёте нет.</p>'
 
@@ -906,7 +926,7 @@ def _rejected(report: dict, by_id: dict | None = None) -> str:
         lines = ", ".join(_lines_label(x) for x in ev if isinstance(x, dict))
         rows.append([f'<span class="fid">{e(r.get("candidate_id") or r.get("id", ""))}</span>', e(r.get("title", "")),
                      e(_source_label(r.get("source", ""))) if r.get("source") else "", e(lines),
-                     e(r.get("reason", "")) + (f' <span class="muted">→</span> {_finding_link(r["duplicate_of"], by_id or {})}'
+                     tx(r.get("reason", "")) + (f' <span class="muted">→</span> {_finding_link(r["duplicate_of"], by_id or {})}'
                                               if r.get("duplicate_of") else "")])
     return ('<p class="lead">Кандидаты, которые линзы предложили, а судья не включил в отчёт, — с причиной. '
             'Так видно, что точность важнее количества.</p>'
@@ -972,7 +992,7 @@ def _passport(report: dict) -> str:
         items.append(f'<li class="st st-{e(v)}"><span>{e(STAGE_LABEL.get(k, k))}{extra}</span><b>{e(STAGE_STATE.get(v, v))}</b></li>')
     st = "".join(items)
     warns = run.get("warnings") or []
-    wl = "".join(f"<li>{e(w)}</li>" for w in warns)
+    wl = "".join(f"<li>{tx(w)}</li>" for w in warns)
     return (f'<div class="pgrid"><div class="tw"><table class="kv">{kv}</table></div><div>'
             + (f'<h3 class="sub">Этапы</h3><ul class="stages">{st}</ul>' if st else "")
             + (f'<h3 class="sub">Предупреждения</h3><ul class="warns">{wl}</ul>' if wl else "")

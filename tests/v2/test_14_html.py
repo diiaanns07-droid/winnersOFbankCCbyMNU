@@ -165,3 +165,11 @@ def test_stage_stats_duplicate_and_offline(report, view):
     r["not_checked"] = ["смысловые противоречия между требованиями"]
     page = H.render_html(r, view)
     assert "Проверка без модели" in page and "Не определён" in page and "смысловые противоречия" in page
+
+
+def test_model_line_refs_become_words(report, view):
+    r = copy.deepcopy(report)
+    r["findings"][0]["problem"] = "Интеграция (L052) обещает чтение, см. L38–L40; critical"
+    page = H.render_html(r, view)
+    assert "Интеграция (строка 52) обещает чтение, см. строки 38–40; критичный" in page
+    assert "(L052)" not in page.split('id="report-data"')[0]
