@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from ._text import Doc, Line, candidate, ev, fmt_list, norm, quoted, signal, tables
+from ._text import Doc, Line, candidate, ev, fmt_list, norm, quoted, tables
 
 DASH = re.compile(r"^\s*(?:—|–|-|−|n/?a|н/д)\s*\.?\s*$", re.I)
 INLINE_DASH = re.compile(r"\b([A-Za-zА-Яа-яЁё][\w\-]{1,20})\s*:\s*(?:—|–|−)\s*(?:[.;,|]|$)")
