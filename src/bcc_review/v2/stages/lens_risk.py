@@ -97,7 +97,8 @@ _TITLE_RES = {topic: re.compile(spec["title"], re.I) for topic, spec in OUT_OF_S
 MAJOR_NEEDS_HOOK: dict[str, dict[str, Any]] = {
     "повторы и дубли событий": {
         "title": r"дедуплик|дубл|повторн\w*\s+(доставк|событи|уведомлени|обработк|запрос|вызов)|идемпотент|двойн"
-                 r"|повтор\w*\s+(\w+\s+)?(событи|доставк|уведомлени|сообщени)",
+                 r"|повтор\w*\s+(\w+\s+)?(событи|доставк|уведомлени|сообщени|передач|отправк)"
+                 r"|(признак|ключ)\w*\s+(\w+\s+)?повтор",
         "hooks": ["повтор", "дубл", "идемпотент", "исходный итог", "однократн"],
     },
     "гонки параллельных событий": {
@@ -112,6 +113,11 @@ MAJOR_NEEDS_HOOK: dict[str, dict[str, Any]] = {
     },
 }
 _MAJOR_RES = {topic: re.compile(spec["title"], re.I) for topic, spec in MAJOR_NEEDS_HOOK.items()}
+# Зацепка для major о повторах — обещание документа, что повтор не меняет итог («повторная доставка … сохраняет
+# исходный итог», «повтор не учитывается», «обработка однократна»), а не любое слово «повтор» («передача
+# повторяется до 2 раз»): без обещания вопрос о дублях — вопрос предметной области.
+_REPEAT_PROMISE_RE = re.compile(r"повтор\w*[^;|.]{0,80}(не\s+(меня|учитыва|созда|влия|увеличива|начисля)|сохраня)"
+                                r"|однократн|исходн\w+\s+итог|не\s+более\s+одного\s+раза\s+на\s+(событи|операци)", re.I)
 
 
 # Риск ИБ уровня major — только конкретный риск описанного интерфейса (данные в адресе, GET, ответ на чужой
@@ -120,6 +126,15 @@ _MAJOR_RES = {topic: re.compile(spec["title"], re.I) for topic, spec in MAJOR_NE
 SECURITY_MAJOR_RE = re.compile(
     r"строк\w*\s+запрос|query|адрес|url|\bget\b|40[34]|чуж|владе|принадлеж|сесси|роль|роли|держател"
     r"|номер\w*\s+карт|цифр|маск|персональн|журнал|лог[аиоу]|перебор|раскры", re.I)
+
+
+# Признак повтора назван в самом обещании («с тем же идентификатором», «ключ идемпотентности»): вопрос закрыт.
+_REPEAT_KEYED_RE = re.compile(r"с\s+тем\s+же|ключ\w*\s+идемпотент|идентификатор\w*\s+(событи|операци|запрос)", re.I)
+
+
+def repeat_promise_without_key(doc_text: str) -> bool:
+    """В документе есть обещание «повтор не меняет итог», в строке которого не назван признак повтора."""
+    return any(_REPEAT_PROMISE_RE.search(ln) and not _REPEAT_KEYED_RE.search(ln) for ln in doc_text.splitlines())
 
 
 def major_without_hook(candidate: dict, doc_text: str) -> str | None:
@@ -132,7 +147,8 @@ def major_without_hook(candidate: dict, doc_text: str) -> str | None:
     if candidate.get("kind") == "security" and not SECURITY_MAJOR_RE.search(title):
         return "риск ИБ без опоры на описанный интерфейс"
     matched = [topic for topic, rx in _MAJOR_RES.items() if rx.search(title)]
-    hooked = [t for t in matched if any(h in doc_text for h in MAJOR_NEEDS_HOOK[t]["hooks"])]
+    hooked = [t for t in matched if (repeat_promise_without_key(doc_text) if t == "повторы и дубли событий"
+                                     else any(h in doc_text for h in MAJOR_NEEDS_HOOK[t]["hooks"]))]
     return matched[0] if matched and not hooked else None
 
 
@@ -246,9 +262,13 @@ _DEST_DEFINED_RE = re.compile(r"карт\w*(\s+для\s+\w+)?\s+(\w+\s+)?(зак
                               r"|сч[её]т\w*\s+для\s+\w+\s+(\w+\s+)?(закрыт|заблокирован)", re.I)
 
 
+# «Порядок событий» (возврат раньше покупки) — эксплуатация, а не неопределённое ключевое событие.
+_EVENT_ORDER_RE = re.compile(r"порядок\s+(\w+\s+)?событи|раньше\s+(покупк|событи|операци)", re.I)
+
+
 def _is_key_event(c: dict) -> bool:
     title = str(c.get("title", ""))
-    return bool(_KEY_EVENT_RE.search(title)) and not _ACCEPTANCE_RE.search(title)
+    return bool(_KEY_EVENT_RE.search(title)) and not _ACCEPTANCE_RE.search(title) and not _EVENT_ORDER_RE.search(title)
 
 
 def _quotes(c: dict) -> list[str]:

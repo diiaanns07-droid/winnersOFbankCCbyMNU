@@ -538,3 +538,22 @@ def test_rollback_described_in_filled_template():
     filled = "| Реализация задачи/проекта предусматривает схему отката решений | Да | Да | Откат — выключение функционала флагом |"
     kept, dropped = lens_risk.postprocess([_cand(t, "minor", "missing_element")], filled)
     assert not kept and "описана" in dropped[0]["reject_reason"]
+
+
+def test_event_order_is_not_key_event():
+    t = "Не определён порядок событий: возврат может прийти раньше покупки"
+    kept, dropped = lens_risk.postprocess([_cand(t, "minor", "ops_risk", "risk")], "Возврат ищет исходную покупку.")
+    assert _sev(t, kept, dropped) == "снято"
+
+
+def test_repeat_major_needs_promise_without_named_key():
+    t = "Обещан один push, но признак распознавания повтора передачи не назван"
+    retries = "Клиент получает один push. При ошибке передача повторяется до 2 раз; 500 — котировка не создаётся."
+    kept, dropped = lens_risk.postprocess([_cand(t, kind="ops_risk", criterion="risk")], retries)
+    assert _sev(t, kept, dropped) == "снято"
+    keyed = "Повторная доставка события с тем же operationId накопленную сумму не меняет."
+    kept, dropped = lens_risk.postprocess([_cand(t, kind="ops_risk", criterion="risk")], keyed)
+    assert _sev(t, kept, dropped) == "снято"
+    promise = "Повторная доставка одного события процессинга сохраняет исходный итог."
+    kept, dropped = lens_risk.postprocess([_cand(t, kind="ops_risk", criterion="risk")], promise)
+    assert _sev(t, kept, dropped) == "major"

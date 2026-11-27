@@ -46,13 +46,19 @@ def score(name, kept):
     rep = sc.as_report({"candidates": kept}, g)
     with redirect_stdout(io.StringIO()):
         res = sc.score_report(rep, g, arbiter="off", cache_path=Path(cache))
+    # «свои» — по эталону без чужих critical: в счёте только по линзе замечание линзы с общей строкой уходит чужому
+    # critical (паросочетание берёт critical первыми), хотя в полном прогоне его даёт владелец
+    g2 = dict(g, items=[it for it in g["items"] if it["level"] != "critical" or "risk" in it.get("owners", [])])
+    with redirect_stdout(io.StringIO()):
+        res2 = sc.score_report(sc.as_report({"candidates": kept}, g2), g2, arbiter="off", cache_path=Path(cache))
+    found_own = {a["gold"] for a in res2["assignment"]}
     found = {a["gold"]: a for a in res["assignment"]}
     mine = [it for it in g["items"] if "risk" in it.get("owners", [])]
     crit_items = [it["id"] for it in g["items"] if it["level"] == "critical"]
     as_crit = res["recall"]["critical"]["as_critical"]
     return {
-        "mine": f"{sum(1 for it in mine if it['id'] in found)}/{len(mine)}",
-        "mine_missing": [it["id"] for it in mine if it["id"] not in found],
+        "mine": f"{sum(1 for it in mine if it['id'] in found_own)}/{len(mine)}",
+        "mine_missing": [it["id"] for it in mine if it["id"] not in found_own],
         "found_all": sorted(found),
         "crit_found": [i for i in crit_items if i in found],
         "as_crit": as_crit,
