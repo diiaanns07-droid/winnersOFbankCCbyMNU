@@ -224,6 +224,9 @@ def cmd_review(argv: list[str]) -> int:
     p.add_argument("--fail-on", choices=["blocker", "partial"], help="ненулевой код выхода при блокере/неполном прогоне")
     p.add_argument("--replay", metavar="runs/<id>",
                    help="собрать отчёт заново из сохранённых ответов этапов прогона: без ключа, сети и вызовов модели")
+    p.add_argument("--interactive", action="store_true",
+                   help="после проверки задать вопросы в консоли, записать <отчёт>.answers.md и сразу пересмотреть "
+                        "дефекты по ответам")
     p.add_argument("--runs", type=int, default=1, metavar="N",
                    help="N независимых проходов рецензентов и судьи: у каждого дефекта устойчивость k/N; в реестр "
                         "идут найденные не меньше чем в половине проходов, остальные — в приложение")
@@ -236,8 +239,11 @@ def cmd_review(argv: list[str]) -> int:
     if a.runs < 1 or a.runs > 9:
         print("--runs: от 1 до 9", file=sys.stderr)
         return 2
-    if a.runs > 1 and (a.answers or a.revise or a.replay):
-        print("--runs нельзя вместе с --answers, --revise и --replay: сначала соберите отчёт с устойчивостью, "
+    if a.interactive and a.answers:
+        print("--interactive нельзя вместе с --answers: ответы либо в консоли, либо файлом", file=sys.stderr)
+        return 2
+    if a.runs > 1 and (a.answers or a.revise or a.replay or a.interactive):
+        print("--runs нельзя вместе с --answers, --revise, --interactive и --replay: сначала соберите отчёт с устойчивостью, "
               "затем ответы — отдельным запуском", file=sys.stderr)
         return 2
     if not Path(a.input).is_file():
@@ -263,14 +269,97 @@ def cmd_review(argv: list[str]) -> int:
         return 2
     a.output = str(out)
     from . import pipeline
-    report, written = pipeline.review(a.input, a.output, _opts(a), log=_log(a.quiet))
+    opts = _opts(a)
+    if a.interactive:
+        opts["revise"] = False  # исправленная редакция — после ответов, во втором проходе
+    report, written = pipeline.review(a.input, a.output, opts, log=_log(a.quiet))
     _print_summary(report, written)
+    if a.interactive and (report.get("run") or {}).get("status") != "failed":
+        again = _interactive(a, report, written)
+        if again is not None:
+            report, written = again
+            print()
+            _print_summary(report, written)
     if (report.get("run") or {}).get("model_error"):
         called = int(((report.get("run") or {}).get("calls") or {}).get("total") or 0)
         lead = ("Модель перестала отвечать во время прогона, отчёт неполный. " if called
                 else "Модель не вызывалась, отчёт построен только правилами. ")
         print("\n" + lead + report["run"]["model_error"], file=sys.stderr)
     return _exit_code(report, a.fail_on)
+
+
+LETTERS = "ABCD"
+_RU_LETTERS = {"А": "A", "Б": "B", "В": "C", "Г": "D", "С": "C"}
+
+
+def ask_questions(questions: list[dict], *, input_fn=None, print_fn=print) -> list[str]:
+    """``--interactive`` (№22): вопросы отчёта в консоли. Ответ — буква варианта (A–D, кириллицей тоже, или
+    цифра 1–4), свой текст или Enter — пропустить; конец ввода (Ctrl+D / Ctrl+Z) — пропустить остальные.
+    Возвращает строки файла ответов в формате ``--answers``: ``Q-01 [тема]: B — текст варианта``."""
+    import builtins
+    input_fn = input_fn or builtins.input
+    lines: list[str] = []
+    total = len(questions)
+    print_fn(f"\nВопросы владельцу: {total}. Ответ — буква варианта, свой текст или Enter, чтобы пропустить.")
+    for i, q in enumerate(questions, 1):
+        qid, topic = str(q.get("id") or f"Q-{i:02d}"), str(q.get("topic") or "").strip()
+        opts = [str(o) for o in (q.get("options") or [])][:len(LETTERS)]
+        print_fn(f"\n[{i}/{total}] {qid}" + (f" · {topic}" if topic else "")
+                 + (f" · кому: {q['to']}" if q.get("to") else "") + (" · блокирует" if q.get("blocking") else ""))
+        print_fn(str(q.get("question") or "").strip())
+        for letter, opt in zip(LETTERS, opts):
+            print_fn(f"  {letter}) {opt}")
+        try:
+            raw = input_fn("Ответ: ")
+        except EOFError:
+            print_fn("\nВвод закончен: остальные вопросы пропущены.")
+            break
+        value = str(raw or "").strip()
+        if not value:
+            continue
+        head = f"{qid} [{topic}]" if topic else qid
+        key = _RU_LETTERS.get(value.upper(), value.upper())
+        if len(value) == 1 and key.isdigit() and 1 <= int(key) <= len(opts):
+            key = LETTERS[int(key) - 1]
+        if len(value) == 1 and key in LETTERS[:len(opts)]:
+            lines.append(f"{head}: {key} — {opts[LETTERS.index(key)]}")
+        else:
+            lines.append(f"{head}: {' '.join(value.split())}")
+    return lines
+
+
+def write_answers_file(report_md: str | Path, lines: list[str], report: dict) -> Path:
+    path = Path(report_md).with_suffix(".answers.md")
+    doc = (report.get("document") or {})
+    head = ["# Ответы владельца", "",
+            f"> Документ: {doc.get('file') or doc.get('title') or ''}; SHA-256 {str(doc.get('sha256') or '')[:12]}…; "
+            f"прогон {(report.get('run') or {}).get('run_id') or ''}. Записано в консоли (--interactive); "
+            "файл можно поправить и передать снова: --answers этот_файл.", ""]
+    path.write_text("\n".join(head + lines) + "\n", encoding="utf-8")
+    return path
+
+
+def _interactive(a: argparse.Namespace, report: dict, written: dict) -> tuple[dict, dict] | None:
+    questions = [q for q in report.get("questions") or [] if isinstance(q, dict)]
+    if not questions:
+        print("\nВопросов нет — пересматривать нечего.")
+        return None
+    lines = ask_questions(questions)
+    if not lines:
+        print("\nОтветов нет — отчёт остаётся как есть.")
+        return None
+    path = write_answers_file(a.output, lines, report)
+    print(f"\nОтветы: {path} ({len(lines)} из {len(questions)}). Пересмотр дефектов…")
+    from . import pipeline
+    from .runs import RunDir
+    run_id = (report.get("run") or {}).get("run_id")
+    src = RunDir(Path(a.runs_dir) / str(run_id), create=False) if run_id else None
+    a.answers = str(path)
+    opts = _opts(a)
+    opts["run_id"] = None
+    if src is None or not src.stages.is_dir():
+        return pipeline.review(a.input, a.output, opts, log=_log(a.quiet))
+    return pipeline.review(a.input, a.output, opts, reuse=src, rerun=set(), log=_log(a.quiet))
 
 
 def cmd_stage(argv: list[str]) -> int:
