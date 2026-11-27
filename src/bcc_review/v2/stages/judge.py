@@ -680,6 +680,51 @@ def _pick_evidence(members: list[dict], base: dict | None) -> list[dict]:
     return [per_line[n] for n in lines]
 
 
+_LQ_RES = [re.compile(r"\bL0*(\d{1,4})\s*[:—–-]?\s*«([^«»]{8,300})»"),
+           re.compile(r"«([^«»]{8,300})»\s*\(L0*(\d{1,4})\)")]
+
+
+def _named_quotes(text: str) -> list[tuple[int, str]]:
+    out = []
+    for i, rx in enumerate(_LQ_RES):
+        for m in rx.finditer(text or ""):
+            n, q = (m.group(1), m.group(2)) if i == 0 else (m.group(2), m.group(1))
+            out.append((int(n), q.strip()))
+    return out
+
+
+def _add_named_sides(item: dict, view: dict) -> int:
+    """Судья в тексте дефекта цитирует место со строкой («L040: «…»»), а среди цитат кандидатов его нет —
+    дословная цитата, найденная в документе на этой строке, добавляется в доказательства. Только для
+    противоречий и дефектов меньше чем с двумя местами: читатель должен видеть обе стороны."""
+    lines = {ln.get("n"): ln for ln in view.get("lines") or [] if isinstance(ln.get("n"), int)}
+    have = {e["line_start"] for e in item["evidence"]}
+    if not lines or (len(have) >= 2 and item["kind"] not in CONFLICT_KINDS):
+        return 0
+    added = 0
+    for n, q in _named_quotes(item["problem"] + " " + item["scenario"]):
+        if n in have or len(item["evidence"]) >= MAX_EVIDENCE:
+            continue
+        found = _find_line(view, q, n)
+        ln = lines.get(found) if found is not None and abs(found - n) <= 1 else None
+        if ln is None:
+            continue
+        text = _s(ln.get("text"))
+        at = text.lower().replace("ё", "е").find(q.lower().replace("ё", "е"))
+        if at < 0:
+            continue
+        item["evidence"].append({"quote": text[at:at + len(q)], "line": found, "line_start": found,
+                                 "line_end": found, "page": ln.get("page"), "section": _s(ln.get("section")),
+                                 "verified": "exact"})
+        have.add(found)
+        item.setdefault("_named_ev", []).append(item["evidence"][-1])
+        added += 1
+    if added:
+        item["evidence"].sort(key=lambda e: e["line_start"])
+        item["_first_line"] = item["evidence"][0]["line_start"]
+    return added
+
+
 def _text(f: dict, base: dict | None, field: str, limit: int) -> str:
     val = _s(f.get(field))
     if not val and base is not None:
@@ -1033,6 +1078,7 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     placed: dict[str, str] = {}  # C-id → ключ дефекта или "rejected"
     run_sources = len({_source_family(_s(c.get("source"))) for c in candidates if _s(c.get("source"))})
     req_maps = _req_maps(requirements)
+    view = _view_of(ctx)
 
     # 1. дефекты судьи: только известные кандидаты, каждый не более одного раза
     drafts: list[dict] = []
@@ -1135,6 +1181,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
             "_model_sev": sev,
             "_model_blocks": blocks,
         }
+        if _add_named_sides(item, view):
+            _warn(ctx, warnings, f"судья: к {item['title'][:50]!r} добавлена цитата места, названного в тексте")
         _calibrate(item, members, ctx, warnings, run_sources, candidates, req_maps)
         findings.append(item)
 
@@ -1145,6 +1193,9 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     for f in findings:  # после слияния — доказательства и источники заново
         if len(f["_members"]) > 1:
             f["evidence"] = _pick_evidence(f["_members"], f["_members"][0]) or f["evidence"]
+            have = {e["line_start"] for e in f["evidence"]}
+            f["evidence"] += [e for e in f.get("_named_ev") or [] if e["line_start"] not in have]
+            f["evidence"].sort(key=lambda e: e["line_start"])
             f["sources"] = _sources(f["_members"])
             f["_first_line"] = f["evidence"][0]["line_start"]
     _cap_critical(findings, ctx, warnings)
@@ -1191,7 +1242,8 @@ def assemble(response: dict, candidates: list[dict], clusters: list[list[str]], 
     summary = _ru_levels(_replace_keys(_s(response.get("verdict_summary")), key_map))
     if not summary:
         summary = fallback_summary(clean)
-    code_summary = bool(summary) and bool(clean) and _code_changed_verdict(findings)
+    code_summary = bool(summary) and bool(clean) and (_code_changed_verdict(findings)
+                                                      or _text_contradicts(summary, clean))
 
     # 7. ссылки на ключи в текстах дефектов → D-xx
     for f in clean:
@@ -1238,11 +1290,11 @@ def _rejected_entry(c: dict, code: str, reason: str, line: int) -> dict:
     }
 
 
-_SIDE_RU = {"no": "нельзя", "conditional": "можно с условиями", "yes": "можно"}
+_SIDE_RU = {"no": "нельзя начинать", "conditional": "можно начинать с условиями", "yes": "можно начинать"}
 
 
 def _list_ids(fs: list[dict], n: int = 3) -> str:
-    return "; ".join(f"{f['id']} — {_lc_first(re.sub(r'[.;:\s]+$', '', f['title']))}" for f in fs[:n])
+    return ", ".join(f"{f['id']} ({_lc_first(re.sub(r'[.;:\s]+$', '', f['title']))})" for f in fs[:n])
 
 
 def verdict_text(findings: list[dict]) -> str:
@@ -1256,11 +1308,11 @@ def verdict_text(findings: list[dict]) -> str:
     head = (f"Разработку и тестирование {_SIDE_RU[dev]}" if dev == test
             else f"Разработку {_SIDE_RU[dev]}, тестирование — {_SIDE_RU[test]}")
     if crit:
-        parts = [f"{head}: критичные дефекты блокируют работу — {_list_ids(crit)}."]
+        parts = [f"{head}: работу блокируют критичные дефекты {_list_ids(crit)}."]
         if major:
-            parts.append(f"Также до приёмки нужно закрыть существенные: {_list_ids(major, 2)}.")
+            parts.append(f"До приёмки нужно закрыть и существенные {_list_ids(major, 2)}.")
     elif "conditional" in (dev, test):
-        parts = [f"{head}: критичных дефектов нет, но существенные нужно закрыть до приёмки — {_list_ids(major)}."]
+        parts = [f"{head}: критичных дефектов нет, но до приёмки нужно закрыть существенные {_list_ids(major)}."]
     elif major:
         parts = [f"{head}: критичных дефектов нет, существенных меньше трёх.",
                  f"До приёмки стоит закрыть {_list_ids(major, 2)}."]
@@ -1280,6 +1332,21 @@ def _code_changed_verdict(findings: list[dict]) -> bool:
              for f in findings]
     a, b = compute_verdict(model), compute_verdict(findings)
     return (a["development"], a["testing"]) != (b["development"], b["testing"])
+
+
+def _text_contradicts(summary: str, findings: list[dict]) -> bool:
+    """Текст обоснования говорит не то, что вердикт: «нельзя» без «нельзя» в вердикте и наоборот,
+    «с условиями» при вердикте «можно» по обеим сторонам."""
+    v = compute_verdict(findings)
+    sides = {v["development"], v["testing"]}
+    low = summary.lower()
+    says_no = bool(re.search(r"нельзя|не может начинаться|не следует начинать|блокиру", low))
+    says_cond = "услови" in low
+    if "no" in sides:
+        return not says_no
+    if sides == {"yes"}:
+        return says_no or says_cond
+    return bool(re.search(r"нельзя", low))
 
 
 def fallback_summary(findings: list[dict]) -> str:

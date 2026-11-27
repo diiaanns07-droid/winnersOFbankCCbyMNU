@@ -229,7 +229,7 @@ def test_verdict_text_rebuilt_when_code_changes_levels():
     res = judge.assemble(resp, cs, [[c["id"]] for c in cs], requirements=REQS, ctx=ctx, warnings=[])
     verdict = judge.compute_verdict(res["findings"])
     assert (verdict["development"], verdict["testing"]) == ("yes", "yes")  # critical одного ревьюера → major → minor
-    assert res["verdict_summary"].startswith("Разработку и тестирование можно")
+    assert res["verdict_summary"].startswith("Разработку и тестирование можно начинать")
     assert "нельзя" not in res["verdict_summary"] and "F0" not in res["verdict_summary"]
     assert any("обоснование вердикта собрано кодом" in w for w in ctx.warnings)
 
@@ -245,6 +245,28 @@ def test_verdict_text_wording_by_side():
     fs = [{"id": "D-01", "title": "Метод не описан.", "severity": "critical", "blocks": "testing", "priority": 1},
           {"id": "D-02", "title": "Код ответа двумя способами", "severity": "major", "blocks": "both", "priority": 2}]
     text = judge.verdict_text(fs)
-    assert text.startswith("Разработку можно, тестирование — нельзя: критичные дефекты блокируют работу — "
-                           "D-01 — метод не описан.")
+    assert text.startswith("Разработку можно начинать, тестирование — нельзя начинать: работу блокируют "
+                           "критичные дефекты D-01 (метод не описан).")
     assert "Исправить первым: D-01, D-02." in text
+
+
+def test_side_named_in_text_with_line_becomes_evidence():
+    """Кандидат процитировал одну сторону противоречия, судья в тексте назвал вторую со строкой —
+    дословная цитата этой строки добавляется в доказательства; выдуманная цитата — нет."""
+    view = {"lines": [{"n": 10, "text": RULE[1], "page": None, "section": "Правила"},
+                      {"n": 20, "text": ACCEPT[1], "page": None, "section": "Приёмка"}]}
+    cs = [cand("C-001", 20, ACCEPT[1], kind="event_conflict", criterion="set_consistent", severity="critical",
+               source="lens:qa", reqs=("R-02", "R-03")),
+          cand("C-002", 20, ACCEPT[1], kind="event_conflict", criterion="set_consistent", severity="critical",
+               source="consistency", reqs=("R-02", "R-03"))]
+    f = crit("F01", ["C-001", "C-002"], "(а) период начисления: L010 ↔ L020",
+             title="Приёмка относит платёж к другому периоду, чем правило начисления")
+    f["problem"] = ("L010: «начисление выполняется по дате зачисления платежа» против L020: «Платёж от 31-го "
+                    "числа начисляется в следующем периоде». L030: «этого текста в документе нет»")
+    ctx = Ctx(None, requirements=REQS)
+    ctx.view = view
+    res = judge.assemble(response([f]), cs, [["C-001", "C-002"]], requirements=REQS, ctx=ctx, warnings=[])
+    d = res["findings"][0]
+    assert [e["line_start"] for e in d["evidence"]] == [10, 20]
+    assert d["evidence"][0]["quote"] == "Начисление выполняется по дате зачисления платежа"  # как в документе
+    assert d["evidence"][0]["section"] == "Правила" and d["severity"] == "critical"
