@@ -153,6 +153,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--cwd", default=".")
     ap.add_argument("--title", default="BCC Review")
     ap.add_argument("--prompt", default="~/bcc-review$ ", help="как показать приглашение перед командой")
+    ap.add_argument("--first", help="ещё снимок в момент --until (до --send): путь PNG")
+    ap.add_argument("--send", help="после --until нажать клавиши (tmux send-keys), например Enter")
+    ap.add_argument("--then", default="", help="после --send ждать эту строку и снимать уже её")
+    ap.add_argument("--path", help="PATH внутри терминала (например, без claude — как у жюри)")
     argv = list(sys.argv[1:] if argv is None else argv)
     cmd = argv[argv.index("--") + 1:] if "--" in argv else []
     a = ap.parse_args(argv[:argv.index("--")] if "--" in argv else argv)
@@ -162,23 +166,41 @@ def main(argv: list[str] | None = None) -> int:
     name = f"shot{os.getpid()}"
     shown = " ".join(cmd)
     inner = f"printf '%s%s\\n' {shlex_quote(a.prompt)} {shlex_quote(shown)}; {' '.join(shlex_quote(c) for c in cmd)}; sleep 3600"
+    extra = ["-e", f"PATH={a.path}"] if a.path else []
     tmux("new-session", "-d", "-s", name, "-x", str(a.cols), "-y", str(a.rows), "-c", str(Path(a.cwd).resolve()),
-         "-e", "COLORTERM=truecolor", "-e", "LANG=C.UTF-8", "sh", "-c", inner)
-    try:
-        tmux("set-option", "-t", name, "status", "off")
+         "-e", "COLORTERM=truecolor", "-e", "LANG=C.UTF-8", *extra, "sh", "-c", inner)
+
+    def wait_for(pattern: str) -> bool:
         end = time.monotonic() + a.timeout
         while time.monotonic() < end:
-            if re.search(a.until or r"\S", tmux("capture-pane", "-p", "-t", name)):
-                break
+            if re.search(pattern or r"\S", tmux("capture-pane", "-p", "-t", name)):
+                time.sleep(a.settle)
+                return True
             time.sleep(0.3)
-        else:
-            print(f"не дождались «{a.until}» за {a.timeout} с; экран:\n" + tmux("capture-pane", "-p", "-t", name),
-                  file=sys.stderr)
+        print(f"не дождались «{pattern}» за {a.timeout} с; экран:\n" + tmux("capture-pane", "-p", "-t", name),
+              file=sys.stderr)
+        return False
+
+    try:
+        tmux("set-option", "-t", name, "status", "off")
+        if not wait_for(a.until):
             return 1
-        time.sleep(a.settle)
-        screen = tmux("capture-pane", "-p", "-e", "-t", name)
+        screens = []
+        if a.send:
+            if a.first:
+                screens.append((a.first, tmux("capture-pane", "-p", "-e", "-t", name)))
+            tmux("send-keys", "-t", name, *a.send.split())
+            if not wait_for(a.then):
+                return 1
+        screens.append((a.png, tmux("capture-pane", "-p", "-e", "-t", name)))
     finally:
         tmux("kill-session", "-t", name, check=False)
+    for png, screen in screens:
+        _render(png, screen, a)
+    return 0
+
+
+def _render(png: str, screen: str, a: argparse.Namespace) -> None:
     body = to_html(screen)
     with tempfile.TemporaryDirectory() as d:
         page = Path(d) / "term.html"
@@ -187,10 +209,9 @@ def main(argv: list[str] | None = None) -> int:
         js.write_text(NODE, encoding="utf-8")
         root = subprocess.run(["npm", "root", "-g"], capture_output=True, text=True).stdout.strip()
         env = dict(os.environ, NODE_PATH=root)
-        Path(a.png).parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run(["node", str(js), str(page), str(Path(a.png).resolve())], check=True, env=env)
-    print(f"снимок: {a.png}")
-    return 0
+        Path(png).parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["node", str(js), str(page), str(Path(png).resolve())], check=True, env=env)
+    print(f"снимок: {png}")
 
 
 def shlex_quote(s: str) -> str:
