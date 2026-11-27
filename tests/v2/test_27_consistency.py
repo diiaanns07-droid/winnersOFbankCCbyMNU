@@ -49,6 +49,12 @@ DOC = [
     "Отправитель: экран подтверждения с именем получателя, суммой и картой списания.",             # 26
     "* **У-9.** Ссылка действует 15 минут включительно.",                                          # 27
     "Экран: кнопка «Подтвердить» доступна 90 секунд после получения ответа.",                      # 28
+    "* **У-10.** При выключении настройки сохраняются и показываются при повторном включении.",    # 29
+    "2. При `enabled` = false поля `step` и `limit` не проверяются и не сохраняются; ответ содержит ранее сохранённые значения.",  # 30
+    "* **У-11.** Если сумма погашена до конца периода, проценты по покупкам не начисляются, иначе проценты начисляются.",  # 31
+    "| Сумма погашена 20-го | Закрыть период 25-го | Проценты за покупки начислены |",            # 32
+    "Приложение получает сведения и включает или выключает напоминание через дочерний документ.",  # 33
+    "Приложение → API: подключить услугу; подписание договора → выдача кредита → выпуск полиса.",  # 34
 ]
 SECTIONS = {8: "Требования к тестированию › Тестирование требований", 11: "Критерии приемки"}
 VIEW = {"lines": [{"n": i, "text": t, "page": None, "section": SECTIONS.get(i, "Требования")}
@@ -56,7 +62,8 @@ VIEW = {"lines": [{"n": i, "text": t, "page": None, "section": SECTIONS.get(i, "
 KINDS = {2: "functional", 3: "api", 4: "api", 5: "functional", 6: "data", 7: "constraint", 8: "functional",
          9: "functional", 10: "functional", 11: "acceptance", 12: "ui", 13: "functional", 14: "constraint", 15: "api",
          16: "constraint", 17: "constraint", 18: "api", 19: "api", 20: "functional", 21: "acceptance",
-         22: "functional", 23: "functional", 24: "goal", 25: "goal", 26: "ui", 27: "functional", 28: "ui"}
+         22: "functional", 23: "functional", 24: "goal", 25: "goal", 26: "ui", 27: "functional", 28: "ui",
+         29: "functional", 30: "api", 31: "functional", 32: "acceptance", 33: "integration", 34: "process"}
 REQS = [{"id": f"R-{n:02d}", "source_id": "", "kind": k, "line_start": n, "line_end": n,
          "section": SECTIONS.get(n, "Требования")} for n, k in KINDS.items()]
 
@@ -105,6 +112,9 @@ def one(p: dict) -> tuple[dict, list[dict]]:
     (pair(16, 17, kind="status_conflict", basis="same_condition"), "two_phase", "undefined"),
     # две цитаты из одной строки — не два места
     (pair(22, 22, qa="Вклад можно пополнять", qb="не более трёх раз в квартал"), "same_place", "undefined"),
+    # отрицание о другом объекте: поля запроса не сохраняются, сохранённые настройки остаются
+    (pair(29, 30, basis="same_condition", qb="При enabled = false поля step и limit не проверяются и не сохраняются"),
+     "other_object", "compatible"),
 ])
 def test_false_conflicts_of_clean_documents_are_not_critical(p, gate, verdict):
     pc, cands = one(p)
@@ -120,6 +130,7 @@ def test_false_conflicts_of_clean_documents_are_not_critical(p, gate, verdict):
     (pair(22, 23, basis="same_condition"), "event_conflict"),                                 # право с пределом
     (pair(27, 11, kind="boundary_conflict"), "boundary_conflict"),                            # «включительно»
     (pair(28, 13), "event_conflict"),                                                         # экран со своим числом
+    (pair(31, 32, qa="проценты по покупкам не начисляются"), "event_conflict"),                 # общий предмет
 ])
 def test_real_conflicts_stay_critical(p, kind):
     pc, cands = one(p)
@@ -154,10 +165,31 @@ def cand(lines: list[int], kind: str = "incomplete", severity: str = "major", qu
     (cand([24, 13], kind="contradiction"), "major"),                   # цель «в момент» против срока
     (cand([24, 13], kind="contradiction", severity="critical"), "major"),  # critical — только обещанное
     (cand([26], kind="missing_element"), "minor"),                     # «получатель» — не обещание действия
+    # обещание стоит в строке, но не в цитате (другой шаг процесса)
+    (cand([34], kind="missing_element", quotes=["подписание договора → выдача кредита → выпуск полиса"]), "minor"),
+    # второй глагол фразы — в цитате: «получает … и включает или выключает …»
+    (cand([33], kind="missing_element", severity="critical",
+          quotes=["включает или выключает напоминание через дочерний документ"]), "critical"),
 ])
 def test_model_candidates_keep_major_only_when_checked(c, severity):
     out = run(candidates=[c])
     assert [x["severity"] for x in out["candidates"]] == [severity]
+
+
+def test_glossary_other_person_and_qualified_name_are_not_major():
+    def g(*terms):
+        return {"concept": "участник", "terms": [{"term": t, "line": n} for t, n in terms],
+                "problem": "Неясно, одно ли это.", "severity": "major"}
+    doc = ["Bearer, сессия клиента — держателя карты.", "Карта принадлежит другому клиенту — 404.",
+           "Страховая компания-партнёр рассчитывает премию.", "Страховая компания не ответила — 502.",
+           "Владелец карты настраивает услугу."]
+    view = {"lines": [{"n": i, "text": t, "page": None, "section": ""} for i, t in enumerate(doc, 1)]}
+    data = {"glossary": [g(("держателя карты", 1), ("другому клиенту", 2)),
+                         g(("Страховая компания-партнёр", 3), ("Страховая компания", 4)),
+                         g(("держателя карты", 1), ("Владелец карты", 5))]}
+    out = C.postprocess(data, view, [])
+    assert [x["severity"] for x in out["glossary"]] == ["minor", "major"]  # «другой клиент» — не название
+    assert [c["severity"] for c in out["candidates"] if c["kind"] == "terminology"] == ["major", "minor"]
 
 
 def test_agent_nouns_are_not_promise_verbs():
@@ -186,10 +218,13 @@ def _repost(label: str) -> list[dict]:
     return out
 
 
-@pytest.mark.skipif(not (RUNS / "h0").exists(), reason="нет записанных ответов h0")
-def test_clean_documents_give_no_critical_and_at_most_one_major():
-    """20 чистых ТЗ (корпус, open2, №20), ответы haiku h0: было critical 8, major 58 (17 документов с major > 1)."""
-    rows = _repost("h0")
+@pytest.mark.parametrize("label", ["h0", "h2"])
+def test_clean_documents_give_no_critical_and_at_most_one_major(label):
+    """20 чистых ТЗ (корпус, open2, №20), два прогона haiku: h0 было critical 8, major 58 (17 документов с
+    major > 1); h2 (свежие ответы после правок) — проверка, что правила держатся на новых ответах."""
+    if not (RUNS / label).exists():
+        pytest.skip(f"нет записанных ответов {label}")
+    rows = _repost(label)
     assert len(rows) == 20
     for res in rows:
         sev = [c["severity"] for c in res["output"]["candidates"]]

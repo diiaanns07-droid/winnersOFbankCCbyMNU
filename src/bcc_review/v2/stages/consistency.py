@@ -557,7 +557,7 @@ _NON_NORMATIVE_SECTION = re.compile(r"тестирование\s+требова�
                                     r"согласовани|глоссари", re.I)
 
 # Причины, по которым пара не конфликт, а совместима (разные предметы, условие права, уточнение границы приёмкой).
-GATE_DROP = ("right_condition", "storage_vs_validity", "non_normative", "acceptance_duration")
+GATE_DROP = ("right_condition", "storage_vs_validity", "non_normative", "acceptance_duration", "other_object")
 GATE_RU = {
     "right_condition": "одно место задаёт условие права, другое — запрет для другого состояния",
     "storage_vs_validity": "срок хранения записи и срок действия — разные предметы",
@@ -568,6 +568,7 @@ GATE_RU = {
     "no_value": "у одной стороны нет ни значения, ни слова границы (ни кода, ни статуса)",
     "two_phase": "одна сторона — следствие ответа другой системы, а не ответ на тот же запрос",
     "same_place": "цитаты не найдены в двух разных местах документа",
+    "other_object": "отрицание в одной цитате относится к другому объекту, чем утверждение другой",
 }
 
 
@@ -579,6 +580,42 @@ _COND_CODE = re.compile(r"(?<![а-яё])(?:при|после|на)\s+(?:отве
 def _cond_codes(q: str) -> set[str]:
     """Коды ответа, которые стоят в цитате условием («при ответе 422», «если АБС вернула 500»), а не исходом."""
     return {a or b for a, b in _COND_CODE.findall(q)}
+
+
+_NEG = re.compile(r"(?<![а-яё])не\s+([а-яё]{4,})", re.I)
+
+
+def _root(w: str) -> str:
+    """Корень для сравнения форм одного глагола («сохраняются», «сохранённые», «сохранены» → «сохран»)."""
+    return w.lower().replace("ё", "е")[:6]
+
+
+def _self_qualified(qa: str, qb: str, line_a: str = "", line_b: str = "") -> bool:
+    """Одна цитата отрицает действие для своего предмета («поля … не сохраняются»), её строка сама же утверждает
+    это действие для другого («ответ содержит ранее сохранённые значения»), а другая цитата утверждает действие для
+    предмета, которого в отрицании нет («настройки сохраняются»). Общий предмет («проценты … не начисляются» ↔
+    «проценты … начислены») — настоящий конфликт."""
+    for x, y, line in ((qa, qb, line_a), (qb, qa, line_b)):
+        for m in _NEG.finditer(x):
+            root = _root(m.group(1))
+            full = line if _norm(x).rstrip(".;: ") in _norm(line) else x
+            pos_x = any(_root(w) == root for w in _WORD.findall(_NEG.sub(" ", full)))
+            neg_y = {_root(n.group(1)) for n in _NEG.finditer(y)}
+            pos_y = root not in neg_y and any(_root(w) == root for w in _WORD.findall(y))
+            if not (pos_x and pos_y):
+                continue
+            head = re.split(r"[.;:]", x[:m.start()])[-1]  # предмет отрицания — слова перед ним в той же фразе
+            subj = {_stem(w) for w in _WORD.findall(head) if len(w) >= 4 and _root(w) != root
+                    and w.lower() not in _STOP_SUBJ and not _NEG.match("не " + w)}
+            other = {_stem(w) for w in _WORD.findall(y) if len(w) >= 4}
+            if subj and not subj & other:
+                return True
+    return False
+
+
+# Служебные слова в предмете отрицания.
+_STOP_SUBJ = {"если", "когда", "после", "кроме", "также", "только", "этом", "этого", "того", "всех", "всего",
+              "проверяются", "проверяется"}
 
 
 def _req_of(ev: dict, known: dict[str, dict] | None) -> dict:
@@ -630,6 +667,11 @@ def conflict_gate(pair: dict, ev_a: dict, ev_b: dict, view: Any, known: dict[str
     # а не исход запроса; другая цитата — ответ на запрос. Это следствие ответа, а не второй исход того же входа.
     if kind == "status_conflict" and any(_CODE.search(q) and not (set(_CODE.findall(q)) - _cond_codes(q)) for q in quotes):
         return "two_phase"
+    # Отрицание о другом объекте: сторона говорит «не сохраняются» и тут же «ранее сохранённые значения» — она сама
+    # различает два объекта (поля запроса и сохранённые настройки); с другой стороной, которая утверждает то же
+    # действие («настройки сохраняются»), исходы совместимы.
+    if kind == "event_conflict" and _self_qualified(qa, qb, _line_text(view, ev_a), _line_text(view, ev_b)):
+        return "other_object"
     # Граница срока: строка приёмки с конкретным временем против «действует N минут» без «включительно».
     if kind == "boundary_conflict":
         for (ev, q, r), (_ev2, q2, _r2) in ((sides[0], sides[1]), (sides[1], sides[0])):
@@ -922,7 +964,7 @@ def normalize_glossary(g: dict, view: Any) -> dict | None:
         if not isinstance(t, dict):
             continue
         term = _s(t.get("term"))
-        if not term or _norm(term) in seen:
+        if not term or _norm(term) in seen or _OTHER_ONE.search(term):  # «другой клиент» — другое лицо, не имя
             continue
         seen.add(_norm(term))
         line = _int(t.get("line")) or 0
@@ -957,10 +999,23 @@ def normalize_glossary(g: dict, view: Any) -> dict | None:
     # («сервис настроек» / «хранилище настроек», «держатель карты» / «владелец карты»).
     if sev == "major" and not _names_share_stem([t["term"] for t in terms]):
         sev = "minor"
+    # Название с уточнением («страховая компания-партнёр» и «страховая компания») — то же лицо или компонент:
+    # major — только если остаются два русских названия, ни одно из которых не входит в другое.
+    if sev == "major" and len(_distinct_names([t["term"] for t in terms])) < 2:
+        sev = "minor"
     return {"concept": _s(g.get("concept")), "terms": terms, "problem": _s(g.get("problem")), "severity": sev}
 
 
 _CYR = re.compile(r"[а-яё]", re.I)
+# «Другой клиент», «чужая карта» — другое лицо или объект того же вида, а не второе название понятия.
+_OTHER_ONE = re.compile(r"(?<![а-яё])(?:друг(?:ой|ого|ому|им|ая|ую|ие|их)|чуж\w*|посторонн\w*)(?![а-яё])", re.I)
+
+
+def _distinct_names(terms: list[str]) -> list[set]:
+    """Основы русских названий без тех, что целиком входят в другое название (название с уточнением)."""
+    stems = [{_stem(w) for w in _WORD.findall(t) if len(w) >= 3 and _CYR.search(w)} for t in terms if _CYR.search(t)]
+    stems = [x for i, x in enumerate(stems) if x and x not in stems[:i]]
+    return [x for x in stems if not any(x < y for y in stems)]
 # Родовые слова названий компонентов и участников: общая основа «сервис» или «банк» не делает две системы одной.
 _GENERIC_ROOTS = ("серв", "систем", "модул", "компонент", "банк", "приложен", "контрол", "платформ", "интерфейс",
                   "метод")
@@ -1207,8 +1262,7 @@ def normalize_candidate(c: dict, view: Any, known: dict[str, dict], requirements
     # обещанное на месте — это не critical (модель приняла соседний процесс за обещанную операцию).
     # Если ни одна цитируемая строка не обещает действие словами (экран с элементом, перечень систем, пример ответа),
     # обещания нет, есть только догадка модели — тоже не critical.
-    promised = (_promises(" ".join(_s(e.get("quote")) for e in evidence))
-                or bool(_PROMISE_SUBJ.search(" ".join(_cited_texts(evidence, view)))))
+    promised = _promises(" ".join(_s(e.get("quote")) for e in evidence)) or _promise_in_lines(evidence, view)
     if cand["severity"] == "critical" and cand["kind"] == "missing_element" and (
             _all_named_described(evidence, view) or not promised):
         cand["severity"] = "major"
@@ -1275,6 +1329,33 @@ def _cited_texts(evidence: list[dict], view: Any) -> list[str]:
             a, b = _span(e)
             texts.extend(by_n.get(n, "") for n in range(a, b + 1))
     return texts
+
+
+def _promise_in_lines(evidence: list[dict], view: Any) -> bool:
+    """Обещание с подлежащим в строке вне цитаты («Приложение получает …», цитата — «получает …»): глагол обещания
+    должен стоять в самой цитате. Обещание в другой части той же строки («Приложение → API: подключить …» рядом
+    с цитатой о другом шаге) кандидату не принадлежит."""
+    by_n = {x.get("n"): _s(x.get("text")) for x in _lines(view)}
+    for e in evidence:
+        if not _found(e):
+            continue
+        a, b = _span(e)
+        line = " ".join(by_n.get(n, "") for n in range(a, b + 1))
+        q = _MD.sub("", _s(e.get("quote"))).lower().strip(" .;:")
+        flat = _MD.sub("", line).lower()
+        start = flat.find(q) if q else -1
+        for sm in _SUBJ_WORD.finditer(flat):
+            window = re.split(r"[.;|]", flat[sm.end():sm.end() + 81])[0]
+            for vm in _PROMISE.finditer(window):  # все глаголы фразы: «получает … и включает или выключает …»
+                if vm.start() > 80:
+                    break
+                pos = sm.end() + vm.start()
+                if start < 0 or start <= pos < start + len(q):
+                    return True
+    return False
+
+
+_SUBJ_WORD = re.compile(r"(?<![а-яё])(?:приложени|клиент|экран|интерфейс|пользовател|мобильн)\w*", re.I)
 
 
 def _all_named_described(evidence: list[dict], view: Any) -> bool:
