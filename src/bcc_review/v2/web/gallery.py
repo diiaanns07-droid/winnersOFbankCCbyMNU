@@ -320,12 +320,12 @@ _CSS = """<style>
 .g43-pv{flex:1 1 0;min-height:0;overflow:hidden;margin-bottom:6px;font-size:13px;line-height:1.35;
   color:var(--b-ink-2,#3A5068);transition:opacity var(--b-base,220ms) var(--b-ease,ease)}
 .g43-leaf>.g43-pv{flex-shrink:1}
-.g43-pv>span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.g43-pv>span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .g43-slot+.g43-slot .g43-pv,.g43-slot+.g43-slot .g43-meta{opacity:0;transition:opacity var(--b-base,220ms) var(--b-ease,ease)}
 .g43-slot+.g43-slot:hover .g43-pv,.g43-slot+.g43-slot:focus-within .g43-pv{opacity:1}
 .g43-slot+.g43-slot:hover .g43-meta,.g43-slot+.g43-slot:focus-within .g43-meta{opacity:1}
 .g43-pile.docs .g43-slot .g43-meta{opacity:1}
-.g43-meta{font:12px/1.4 var(--b-mono,ui-monospace,Consolas,monospace);color:var(--b-ink-3,#5B6F84);
+.g43-meta{font:11.5px/1.4 var(--b-mono,ui-monospace,Consolas,monospace);color:var(--b-ink-3,#5B6F84);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .g43-t{font-size:15px;line-height:1.35;font-weight:600;letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .g43-v{display:flex;flex-direction:column;align-items:flex-start;gap:1px;font-size:14px;line-height:1.4;

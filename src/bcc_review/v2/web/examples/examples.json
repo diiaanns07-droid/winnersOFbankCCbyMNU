@@ -36,7 +36,7 @@
     {
       "id": "mock",
       "title": "Демо без модели",
-      "subtitle": "официальный ТЗ",
+      "subtitle": "mock",
       "json": "src/bcc_review/v2/web/examples/mock/requirements.json",
       "html": "src/bcc_review/v2/web/examples/mock/requirements.html",
       "md": "src/bcc_review/v2/web/examples/mock/requirements.md",
