@@ -6,6 +6,7 @@
 * critical о неопределённом ключевом событии (этап операции) подаётся как `ambiguity`/`unambiguous` — основание (б)
   судьи, а не «пропуск» и не «расхождение с целью»;
 * калибровка серьёзности по шкале контракта (раздел 5): риск ИБ и эксплуатационный риск — не выше major;
+  нет схемы отката (пункт шаблона ревью) — всегда minor;
   расхождение ролей с видом `terminology` переводится в `security` (риск доступа, а не оформление);
   critical без сценария, последствий или с `blocks = none` — major;
 * страховка от «фантазий»: замечание о теме, которой документ не касается ни словом (PCI DSS, шифрование,
@@ -13,7 +14,8 @@
 * замечание, все цитаты которого — определения из раздела терминов (или первая цитата-зацепка у
   «неоднозначности/неполноты»), — не выше minor;
 * противоречие с критерием приёмки снимается: это зона тестировщика (№06), у линзы — дубль;
-* major о дублях, гонках и сбоях смежных систем — minor, если документ этих тем не касается;
+* major о дублях, гонках и сбоях смежных систем — minor, если документ этих тем не касается; отмена объекта во
+  время начатой по нему операции при разрешённой документом отмене — major (не вопрос);
   major-риск ИБ без опоры на описанный интерфейс (адрес, GET, чужой объект, владение, номер карты,
   журналы, хранение) — minor;
 * minor — только с текстовой зацепкой (откат по шаблону ревью, пояс городом), не больше двух; прочие minor —
@@ -121,8 +123,8 @@ SECURITY_MAJOR_RE = re.compile(
 
 def major_without_hook(candidate: dict, doc_text: str) -> str | None:
     """Тема эксплуатационного major, которой документ не касается (тогда это minor), или None."""
-    if candidate.get("severity") != "major":
-        return None
+    if candidate.get("severity") != "major" or _is_key_event(candidate):
+        return None  # неопределённое ключевое событие не понижается из-за попутных слов («сбой», «повтор»)
     title = str(candidate.get("title", ""))
     if candidate.get("kind") == "security" and not SECURITY_MAJOR_RE.search(title):
         return "риск ИБ без опоры на описанный интерфейс"
@@ -206,7 +208,12 @@ _ROLE_RE = re.compile(r"рол[ьие]|держател|владел|клиен�
 # в ключевом правиле. Подавать как ambiguity/unambiguous, а не как «пропуск» или «расхождение с целью».
 _KEY_EVENT_RE = re.compile(
     r"этап\w*\s+(карточн\w+\s+)?операц|как\w*\s+(именно\s+)?событи|событи\w*.{0,50}не\s+(определ|уточн)"
-    r"|не\s+(определ|уточн)\w*.{0,60}событи|авторизац\w*\s+или\s+(проведени|клиринг)", re.I)
+    r"|не\s+(определ|уточн)\w*.{0,60}событи|авторизац\w*\s+или\s+(проведени|клиринг)"
+    r"|не\s+определ\w*,?\s+(когда|в\s+какой\s+момент|каким\s+событием|какой\s+момент)"
+    r"|какой\s+момент\s+дела\w*|считается\s+(оплачен|внес[её]н|провед[её]н|выполнен|исполнен|зачислен)", re.I)
+_CANCEL_DURING_RE = re.compile(
+    r"отмен\w*.{0,80}(во\s+время|одновременн|параллельн|уже\s+начат|в\s+обработк|начат\w*\s+по|в\s+процессе)"
+    r"|(во\s+время|одновременн|в\s+процессе)\w*.{0,60}отмен", re.I)
 _ACCEPTANCE_RE = re.compile(r"критери\w*\s+приёмк|критери\w*\s+приемк", re.I)
 
 
@@ -218,8 +225,16 @@ def _is_key_event(c: dict) -> bool:
 def calibrate(candidate: dict) -> dict:
     """Приводит серьёзность к шкале контракта; возвращает копию кандидата."""
     c = dict(candidate)
-    if c.get("severity") == "critical" and _is_key_event(c) and c.get("kind") != "ambiguity":
-        c["kind"], c["criterion"] = "ambiguity", "unambiguous"
+    if _is_key_event(c):
+        if c.get("severity") == "minor":
+            # неопределённое ключевое событие — не вопрос предметной области (модель занизила уровень)
+            c["severity"] = "major"
+        if c.get("severity") == "critical" and c.get("kind") != "ambiguity":
+            c["kind"], c["criterion"] = "ambiguity", "unambiguous"
+    if c.get("severity") in ("critical", "major") and _TITLE_RES["откат и выключение функции"].search(
+            str(c.get("title", ""))):
+        # отсутствие схемы отката по пункту шаблона ревью — оформление процесса, не дефект требования
+        c["severity"] = "minor"
     if c.get("kind") == "terminology" and _ROLE_RE.search(str(c.get("title", ""))):
         # расхождение ролей — риск доступа (дополнительная карта), а не оформление терминов
         c["kind"], c["criterion"] = "security", "risk"
@@ -294,6 +309,9 @@ def postprocess(candidates: Iterable[dict], view: Any = None,
             c["severity"] = "minor"
         if doc and major_without_hook(c, doc):
             c["severity"] = "minor"
+        if c["severity"] == "minor" and doc and "отмен" in doc and _CANCEL_DURING_RE.search(str(c.get("title", ""))):
+            # документ разрешает отмену, а исход начатой по объекту операции не описан — дефект, не вопрос
+            c["severity"] = "major"
         topic = missing_hook(c, doc) if doc else None
         if topic:
             dropped.append(_drop(c, f"тема «{topic}» в документе не затрагивается"))

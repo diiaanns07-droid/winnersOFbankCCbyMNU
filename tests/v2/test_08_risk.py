@@ -230,6 +230,28 @@ def test_acceptance_conflicts_left_to_qa():
     assert all("тестировщика" in d["reject_reason"] for d in dropped)
 
 
+def test_cancel_during_operation_is_major_when_cancel_allowed():
+    t = "Отмена объекта и перевод могут выполниться одновременно: исход не определён"
+    kept, dropped = lens_risk.postprocess([_cand(t, "minor", "ops_risk", "risk")], "Получатель может отменить код.")
+    assert _sev(t, kept, dropped) == "major"
+    kept, dropped = lens_risk.postprocess([_cand(t, "minor", "ops_risk", "risk")], "Документ без этой темы.")
+    assert _sev(t, kept, dropped) == "снято"
+
+
+def test_rollback_is_always_minor():
+    c = lens_risk.calibrate(_cand("Схема отката и выключения функции перевода не описана", "major", "ops_risk", "risk"))
+    assert c["severity"] == "minor"
+
+
+def test_key_event_minor_is_not_a_question():
+    t = "Не определено, когда объект с суммой считается оплаченным и доступен ли он после отказа"
+    kept, dropped = lens_risk.postprocess([_cand(t, "minor")], "документ")
+    assert _sev(t, kept, dropped) == "major"
+    t = "Не определено, когда объект считается оплаченным и доступен ли он снова после отказа или сбоя"
+    kept, dropped = lens_risk.postprocess([_cand(t, "minor")], "документ без этой темы")
+    assert _sev(t, kept, dropped) == "major", "слово «сбоя» не понижает ключевое событие"
+
+
 def test_lens_output_limit_for_reasoning_models():
     assert lens_risk.MAX_OUTPUT_TOKENS == 32000
 
