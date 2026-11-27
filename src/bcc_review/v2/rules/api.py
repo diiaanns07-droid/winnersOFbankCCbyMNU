@@ -32,8 +32,11 @@ READ_TOKENS = {"get", "read", "list", "fetch", "find", "search", "check", "load"
 # Начало описания метода, означающее изменение состояния.
 MUTATING_DESC = re.compile(
     r"^(сохранени|изменени|удалени|создани|обновлени|замен|установк|установлени|отключени|включени|"
-    r"блокировк|разблокировк|отмен|добавлени|редактировани|запис|регистраци|подтверждени|перевод|списани)",
+    r"блокировк|разблокировк|отмен|добавлени|редактировани|запис|регистраци|подтверждени|перевод|списани|"
+    r"смен[аыуе]\b|заказ\b|подключени|оформлени|закрыти|открыти|привязк|отвязк|перевыпуск)",
     re.I)
+# заголовок блока метода с описанием: «Метод 1. Смена PIN-кода», «Метод 2: заказ выписки»
+METHOD_TITLE = re.compile(r"^(?:метод|method|операция)\s*№?\s*\d+\s*[.:)—–-]\s*(.{3,80})$", re.I)
 
 REASON_PHRASES = [
     (re.compile(r"\bno content\b", re.I), 204), (re.compile(r"\bcreated\b", re.I), 201),
@@ -167,6 +170,7 @@ INLINE_METHOD = re.compile(r"^(?P<lead>[^:|]{0,60}?(?:эндпоинт|endpoint|
 def find_methods(doc: Doc) -> list[Method]:
     L = doc.lines
     methods: list[Method] = []
+    head_desc: dict[int, tuple[str, Line]] = {}
     row_methods: list[Method] = []
     for idx, x in enumerate(L):
         if not x.text or x.is_code:
@@ -227,6 +231,10 @@ def find_methods(doc: Doc) -> list[Method]:
             if hm:
                 meth.name, meth.name_line, meth.start = hm.group(1), L[k], L[k].n
                 break
+            tm = METHOD_TITLE.match(L[k].text.strip()) if L[k].is_heading else None
+            if tm:
+                head_desc[id(meth)] = (tm.group(1).strip(), L[k])
+                break
             if L[k].text and L[k].cells is None and not L[k].is_sep and k < idx - 1 and \
                     (L[k].is_heading or len(L[k].text) < 60):
                 # другой заголовок раньше названия метода — дальше не ищем
@@ -261,6 +269,8 @@ def find_methods(doc: Doc) -> list[Method]:
                 m.desc, m.desc_line = val, y
             elif key == "curl" and m.curl_line is None:
                 m.curl_line = y
+        if not m.desc and id(m) in head_desc:  # описание из заголовка блока, если в таблице его нет
+            m.desc, m.desc_line = head_desc[id(m)]
         if not m.name and m.url:
             segs = [s for s in m.url.split("/") if s and not s.startswith("{")]
             if segs and re.match(r"^[a-z]+[A-Z]\w*$", segs[-1]):
@@ -362,7 +372,8 @@ def rule_content_type_without_body(doc: Doc, methods: list[Method], out: dict) -
         label = f" метода {m.label}" if m and m.label else ""
         out["candidates"].append(candidate(
             "api.content_type_without_body",
-            title=(f"Content-Type указан{label if '/' not in label else ''}, хотя тела запроса нет"),
+            title=(f"Заголовок Content-Type указан{(' у' + label) if label and '/' not in label else ''}, "
+                   "хотя тела запроса нет"),
             kind="api_contract", criterion="set_consistent", severity="minor", blocks="development",
             evidence=[ev(ct, ct_frag), ev(nb, nb_frag)],
             problem=(f"В описании запроса{label} одновременно указано {quoted(ct_frag)} и {quoted(nb_frag)}. "
@@ -954,8 +965,56 @@ def rule_inventory(doc: Doc, methods: list[Method], out: dict) -> None:
                                  "Описанные методы API: " + "; ".join(parts) + ".", ("architect",), "inventory"))
 
 
+# --- идемпотентный повтор: «повторный запрос с тем же requestId возвращает результат первого» ---------------
+# Справка для линз, а не дефект: повтор с тем же ключом — не новый запрос, шаги проверки логики (вернуть 410, 409,
+# 422) к нему не применяются. Без справки модели раз за разом пишут critical «повтор: результат первого или ошибка
+# шага N» — на исправленных ТЗ это ложная тревога (вопрос, где в шагах стоит проверка ключа, — minor).
+IDEM_REPLAY = re.compile(
+    r"\bповторн\w*\s+(?:запрос|вызов|обращени)\w*\s+с\s+(?:тем\s+же|таким\s+же|тем\s+же\s+самым)\s+"
+    r"(?:ключ\w*\s+(?:идемпотентност\w*|запроса)\s*)?[`\"«]?([A-Za-z][\w-]*(?:[Ii]d|ID|[Kk]ey))[`\"»]?"
+    r".{0,60}?\b(?:возвращает|возвращается|отдаёт|отдает|даёт|дает|получает)\s+(?:тот\s+же\s+(?:самый\s+)?"
+    r"(?:результат|ответ)|(?:сохранённ\w+\s+|сохраненн\w+\s+)?(?:результат|ответ)\w*\s+(?:первого|исходного|"
+    r"первоначального|предыдущего))", re.I)
+
+
+# повтор с теми же параметрами: «Повторный вызов с теми же суммой и сроком возвращает действующие условия»
+REPLAY_PARAMS = re.compile(
+    r"\bповторн\w*\s+(?:запрос|вызов|обращени)\w*\s+(?:метода\s+)?с\s+(?:теми\s+же|такими\s+же)\s+([^.;]{3,60}?)\s+"
+    r"(?:возвращает|возвращается|отдаёт|отдает)\s+([^.;]{3,80})", re.I)
+
+
+def rule_idempotent_replay(doc: Doc, out: dict) -> None:
+    for x in doc.lines:
+        if not x.text or x.is_code:
+            continue
+        m = IDEM_REPLAY.search(x.joined)
+        if not m:
+            p = REPLAY_PARAMS.search(x.joined)
+            if p and not re.match(r"\s*(?:код|ошибк|статус)|\s*[1-5]\d\d\b", p.group(2), re.I):
+                frag = x.joined[p.start():].split(".")[0].strip()
+                out["signals"].append(signal(
+                    "api.idempotent_replay", x, frag,
+                    f"Справка, не дефект: документ сам задаёт исход повторного вызова с теми же {p.group(1).strip()} — "
+                    f"{p.group(2).strip().rstrip('.')}. Шаги логики описывают первый вызов; что вернуть на повтор после "
+                    "отказа, подписания или другой смены состояния — уточнение (minor), а не противоречие «особое "
+                    "правило против шага» и не critical. Справка — только об этом повторе: остальные особые правила "
+                    "сверяй с функциональными требованиями как обычно.",
+                    ("consistency", "qa", "architect", "risk", "analyst"), "inventory"))
+                return
+            continue
+        frag = x.joined[m.start():].split(".")[0].strip()
+        out["signals"].append(signal(
+            "api.idempotent_replay", x, frag,
+            f"Справка, не дефект: повтор с тем же {m.group(1)} — идемпотентный повтор, а не новый запрос; документ "
+            "задаёт исход — результат первого запроса. Шаги проверки логики относятся к новому запросу, поэтому "
+            "«результат первого или ошибка шага» — не противоречие и не critical; уточнить можно только, где в шагах "
+            "стоит проверка ключа (minor).", ("consistency", "qa", "architect", "risk", "analyst"), "inventory"))
+        return
+
+
 def run(doc: Doc, out: dict) -> None:
     methods = find_methods(doc)
+    rule_idempotent_replay(doc, out)
     out.setdefault("_methods", methods)
     rule_get_mutation(doc, methods, out)
     rule_content_type_without_body(doc, methods, out)

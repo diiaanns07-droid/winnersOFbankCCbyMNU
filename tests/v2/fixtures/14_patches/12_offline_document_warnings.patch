@@ -1,0 +1,14 @@
+diff --git a/src/bcc_review/v2/rules/offline.py b/src/bcc_review/v2/rules/offline.py
+index 12849eec..202711e5 100644
+--- a/src/bcc_review/v2/rules/offline.py
++++ b/src/bcc_review/v2/rules/offline.py
+@@ -179,7 +179,8 @@ def build(view: dict, requirements: Any = None, *, started_at: str | None = None
+                 "warnings": list(out.get("warnings") or []) + [
+                     "Модель не вызывалась (--provider offline): отчёт — предварительная проверка правилами."]},
+         "document": {k: view.get(k) for k in ("title", "file", "format", "sha256", "pages")} | {
+-            "lines": len(view.get("lines") or [])},
++            "lines": len(view.get("lines") or [])} | (
++            {"warnings": [str(w) for w in view["warnings"] if w]} if view.get("warnings") else {}),
+         "requirements": list(reqs or []), "excluded": [], "findings": findings, "rejected": rejected,
+         "signals": out["signals"], "acceptance_checks": [], "pair_checks": [], "trace": [], "glossary": [],
+         "test_cases": [], "questions": [], "checklist": [], "verdict": verdict(findings),

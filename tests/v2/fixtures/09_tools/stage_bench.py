@@ -71,7 +71,9 @@ def run_case(name: str, path: Path, opts: dict, dest: Path) -> dict:
     except Exception as exc:  # noqa: BLE001
         out, err = {"candidates": [], "pair_checks": [], "trace": [], "glossary": []}, f"{type(exc).__name__}: {exc}"
     sec = round(time.monotonic() - t0, 1)
-    raw = rec.raw[-1] if rec.raw else {}
+    raw: dict = {}
+    for part in rec.raw:  # при делении этапа — два ответа, каждый со своими полями
+        raw.update(part or {})
     res = {"case": name, "doc": str(path.relative_to(ROOT)), "seconds": sec, "error": err, "warnings": ctx.warnings,
            "stats": dict(getattr(llm, "stats", {}) or {}), "raw": raw, "requirements": seg["requirements"], "output": out}
     dest.write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -80,7 +82,7 @@ def run_case(name: str, path: Path, opts: dict, dest: Path) -> dict:
 
 def cmd_run(a) -> int:
     opts = {**DEFAULTS, "provider": a.provider, "model": a.model, "cache": not a.no_cache, "effort": a.effort,
-            "max_calls": 4, "stage_timeout": 600.0}
+            "max_calls": 4, "stage_timeout": 600.0, consistency.SPLIT_OPTION: a.split}
     todo = cases(a.set)
     if a.cases:
         want = set(a.cases.split(","))
@@ -99,6 +101,20 @@ def cmd_run(a) -> int:
             print(f"{res['case']}: {res['seconds']} с, кандидатов {len(o['candidates'])}, пар {len(o['pair_checks'])}"
                   + (f", ОШИБКА {res['error']}" if res["error"] else ""), flush=True)
     return 0
+
+
+def cmd_repost(a) -> int:
+    """Пересчитать сохранённые ответы модели текущим кодом разбора (без вызова модели)."""
+    src, dest = OUT / a.src, OUT / a.label
+    dest.mkdir(parents=True, exist_ok=True)
+    for p in sorted(src.glob("*.json")):
+        res = json.loads(p.read_text(encoding="utf-8"))
+        if not res.get("raw"):
+            continue
+        view = load_view(ROOT / res["doc"])
+        res["output"] = consistency.postprocess(res["raw"], view, res["requirements"])
+        (dest / p.name).write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
+    return cmd_score(a)
 
 
 # ---------------------------------------------------------------- счёт
@@ -258,10 +274,14 @@ def main(argv=None) -> int:
     r.add_argument("--jobs", type=int, default=4)
     r.add_argument("--repeat", type=int, default=1)
     r.add_argument("--no-cache", action="store_true")
+    r.add_argument("--split", action="store_true", help="этап двумя параллельными вызовами")
     s = sub.add_parser("score")
     s.add_argument("--label", required=True)
+    rp = sub.add_parser("repost")
+    rp.add_argument("--from", dest="src", required=True)
+    rp.add_argument("--label", required=True)
     a = ap.parse_args(argv)
-    return cmd_run(a) if a.cmd == "run" else cmd_score(a)
+    return {"run": cmd_run, "score": cmd_score, "repost": cmd_repost}[a.cmd](a)
 
 
 if __name__ == "__main__":

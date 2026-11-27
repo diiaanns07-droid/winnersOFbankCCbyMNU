@@ -59,7 +59,7 @@ def _is_windows() -> bool:
     return os.name == "nt"
 
 
-def find_cli(env: Mapping[str, str] | None = None, which: Callable[[str], str | None] = shutil.which) -> list[str] | None:
+def find_cli(env: Mapping[str, str] | None = None, which: Callable[[str], str | None] | None = None) -> list[str] | None:
     """Команда запуска CLI списком аргументов или ``None``, если CLI не найден.
 
     На Windows предпочитаем ``claude.exe`` (нативная установка). Для ``claude.cmd`` (установка через npm)
@@ -67,6 +67,7 @@ def find_cli(env: Mapping[str, str] | None = None, which: Callable[[str], str | 
     передаются ненадёжно.
     """
     env = os.environ if env is None else env
+    which = which or shutil.which  # поиск в момент вызова: подмена shutil.which в тестах действует
     explicit = (env.get("CLAUDE_CLI_BIN") or "").strip()
     if explicit:
         return [explicit]
