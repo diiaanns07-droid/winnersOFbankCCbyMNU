@@ -75,3 +75,27 @@ class MockProvider:
 
 
 Provider = MockProvider
+
+
+class ReplayProvider(MockProvider):
+    """``--replay runs/<id>`` (№22): ответы модели — только записанные этим прогоном (``responses/<этап>.json``),
+    в порядке вызовов. Записи нет — ошибка «not_configured», а не пустой ответ: этап честно помечается
+    невыполненным, вердикт не выносится. Сети и ключа не нужно."""
+
+    name = "replay"
+
+    def __init__(self, *, fixtures_dir: str | Path | None = None, model: str | None = None, **kw: Any) -> None:
+        super().__init__(fixtures_dir=fixtures_dir, model=model or "replay", **kw)
+
+    def invoke(self, *, model: str | None, messages: Sequence[Mapping[str, Any]], schema: Mapping[str, Any],
+               timeout_s: float = 0, max_output_tokens: int | None = None, stage: str = "", **kw: Any) -> dict:
+        stage = stage or "unknown"
+        with self._lock:
+            k = self.counts.get(stage, 0) + 1
+        raw = self._lookup(stage, k)
+        if raw is None or not _valid(conform(raw, dict(schema)), schema):
+            from bcc_review.contracts import ProviderError
+            raise ProviderError("not_configured", f"в сохранённом прогоне нет ответа модели для этапа {stage} "
+                                                  f"(вызов {k}); повтор без модели невозможен")
+        return super().invoke(model=model, messages=messages, schema=schema, timeout_s=timeout_s,
+                              max_output_tokens=max_output_tokens, stage=stage, **kw)

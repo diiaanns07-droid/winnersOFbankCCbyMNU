@@ -1,6 +1,7 @@
 """Командная строка v2.
 
     python -m bcc_review ВХОД ОТЧЁТ.md [--provider P] [--model M] [--export html,jira,docx,pdf]
+    python -m bcc_review ВХОД ОТЧЁТ.md --replay runs/<id>     (отчёт из сохранённых ответов, без модели)
     python -m bcc_review stage ЭТАП --doc ВХОД --from runs/<id> [--provider P --model M] [--out ОТЧЁТ.md]
     python -m bcc_review verify ОТЧЁТ.json ВХОД
     python -m bcc_review doctor [--live] [--provider P] [--model M]
@@ -115,6 +116,7 @@ def _opts(a: argparse.Namespace) -> dict:
         "consistency": not a.no_consistency, "clarify": not a.no_clarify, "quiet": a.quiet,
         "fast_start": getattr(a, "fast_start", None),
         "answers": getattr(a, "answers", None), "revise": getattr(a, "revise", False),
+        "replay": getattr(a, "replay", None),
     }
 
 
@@ -201,6 +203,8 @@ def cmd_review(argv: list[str]) -> int:
     p.add_argument("--answers", metavar="ФАЙЛ", help="ответы на вопросы отчёта: пересмотр дефектов «до/после»")
     p.add_argument("--revise", action="store_true", help="исправленная редакция ТЗ «было → стало»")
     p.add_argument("--fail-on", choices=["blocker", "partial"], help="ненулевой код выхода при блокере/неполном прогоне")
+    p.add_argument("--replay", metavar="runs/<id>",
+                   help="собрать отчёт заново из сохранённых ответов этапов прогона: без ключа, сети и вызовов модели")
     a = p.parse_args(argv)
     if not Path(a.input).is_file():
         print(f"Файл не найден: {a.input}", file=sys.stderr)
@@ -212,6 +216,14 @@ def cmd_review(argv: list[str]) -> int:
     if unknown:
         print(f"Неизвестная линза: {', '.join(unknown)}; допустимо: {', '.join(LENSES)}", file=sys.stderr)
         return 2
+    if a.replay:
+        from .runs import RunDir
+        src = RunDir(a.replay, create=False)
+        if not src.stages.is_dir() or not any(src.stages.glob("*.json")):
+            print(f"Нет сохранённых этапов в «{a.replay}»: укажите каталог прогона runs/<id> (в нём папка stages)",
+                  file=sys.stderr)
+            return 2
+        a.replay = str(src.path)
     out = _output_path(a.input, a.output)
     if out is None:
         return 2
