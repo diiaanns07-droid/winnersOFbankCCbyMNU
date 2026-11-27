@@ -1,0 +1,22 @@
+{
+  "job": [
+    "review",
+    "base",
+    "fx",
+    "haiku"
+  ],
+  "commit": "3e7133c2b7328ecdc7cfd370e7b72b12c7f67c6e",
+  "code": 0,
+  "at": "2026-11-27T20:02:38+05:00",
+  "duration_s": 281.9,
+  "status": "complete",
+  "models": [
+    "claude-haiku-5-5"
+  ],
+  "cache": 0,
+  "critical": 0,
+  "development": "yes",
+  "testing": "yes",
+  "verify": 0,
+  "quota": false
+}

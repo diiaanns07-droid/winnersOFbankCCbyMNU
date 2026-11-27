@@ -190,5 +190,71 @@
       }
     ],
     "rejected": []
+  },
+  {
+    "kind": "review",
+    "variant": "base",
+    "case": "fx",
+    "model_requested": "haiku",
+    "commit": "3e7133c2b7328ecdc7cfd370e7b72b12c7f67c6e",
+    "status": "complete",
+    "seconds": 281.9,
+    "verify": 0,
+    "quota": false,
+    "actual": [
+      "claude-haiku-5-5"
+    ],
+    "calls": {
+      "total": 9,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "tokens": {
+      "input": 428309,
+      "output": 168494
+    },
+    "dirty": false,
+    "verdict": [
+      "yes",
+      "yes"
+    ],
+    "open": {
+      "minor": 13
+    },
+    "critical": []
+  },
+  {
+    "kind": "review",
+    "variant": "patch",
+    "case": "fx",
+    "model_requested": "haiku",
+    "commit": "9d1e157ce2715b28861acfe8533e3fa813172af3",
+    "status": "complete",
+    "seconds": 328.8,
+    "verify": 0,
+    "quota": false,
+    "actual": [
+      "claude-haiku-5-5"
+    ],
+    "calls": {
+      "total": 10,
+      "cached": 0,
+      "failed": 0,
+      "split": 0
+    },
+    "tokens": {
+      "input": 367553,
+      "output": 191949
+    },
+    "dirty": false,
+    "verdict": [
+      "yes",
+      "yes"
+    ],
+    "open": {
+      "minor": 14
+    },
+    "critical": []
   }
 ]
