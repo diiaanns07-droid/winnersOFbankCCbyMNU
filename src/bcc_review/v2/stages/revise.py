@@ -679,7 +679,10 @@ def run(ctx: Any, findings: list[dict], answers: Any = None) -> dict:
             "stats": {**applied["stats"], "findings": n_findings, "decisions": len(owner),
                       "with_rewrite": len(rewrites),
                       "without_rewrite": missing, "check_fixes": len(check.get("fixes", [])),
-                      "check_edits": check.get("stats", {}).get("replaced", 0) + check.get("stats", {}).get("inserted", 0)}}
+                      "check_edits": check.get("stats", {}).get("replaced", 0) + check.get("stats", {}).get("inserted", 0),
+                      # что код не внёс или пометил (отвергнутое значение, выбор стороны спора, выдуманное число):
+                      # предупреждения этапа идут после сборки run.warnings — без этого поля их нет в отчёте
+                      "warnings": list(dict.fromkeys(warnings))}}
 
 
 def _changed_lines(md_lines: list[str]) -> list[str]:

@@ -123,3 +123,16 @@ def test_bound_reply_conflict_values_also_guarded():
     rw = [{"finding_id": "D-01", "answer_ids": [], "edits": [
         {"action": "insert_after", "line": 2, "old": "", "new": "При блокировке возвращается 409."}]}]
     assert revise.check_values(rw, clar, ["а", "б"], {}, []) == []
+
+
+def test_revise_warnings_reach_stats():
+    # предупреждения этапа идут после сборки run.warnings — в отчёт они попадают через revise_stats.warnings
+    from test_11_clarify import DOC
+    clar = recheck.apply_answers(FakeCtx(FakeLLM(_resp([]))), _report(), CLASH)["clarification"]
+    resp = {"rewrites": [{"finding_id": "D-01", "summary": "код блокировки", "edits": [
+        {"action": "insert_after", "line": 40, "old": "", "new": "* При блокировке счёта возвращается 423."}]}]}
+    ctx = FakeCtx(FakeLLM(resp))
+    ctx.options = {"input": str(DOC), "revise_check": False}
+    res = revise.run(ctx, FINDINGS, clar)
+    assert "возвращается 423" not in res["revised_markdown"]
+    assert any("ответы адресатов расходятся" in w for w in res["stats"]["warnings"])
